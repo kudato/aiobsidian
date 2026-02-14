@@ -1,3 +1,6 @@
+import pytest
+
+from aiobsidian._exceptions import NotFoundError
 from aiobsidian.models.commands import Command
 
 
@@ -25,3 +28,14 @@ async def test_execute_command(mock_api, client):
     await client.commands.execute("graph:open")
 
     assert route.called
+
+
+async def test_execute_not_found(mock_api, client):
+    mock_api.post("/commands/nonexistent/").respond(
+        404, json={"message": "Command not found"}
+    )
+
+    with pytest.raises(NotFoundError) as exc_info:
+        await client.commands.execute("nonexistent")
+
+    assert exc_info.value.status_code == 404

@@ -1,5 +1,7 @@
 import httpx
+import pytest
 
+from aiobsidian._exceptions import AuthenticationError, NotFoundError
 from aiobsidian._types import ContentType, PatchOperation, TargetType
 from aiobsidian.models.vault import DocumentMap, NoteJson, VaultDirectory
 
@@ -122,3 +124,38 @@ async def test_get_document_map_convenience(mock_api, client):
 
     assert isinstance(result, DocumentMap)
     assert result.headings == ["# Hello"]
+
+
+async def test_get_not_found(mock_api, client):
+    mock_api.get("/vault/missing.md").respond(404, json={"message": "File not found"})
+
+    with pytest.raises(NotFoundError) as exc_info:
+        await client.vault.get("missing.md")
+
+    assert exc_info.value.status_code == 404
+
+
+async def test_create_unauthorized(mock_api, client):
+    mock_api.put("/vault/secret.md").respond(401, json={"message": "Unauthorized"})
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        await client.vault.create("secret.md", "content")
+
+    assert exc_info.value.status_code == 401
+
+
+async def test_patch_prepend_to_block(mock_api, client):
+    route = mock_api.patch("/vault/note.md").respond(200)
+
+    await client.vault.patch(
+        "note.md",
+        "prepended text",
+        operation=PatchOperation.PREPEND,
+        target_type=TargetType.BLOCK,
+        target="^abc123",
+    )
+
+    request: httpx.Request = route.calls[0].request
+    assert request.headers["operation"] == "prepend"
+    assert request.headers["target-type"] == "block"
+    assert request.headers["target"] == "^abc123"

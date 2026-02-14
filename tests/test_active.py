@@ -1,5 +1,7 @@
 import httpx
+import pytest
 
+from aiobsidian._exceptions import NotFoundError
 from aiobsidian._types import ContentType, PatchOperation, TargetType
 from aiobsidian.models.vault import DocumentMap, NoteJson
 
@@ -100,3 +102,12 @@ async def test_get_document_map_convenience(mock_api, client):
 
     assert isinstance(result, DocumentMap)
     assert result.headings == ["# Active"]
+
+
+async def test_get_not_found(mock_api, client):
+    mock_api.get("/active/").respond(404, json={"message": "No active file"})
+
+    with pytest.raises(NotFoundError) as exc_info:
+        await client.active.get()
+
+    assert exc_info.value.status_code == 404

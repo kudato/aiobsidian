@@ -1,5 +1,7 @@
 import httpx
+import pytest
 
+from aiobsidian._exceptions import NotFoundError
 from aiobsidian._types import ContentType, PatchOperation, Period, TargetType
 from aiobsidian.models.vault import NoteJson
 
@@ -67,3 +69,22 @@ async def test_delete(mock_api, client):
     await client.periodic.delete(Period.YEARLY)
 
     assert route.called
+
+
+async def test_get_not_found(mock_api, client):
+    mock_api.get("/periodic/daily/").respond(
+        404, json={"message": "No daily note found"}
+    )
+
+    with pytest.raises(NotFoundError) as exc_info:
+        await client.periodic.get(Period.DAILY)
+
+    assert exc_info.value.status_code == 404
+
+
+async def test_get_quarterly(mock_api, client):
+    mock_api.get("/periodic/quarterly/").respond(200, text="# Q1 2026")
+
+    result = await client.periodic.get(Period.QUARTERLY)
+
+    assert result == "# Q1 2026"

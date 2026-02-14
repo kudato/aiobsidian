@@ -1,5 +1,7 @@
 import httpx
+import pytest
 
+from aiobsidian._exceptions import APIError
 from aiobsidian.models.search import SearchResult
 
 SIMPLE_RESULTS = [
@@ -55,3 +57,14 @@ async def test_jsonlogic_search(mock_api, client):
     assert len(results) == 1
     request: httpx.Request = route.calls[0].request
     assert request.headers["content-type"] == "application/vnd.olrapi.jsonlogic+json"
+
+
+async def test_simple_search_server_error(mock_api, client):
+    mock_api.post("/search/simple/").respond(
+        500, json={"message": "Internal server error"}
+    )
+
+    with pytest.raises(APIError) as exc_info:
+        await client.search.simple("query")
+
+    assert exc_info.value.status_code == 500
