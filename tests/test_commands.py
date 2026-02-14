@@ -1,0 +1,27 @@
+from aiobsidian.models.commands import Command
+
+
+async def test_list_commands(mock_api, client):
+    mock_api.get("/commands/").respond(
+        200,
+        json={
+            "commands": [
+                {"id": "global-search:open", "name": "Search: Search in all files"},
+                {"id": "graph:open", "name": "Graph view: Open graph view"},
+            ]
+        },
+    )
+
+    result = await client.commands.list()
+
+    assert len(result) == 2
+    assert isinstance(result[0], Command)
+    assert result[0].id == "global-search:open"
+
+
+async def test_execute_command(mock_api, client):
+    route = mock_api.post("/commands/graph:open/").respond(204)
+
+    await client.commands.execute("graph:open")
+
+    assert route.called
