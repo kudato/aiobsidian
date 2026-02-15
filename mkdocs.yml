@@ -1,0 +1,80 @@
+site_name: aiobsidian
+site_url: https://kudato.github.io/aiobsidian
+site_description: Async Python client for Obsidian Local REST API
+repo_url: https://github.com/kudato/aiobsidian
+repo_name: kudato/aiobsidian
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep purple
+      accent: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - content.code.copy
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - toc.follow
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+            merge_init_into_class: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+      - Configuration: getting-started/configuration.md
+  - User Guide:
+      - Vault Operations: guide/vault.md
+      - Active File: guide/active-file.md
+      - Periodic Notes: guide/periodic-notes.md
+      - Commands: guide/commands.md
+      - Search: guide/search.md
+      - Open Files: guide/open.md
+      - Error Handling: guide/error-handling.md
+  - API Reference:
+      - Client: reference/client.md
+      - Resources:
+          - Vault: reference/resources/vault.md
+          - Active File: reference/resources/active.md
+          - Periodic Notes: reference/resources/periodic.md
+          - Commands: reference/resources/commands.md
+          - Search: reference/resources/search.md
+          - Open: reference/resources/open.md
+          - System: reference/resources/system.md
+      - Models: reference/models.md
+      - Enums: reference/enums.md
+      - Exceptions: reference/exceptions.md
