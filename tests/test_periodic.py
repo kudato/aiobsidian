@@ -3,7 +3,7 @@ import pytest
 
 from aiobsidian._exceptions import NotFoundError
 from aiobsidian._types import ContentType, PatchOperation, Period, TargetType
-from aiobsidian.models.vault import NoteJson
+from aiobsidian.models.vault import DocumentMap, NoteJson
 
 NOTE_JSON = {
     "content": "# Daily",
@@ -88,3 +88,37 @@ async def test_get_quarterly(mock_api, client):
     result = await client.periodic.get(Period.QUARTERLY)
 
     assert result == "# Q1 2026"
+
+
+async def test_get_document_map(mock_api, client):
+    doc_map = {
+        "headings": ["# Tasks"],
+        "blocks": ["^id1"],
+        "frontmatterFields": ["date"],
+    }
+    mock_api.get("/periodic/daily/").respond(200, json=doc_map)
+    result = await client.periodic.get(
+        Period.DAILY, content_type=ContentType.DOCUMENT_MAP
+    )
+    assert isinstance(result, DocumentMap)
+    assert result.frontmatter_fields == ["date"]
+
+
+async def test_patch_frontmatter(mock_api, client):
+    route = mock_api.patch("/periodic/daily/").respond(200)
+    await client.periodic.patch(
+        Period.DAILY,
+        '"good"',
+        operation=PatchOperation.REPLACE,
+        target_type=TargetType.FRONTMATTER,
+        target="mood",
+    )
+    assert route.calls[0].request.headers["content-type"] == "application/json"
+
+
+async def test_append_sends_content_and_header(mock_api, client):
+    route = mock_api.post("/periodic/daily/").respond(204)
+    await client.periodic.append(Period.DAILY, "new entry")
+    request = route.calls[0].request
+    assert request.content == b"new entry"
+    assert request.headers["content-type"] == "text/markdown"

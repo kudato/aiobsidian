@@ -68,3 +68,34 @@ async def test_client_raises_api_error_non_json_response(mock_api, client):
         await client.request("GET", "/bad")
     assert exc_info.value.status_code == 500
     assert exc_info.value.message == "Internal Server Error"
+
+
+async def test_aclose_closes_internal_client():
+    client = ObsidianClient("key")
+    await client.aclose()
+    assert client._http.is_closed is True
+
+
+async def test_build_http_client_timeout():
+    client = ObsidianClient("key", timeout=60.0)
+    assert client._http.timeout == httpx.Timeout(60.0)
+    await client.aclose()
+
+
+async def test_raise_for_status_json_without_message_key(mock_api, client):
+    mock_api.get("/x").respond(400, json={"detail": "something"})
+    with pytest.raises(APIError) as exc_info:
+        await client.request("GET", "/x")
+    assert "detail" in exc_info.value.message
+
+
+async def test_api_error_str_with_error_code():
+    err = APIError(404, "Not found", 40401)
+    assert str(err) == "[404] Not found (error_code=40401)"
+    assert err.error_code == 40401
+
+
+async def test_api_error_str_without_error_code():
+    err = APIError(500, "Internal error")
+    assert str(err) == "[500] Internal error"
+    assert err.error_code is None

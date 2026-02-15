@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import pytest
 
@@ -68,3 +70,16 @@ async def test_simple_search_server_error(mock_api, client):
         await client.search.simple("query")
 
     assert exc_info.value.status_code == 500
+
+
+async def test_dataview_sends_dql_body(mock_api, client):
+    route = mock_api.post("/search/").respond(200, json=[])
+    await client.search.dataview("TABLE file.name FROM #tag")
+    assert route.calls[0].request.content == b"TABLE file.name FROM #tag"
+
+
+async def test_jsonlogic_sends_json_body(mock_api, client):
+    route = mock_api.post("/search/").respond(200, json=[])
+    query = {"glob": ["*.md"]}
+    await client.search.jsonlogic(query)
+    assert json.loads(route.calls[0].request.content) == {"glob": ["*.md"]}

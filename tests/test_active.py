@@ -86,24 +86,6 @@ async def test_get_document_map(mock_api, client):
     assert result.headings == ["# Active"]
 
 
-async def test_get_json_convenience(mock_api, client):
-    mock_api.get("/active/").respond(200, json=NOTE_JSON)
-
-    result = await client.active.get_json()
-
-    assert isinstance(result, NoteJson)
-    assert result.path == "active.md"
-
-
-async def test_get_document_map_convenience(mock_api, client):
-    mock_api.get("/active/").respond(200, json=DOC_MAP_JSON)
-
-    result = await client.active.get_document_map()
-
-    assert isinstance(result, DocumentMap)
-    assert result.headings == ["# Active"]
-
-
 async def test_get_not_found(mock_api, client):
     mock_api.get("/active/").respond(404, json={"message": "No active file"})
 
@@ -111,3 +93,23 @@ async def test_get_not_found(mock_api, client):
         await client.active.get()
 
     assert exc_info.value.status_code == 404
+
+
+async def test_append_sends_content_and_header(mock_api, client):
+    route = mock_api.post("/active/").respond(204)
+    await client.active.append("extra text")
+    request: httpx.Request = route.calls[0].request
+    assert request.content == b"extra text"
+    assert request.headers["content-type"] == "text/markdown"
+
+
+async def test_patch_custom_delimiter(mock_api, client):
+    route = mock_api.patch("/active/").respond(200)
+    await client.active.patch(
+        "content",
+        operation=PatchOperation.APPEND,
+        target_type=TargetType.HEADING,
+        target="A > B",
+        target_delimiter=">",
+    )
+    assert route.calls[0].request.headers["target-delimiter"] == ">"
