@@ -13,3 +13,5 @@ build/
 .pytest_cache/
 .mypy_cache/
 *.lock
+.coverage
+coverage.xml

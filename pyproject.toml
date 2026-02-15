@@ -26,13 +26,21 @@ dependencies = [
 
 [project.urls]
 Repository = "https://github.com/kudato/aiobsidian"
+Documentation = "https://kudato.github.io/aiobsidian"
 
 [dependency-groups]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.25",
+    "pytest-cov>=6.0",
     "respx>=0.22",
     "ruff>=0.9",
+    "mypy>=1.14",
+]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.27",
 ]
 
 [tool.pytest.ini_options]
@@ -44,3 +52,12 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["respx", "respx.*"]
+ignore_missing_imports = true
