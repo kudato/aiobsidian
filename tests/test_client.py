@@ -99,3 +99,13 @@ async def test_api_error_str_without_error_code():
     err = APIError(500, "Internal error")
     assert str(err) == "[500] Internal error"
     assert err.error_code is None
+
+
+async def test_repr_does_not_contain_api_key():
+    client = ObsidianClient("super-secret-key", host="myhost", port=9999, scheme="http")
+    r = repr(client)
+    assert "super-secret-key" not in r
+    assert "myhost" in r
+    assert "9999" in r
+    assert "http" in r
+    await client.aclose()

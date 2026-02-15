@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Literal, overload
 
 from .._base_resource import ContentResource
