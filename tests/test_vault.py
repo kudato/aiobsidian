@@ -192,3 +192,34 @@ async def test_list_strips_trailing_slashes(mock_api, client):
     mock_api.get("/vault/folder/").respond(200, json={"files": ["a.md"]})
     result = await client.vault.list("/folder/")
     assert result.files == ["a.md"]
+
+
+async def test_get_path_with_spaces(mock_api, client):
+    route = mock_api.get("/vault/notes/my%20note.md").respond(200, text="# Spaced")
+
+    result = await client.vault.get("notes/my note.md")
+
+    assert result == "# Spaced"
+    assert route.called
+
+
+async def test_get_path_with_unicode(mock_api, client):
+    encoded = (
+        "/vault/%D0%B7%D0%B0%D0%BC%D0%B5%D1%82%D0%BA%D0%B8"
+        "/%D0%B7%D0%B0%D0%BC%D0%B5%D1%82%D0%BA%D0%B0.md"
+    )
+    route = mock_api.get(encoded).respond(200, text="# Кириллица")
+
+    result = await client.vault.get("заметки/заметка.md")
+
+    assert result == "# Кириллица"
+    assert route.called
+
+
+async def test_get_deep_nested_path(mock_api, client):
+    route = mock_api.get("/vault/a/b/c/d/file.md").respond(200, text="# Deep")
+
+    result = await client.vault.get("a/b/c/d/file.md")
+
+    assert result == "# Deep"
+    assert route.called
