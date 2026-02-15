@@ -54,12 +54,21 @@ class ObsidianClient:
         verify_ssl: bool = False,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
+        self._host = host
+        self._port = port
+        self._scheme = scheme
         self._base_url = f"{scheme}://{host}:{port}"
         self._api_key = api_key
         self._timeout = timeout
         self._verify_ssl = verify_ssl
         self._external_client = http_client is not None
         self._http = http_client or self._build_http_client()
+
+    def __repr__(self) -> str:
+        return (
+            f"ObsidianClient(host={self._host!r}, port={self._port!r}, "
+            f"scheme={self._scheme!r})"
+        )
 
     def _build_http_client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(
