@@ -1,12 +1,30 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Versions(BaseModel):
+    """Version information for Obsidian and the REST API plugin.
+
+    Attributes:
+        obsidian: Obsidian application version string.
+        self_: REST API plugin version string (aliased from `"self"`).
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
     obsidian: str
     self_: str = Field(alias="self")
 
 
 class ServerStatus(BaseModel):
+    """Status response from the Obsidian REST API root endpoint.
+
+    Attributes:
+        ok: Status message (typically `"OK"`).
+        service: Service identifier string.
+        authenticated: Whether the request was authenticated.
+        versions: Version information for Obsidian and the plugin.
+    """
+
     ok: str
     service: str
     authenticated: bool

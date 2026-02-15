@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, overload
 
 from ._types import ContentType, PatchOperation, TargetType
 from .models.vault import DocumentMap, NoteJson
@@ -10,10 +10,41 @@ if TYPE_CHECKING:
 
 
 class BaseResource:
+    """Base class for all API resource classes."""
+
     __slots__ = ("_client",)
 
     def __init__(self, client: ObsidianClient) -> None:
         self._client = client
+
+
+class ContentResource(BaseResource):
+    """Base class for resources that operate on file content.
+
+    Provides shared helpers for content retrieval, appending,
+    and patching that are used by vault, active file, and
+    periodic notes resources.
+    """
+
+    @overload
+    async def _get_content(
+        self, url: str, content_type: Literal[ContentType.MARKDOWN]
+    ) -> str: ...
+
+    @overload
+    async def _get_content(
+        self, url: str, content_type: Literal[ContentType.NOTE_JSON]
+    ) -> NoteJson: ...
+
+    @overload
+    async def _get_content(
+        self, url: str, content_type: Literal[ContentType.DOCUMENT_MAP]
+    ) -> DocumentMap: ...
+
+    @overload
+    async def _get_content(
+        self, url: str, content_type: ContentType
+    ) -> str | NoteJson | DocumentMap: ...
 
     async def _get_content(
         self,

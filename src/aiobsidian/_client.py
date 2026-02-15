@@ -19,7 +19,29 @@ if TYPE_CHECKING:
 
 
 class ObsidianClient:
-    """Async client for Obsidian Local REST API."""
+    """Async client for the Obsidian Local REST API.
+
+    Provides access to vault files, the active file, periodic notes,
+    commands, search, and system information through resource properties.
+
+    Can be used as an async context manager:
+
+    ```python
+    async with ObsidianClient(api_key="your-key") as client:
+        status = await client.system.status()
+    ```
+
+    Args:
+        api_key: API key from the Local REST API plugin settings.
+        host: Hostname of the Obsidian REST API server.
+        port: Port number of the Obsidian REST API server.
+        scheme: URL scheme (`"https"` or `"http"`).
+        timeout: Request timeout in seconds.
+        verify_ssl: Whether to verify SSL certificates. Defaults to
+            `False` because the plugin uses self-signed certificates.
+        http_client: Optional pre-configured `httpx.AsyncClient`. When
+            provided, the client will **not** be closed on `aclose()`.
+    """
 
     def __init__(
         self,
@@ -57,6 +79,28 @@ class ObsidianClient:
         headers: dict[str, str] | None = None,
         params: dict[str, Any] | None = None,
     ) -> httpx.Response:
+        """Send an HTTP request to the Obsidian REST API.
+
+        This is a low-level method used internally by resource classes.
+        Prefer using the resource methods (e.g. `client.vault.get()`)
+        for typical operations.
+
+        Args:
+            method: HTTP method (GET, POST, PUT, PATCH, DELETE).
+            path: API endpoint path (e.g. `"/vault/note.md"`).
+            content: Raw request body.
+            json: JSON-serializable request body.
+            headers: Additional HTTP headers.
+            params: URL query parameters.
+
+        Returns:
+            The `httpx.Response` object.
+
+        Raises:
+            AuthenticationError: If the API key is invalid (HTTP 401).
+            NotFoundError: If the resource is not found (HTTP 404).
+            APIError: For any other HTTP error (status >= 400).
+        """
         response = await self._http.request(
             method,
             path,
@@ -91,42 +135,49 @@ class ObsidianClient:
 
     @cached_property
     def vault(self) -> VaultResource:
+        """Access vault file operations (read, create, append, patch, delete, list)."""
         from .resources.vault import VaultResource
 
         return VaultResource(self)
 
     @cached_property
     def active(self) -> ActiveFileResource:
+        """Access the currently active file in Obsidian."""
         from .resources.active import ActiveFileResource
 
         return ActiveFileResource(self)
 
     @cached_property
     def periodic(self) -> PeriodicNotesResource:
+        """Access periodic notes (daily, weekly, monthly, quarterly, yearly)."""
         from .resources.periodic import PeriodicNotesResource
 
         return PeriodicNotesResource(self)
 
     @cached_property
     def commands(self) -> CommandsResource:
+        """List and execute Obsidian commands."""
         from .resources.commands import CommandsResource
 
         return CommandsResource(self)
 
     @cached_property
     def search(self) -> SearchResource:
+        """Search vault content (simple text, Dataview DQL, JsonLogic)."""
         from .resources.search import SearchResource
 
         return SearchResource(self)
 
     @cached_property
     def open(self) -> OpenResource:
+        """Open files in the Obsidian UI."""
         from .resources.open import OpenResource
 
         return OpenResource(self)
 
     @cached_property
     def system(self) -> SystemResource:
+        """Access server status and OpenAPI specification."""
         from .resources.system import SystemResource
 
         return SystemResource(self)
@@ -140,5 +191,11 @@ class ObsidianClient:
         await self.aclose()
 
     async def aclose(self) -> None:
+        """Close the underlying HTTP client.
+
+        If an external `httpx.AsyncClient` was provided to the
+        constructor, this method is a no-op — the caller is
+        responsible for closing it.
+        """
         if not self._external_client:
             await self._http.aclose()

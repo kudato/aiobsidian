@@ -4,7 +4,7 @@ from ._client import ObsidianClient
 from ._exceptions import APIError, AuthenticationError, NotFoundError, ObsidianError
 from ._types import ContentType, PatchOperation, Period, TargetType
 from .models.commands import Command
-from .models.search import SearchMatch, SearchResult
+from .models.search import MatchSpan, SearchMatch, SearchResult
 from .models.system import ServerStatus, Versions
 from .models.vault import DocumentMap, FileStat, NoteJson, VaultDirectory
 
@@ -15,6 +15,7 @@ __all__ = [
     "ContentType",
     "DocumentMap",
     "FileStat",
+    "MatchSpan",
     "NotFoundError",
     "NoteJson",
     "ObsidianClient",
