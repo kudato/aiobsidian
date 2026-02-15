@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Obsidian Local REST API
+    url: https://github.com/coddingtonbear/obsidian-local-rest-api
+    about: Issues related to the Obsidian plugin itself should be reported there.

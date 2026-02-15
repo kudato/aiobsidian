@@ -1,11 +1,25 @@
 # aiobsidian
 
-Async Python client for [Obsidian Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin.
+[![CI](https://github.com/kudato/aiobsidian/actions/workflows/ci.yml/badge.svg)](https://github.com/kudato/aiobsidian/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/aiobsidian)](https://pypi.org/project/aiobsidian/)
+[![Python](https://img.shields.io/pypi/pyversions/aiobsidian)](https://pypi.org/project/aiobsidian/)
+[![License](https://img.shields.io/github/license/kudato/aiobsidian)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-mkdocs-blue)](https://kudato.github.io/aiobsidian)
+
+Async Python client for the [Obsidian Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin.
+
+---
 
 ## Installation
 
 ```bash
 pip install aiobsidian
+```
+
+Or with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv add aiobsidian
 ```
 
 ## Quick start
@@ -16,7 +30,7 @@ from aiobsidian import ObsidianClient
 
 async def main():
     async with ObsidianClient("your-api-key") as client:
-        # Get server status
+        # Server status
         status = await client.system.status()
         print(status.versions.obsidian)
 
@@ -33,7 +47,6 @@ async def main():
             print(r.filename, r.score)
 
         # Execute a command
-        commands = await client.commands.list()
         await client.commands.execute("daily-notes")
 
 asyncio.run(main())
@@ -41,19 +54,23 @@ asyncio.run(main())
 
 ## Features
 
-- Full async/await support via `httpx`
-- All Obsidian Local REST API endpoints covered:
-  - **Vault** — CRUD operations on any file
-  - **Active** — operations on the currently open file
-  - **Periodic** — daily, weekly, monthly, quarterly, yearly notes
-  - **Commands** — list and execute Obsidian commands
-  - **Search** — simple text search, Dataview DQL, JsonLogic
-  - **Open** — open files in Obsidian UI
-  - **System** — server status, OpenAPI spec
-- Pydantic v2 models for all responses
-- Custom exception hierarchy with error codes
-- Context manager lifecycle management
-- Bring-your-own `httpx.AsyncClient` support
+- **Full async/await** support via [httpx](https://www.python-httpx.org/)
+- **Complete API coverage** — all Obsidian Local REST API endpoints:
+
+  | Resource | Description |
+  |----------|-------------|
+  | **Vault** | CRUD operations on any file |
+  | **Active** | Operations on the currently open file |
+  | **Periodic** | Daily, weekly, monthly, quarterly, yearly notes |
+  | **Commands** | List and execute Obsidian commands |
+  | **Search** | Simple text search, Dataview DQL, JsonLogic |
+  | **Open** | Open files in Obsidian UI |
+  | **System** | Server status, OpenAPI spec |
+
+- **Pydantic v2** models for type-safe responses
+- **Custom exception hierarchy** with error codes
+- **Bring-your-own `httpx.AsyncClient`** support
+- **Context manager** lifecycle management
 
 ## Configuration
 
@@ -68,50 +85,29 @@ client = ObsidianClient(
 )
 ```
 
-## Contributing
+### External HTTP client
 
-### For contributors
+You can provide your own `httpx.AsyncClient` for full control over transport settings:
 
-1. [Fork](https://github.com/kudato/aiobsidian/fork) this repository
-2. Clone your fork and create a branch:
+```python
+import httpx
+from aiobsidian import ObsidianClient
 
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/aiobsidian.git
-   cd aiobsidian
-   git checkout -b feature/your-feature
-   ```
-
-3. Make changes and commit using [Conventional Commits](https://www.conventionalcommits.org/):
-
-   ```
-   feat: add new feature
-   fix: fix bug in vault resource
-   docs: update README
-   refactor: extract helper method
-   test: add search tests
-   chore: update dependencies
-   ```
-
-4. Push to your fork and open a Pull Request:
-
-   ```bash
-   git push origin feature/your-feature
-   gh pr create  # or use GitHub UI
-   ```
-
-### For maintainers
-
-```bash
-# Update version in pyproject.toml
-sed -i '' 's/version = ".*/version = "X.Y.Z"/' pyproject.toml
-git add pyproject.toml
-git commit -m "chore: release vX.Y.Z"
-git tag vX.Y.Z
-git push origin main --tags
+async with httpx.AsyncClient(timeout=60.0, verify=False) as http:
+    async with ObsidianClient("your-api-key", http_client=http) as client:
+        status = await client.system.status()
 ```
 
-CI will automatically create a GitHub Release and publish to PyPI.
+When an external client is provided, `aiobsidian` will not close it — you manage its lifecycle.
+
+## Documentation
+
+Full documentation is available at [kudato.github.io/aiobsidian](https://kudato.github.io/aiobsidian).
+
+## Contributing
+
+Contributions are welcome! Please see the [Contributing Guide](CONTRIBUTING.md) for details.
 
 ## License
 
-MIT
+[MIT](LICENSE)
