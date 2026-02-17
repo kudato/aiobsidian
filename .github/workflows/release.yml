@@ -33,7 +33,7 @@ jobs:
           fi
           echo "VERSION=$TAG_VERSION" >> "$GITHUB_ENV"
 
-      - uses: astral-sh/setup-uv@v4
+      - uses: astral-sh/setup-uv@v7
 
       - name: Build
         run: uv build
