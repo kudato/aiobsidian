@@ -113,3 +113,18 @@ async def test_patch_custom_delimiter(mock_api, client):
         target_delimiter=">",
     )
     assert route.calls[0].request.headers["target-delimiter"] == ">"
+
+
+async def test_patch_non_ascii_target(mock_api, client):
+    route = mock_api.patch("/active/").respond(200)
+
+    await client.active.patch(
+        "content",
+        operation=PatchOperation.REPLACE,
+        target_type=TargetType.HEADING,
+        target="Заголовок",
+    )
+
+    request: httpx.Request = route.calls[0].request
+    raw_headers = {k.lower(): v for k, v in request.headers.raw}
+    assert raw_headers[b"target"] == "Заголовок".encode()

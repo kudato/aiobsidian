@@ -85,7 +85,7 @@ class ObsidianClient:
         *,
         content: str | bytes | None = None,
         json: Any = None,
-        headers: dict[str, str] | None = None,
+        headers: dict[str, str | bytes] | None = None,
         params: dict[str, Any] | None = None,
     ) -> httpx.Response:
         """Send an HTTP request to the Obsidian REST API.

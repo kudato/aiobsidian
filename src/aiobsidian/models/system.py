@@ -21,13 +21,15 @@ class ServerStatus(BaseModel):
     """Status response from the Obsidian REST API root endpoint.
 
     Attributes:
-        ok: Status message (typically `"OK"`).
+        status: Status message (typically `"OK"`).
         service: Service identifier string.
         authenticated: Whether the request was authenticated.
         versions: Version information for Obsidian and the plugin.
     """
 
-    ok: str
+    model_config = ConfigDict(extra="ignore")
+
+    status: str
     service: str
     authenticated: bool
     versions: Versions

@@ -4,10 +4,13 @@ from aiobsidian._exceptions import APIError, AuthenticationError
 from aiobsidian.models.system import ServerStatus
 
 STATUS_JSON = {
-    "ok": "OK",
+    "status": "OK",
     "service": "Obsidian Local REST API",
     "authenticated": True,
     "versions": {"obsidian": "1.7.7", "self": "3.2.0"},
+    "manifest": {"id": "obsidian-local-rest-api", "name": "Local REST API"},
+    "certificateInfo": {"validFrom": "2024-01-01"},
+    "apiExtensions": [],
 }
 
 
@@ -17,6 +20,7 @@ async def test_status(mock_api, client):
     result = await client.system.status()
 
     assert isinstance(result, ServerStatus)
+    assert result.status == "OK"
     assert result.authenticated is True
     assert result.versions.obsidian == "1.7.7"
     assert result.versions.self_ == "3.2.0"

@@ -223,3 +223,19 @@ async def test_get_deep_nested_path(mock_api, client):
 
     assert result == "# Deep"
     assert route.called
+
+
+async def test_patch_non_ascii_target(mock_api, client):
+    route = mock_api.patch("/vault/note.md").respond(200)
+
+    await client.vault.patch(
+        "note.md",
+        "content",
+        operation=PatchOperation.REPLACE,
+        target_type=TargetType.HEADING,
+        target="Заметки",
+    )
+
+    request: httpx.Request = route.calls[0].request
+    raw_headers = {k.lower(): v for k, v in request.headers.raw}
+    assert raw_headers[b"target"] == "Заметки".encode()

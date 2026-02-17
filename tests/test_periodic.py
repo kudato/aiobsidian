@@ -122,3 +122,19 @@ async def test_append_sends_content_and_header(mock_api, client):
     request = route.calls[0].request
     assert request.content == b"new entry"
     assert request.headers["content-type"] == "text/markdown"
+
+
+async def test_patch_non_ascii_target(mock_api, client):
+    route = mock_api.patch("/periodic/daily/").respond(200)
+
+    await client.periodic.patch(
+        Period.DAILY,
+        "content",
+        operation=PatchOperation.REPLACE,
+        target_type=TargetType.HEADING,
+        target="Задачи",
+    )
+
+    request: httpx.Request = route.calls[0].request
+    raw_headers = {k.lower(): v for k, v in request.headers.raw}
+    assert raw_headers[b"target"] == "Задачи".encode()

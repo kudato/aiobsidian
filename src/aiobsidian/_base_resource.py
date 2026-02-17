@@ -80,11 +80,11 @@ class ContentResource(BaseResource):
         target: str,
         target_delimiter: str = "::",
     ) -> None:
-        headers: dict[str, str] = {
+        headers: dict[str, str | bytes] = {
             "Content-Type": ContentType.MARKDOWN,
             "Operation": operation.value,
             "Target-Type": target_type.value,
-            "Target": target,
+            "Target": target.encode("utf-8"),
             "Target-Delimiter": target_delimiter,
         }
         if target_type == TargetType.FRONTMATTER:
