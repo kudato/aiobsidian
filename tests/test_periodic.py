@@ -136,5 +136,4 @@ async def test_patch_non_ascii_target(mock_api, client):
     )
 
     request: httpx.Request = route.calls[0].request
-    raw_headers = {k.lower(): v for k, v in request.headers.raw}
-    assert raw_headers[b"target"] == "Задачи".encode()
+    assert request.headers["target"] == "%D0%97%D0%B0%D0%B4%D0%B0%D1%87%D0%B8"
