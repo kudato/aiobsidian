@@ -80,7 +80,7 @@ async def test_patch(mock_api, client):
     request: httpx.Request = route.calls[0].request
     assert request.headers["operation"] == "replace"
     assert request.headers["target-type"] == "heading"
-    assert request.headers["target"] == "Section 1"
+    assert request.headers["target"] == "Section%201"
     assert request.headers["content-type"] == "text/markdown"
     assert request.headers["target-delimiter"] == "::"
 
@@ -142,7 +142,7 @@ async def test_patch_prepend_to_block(mock_api, client):
     request: httpx.Request = route.calls[0].request
     assert request.headers["operation"] == "prepend"
     assert request.headers["target-type"] == "block"
-    assert request.headers["target"] == "^abc123"
+    assert request.headers["target"] == "%5Eabc123"
 
 
 async def test_get_sends_accept_header(mock_api, client):
@@ -237,5 +237,4 @@ async def test_patch_non_ascii_target(mock_api, client):
     )
 
     request: httpx.Request = route.calls[0].request
-    raw_headers = {k.lower(): v for k, v in request.headers.raw}
-    assert raw_headers[b"target"] == "Заметки".encode()
+    assert request.headers["target"] == "%D0%97%D0%B0%D0%BC%D0%B5%D1%82%D0%BA%D0%B8"

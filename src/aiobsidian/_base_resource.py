@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal, overload
+from urllib.parse import quote
 
 from ._types import ContentType, PatchOperation, TargetType
 from .models.vault import DocumentMap, NoteJson
@@ -80,11 +81,11 @@ class ContentResource(BaseResource):
         target: str,
         target_delimiter: str = "::",
     ) -> None:
-        headers: dict[str, str | bytes] = {
+        headers: dict[str, str] = {
             "Content-Type": ContentType.MARKDOWN,
             "Operation": operation.value,
             "Target-Type": target_type.value,
-            "Target": target.encode("utf-8"),
+            "Target": quote(target, safe=""),
             "Target-Delimiter": target_delimiter,
         }
         if target_type == TargetType.FRONTMATTER:
