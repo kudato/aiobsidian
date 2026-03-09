@@ -1,7 +1,17 @@
-"""Async Python client for Obsidian Local REST API."""
+"""Async Python client for Obsidian Local REST API and CLI."""
 
+from ._cli import ObsidianCLI
 from ._client import ObsidianClient
-from ._exceptions import APIError, AuthenticationError, NotFoundError, ObsidianError
+from ._exceptions import (
+    APIError,
+    AuthenticationError,
+    BinaryNotFoundError,
+    CLIError,
+    CLITimeoutError,
+    CommandError,
+    NotFoundError,
+    ObsidianError,
+)
 from ._types import ContentType, PatchOperation, Period, TargetType
 from .models.commands import Command
 from .models.search import MatchSpan, SearchMatch, SearchResult
@@ -11,13 +21,18 @@ from .models.vault import DocumentMap, FileStat, NoteJson, VaultDirectory
 __all__ = [
     "APIError",
     "AuthenticationError",
+    "BinaryNotFoundError",
+    "CLIError",
+    "CLITimeoutError",
     "Command",
+    "CommandError",
     "ContentType",
     "DocumentMap",
     "FileStat",
     "MatchSpan",
     "NotFoundError",
     "NoteJson",
+    "ObsidianCLI",
     "ObsidianClient",
     "ObsidianError",
     "PatchOperation",

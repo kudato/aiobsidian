@@ -5,12 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "aiobsidian"
 version = "0.2.0"
-description = "Async Python client for Obsidian Local REST API"
+description = "Async Python client for Obsidian Local REST API and CLI"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.13"
 authors = [{ name = "kudato" }]
-keywords = ["obsidian", "async", "api", "client"]
+keywords = ["obsidian", "async", "api", "cli", "client"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Framework :: AsyncIO",
