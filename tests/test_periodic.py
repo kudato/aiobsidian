@@ -1,3 +1,5 @@
+import datetime
+
 import httpx
 import pytest
 
@@ -137,3 +139,66 @@ async def test_patch_non_ascii_target(mock_api, client):
 
     request: httpx.Request = route.calls[0].request
     assert request.headers["target"] == "%D0%97%D0%B0%D0%B4%D0%B0%D1%87%D0%B8"
+
+
+async def test_get_markdown_with_date(mock_api, client):
+    mock_api.get("/periodic/daily/2024/3/15/").respond(200, text="# March 15")
+
+    result = await client.periodic.get(Period.DAILY, date=datetime.date(2024, 3, 15))
+
+    assert result == "# March 15"
+
+
+async def test_get_note_json_with_date(mock_api, client):
+    mock_api.get("/periodic/weekly/2024/1/8/").respond(200, json=NOTE_JSON)
+
+    result = await client.periodic.get(
+        Period.WEEKLY,
+        date=datetime.date(2024, 1, 8),
+        content_type=ContentType.NOTE_JSON,
+    )
+
+    assert isinstance(result, NoteJson)
+
+
+async def test_update_with_date(mock_api, client):
+    route = mock_api.put("/periodic/monthly/2024/6/1/").respond(204)
+
+    await client.periodic.update(
+        Period.MONTHLY, "# June", date=datetime.date(2024, 6, 1)
+    )
+
+    assert route.called
+
+
+async def test_append_with_date(mock_api, client):
+    route = mock_api.post("/periodic/daily/2024/12/25/").respond(204)
+
+    await client.periodic.append(
+        Period.DAILY, "Merry Christmas!", date=datetime.date(2024, 12, 25)
+    )
+
+    assert route.called
+
+
+async def test_patch_with_date(mock_api, client):
+    route = mock_api.patch("/periodic/daily/2024/3/15/").respond(200)
+
+    await client.periodic.patch(
+        Period.DAILY,
+        "patched",
+        date=datetime.date(2024, 3, 15),
+        operation=PatchOperation.APPEND,
+        target_type=TargetType.HEADING,
+        target="Tasks",
+    )
+
+    assert route.called
+
+
+async def test_delete_with_date(mock_api, client):
+    route = mock_api.delete("/periodic/yearly/2023/1/1/").respond(204)
+
+    await client.periodic.delete(Period.YEARLY, date=datetime.date(2023, 1, 1))
+
+    assert route.called

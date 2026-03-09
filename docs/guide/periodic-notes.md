@@ -17,6 +17,39 @@ Period.QUARTERLY  # Quarterly note
 Period.YEARLY     # Yearly note
 ```
 
+## Accessing notes by date
+
+By default, all methods operate on the **current** periodic note. Pass `date` to access a note for a specific date:
+
+```python
+import datetime
+from aiobsidian import ContentType, Period
+
+# Get the daily note for March 15, 2024
+content = await client.periodic.get(
+    Period.DAILY, date=datetime.date(2024, 3, 15)
+)
+
+# Update a specific monthly note
+await client.periodic.update(
+    Period.MONTHLY,
+    "# June 2024 Summary",
+    date=datetime.date(2024, 6, 1),
+)
+
+# Append to a past daily note
+await client.periodic.append(
+    Period.DAILY,
+    "\n\nLate addition.",
+    date=datetime.date(2024, 3, 15),
+)
+
+# Delete a yearly note
+await client.periodic.delete(
+    Period.YEARLY, date=datetime.date(2023, 1, 1)
+)
+```
+
 ## Reading a periodic note
 
 ```python
