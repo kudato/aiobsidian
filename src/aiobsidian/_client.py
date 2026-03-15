@@ -3,12 +3,12 @@ from __future__ import annotations
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-import httpx
-
 from ._constants import DEFAULT_HOST, DEFAULT_PORT, DEFAULT_SCHEME, DEFAULT_TIMEOUT
 from ._exceptions import APIError, AuthenticationError, NotFoundError
 
 if TYPE_CHECKING:
+    import httpx
+
     from .resources.active import ActiveFileResource
     from .resources.commands import CommandsResource
     from .resources.open import OpenResource
@@ -64,6 +64,17 @@ class ObsidianClient:
         self._external_client = http_client is not None
         self._http = http_client or self._build_http_client()
 
+    @staticmethod
+    def _import_httpx() -> Any:
+        try:
+            import httpx
+        except ImportError:
+            raise ImportError(
+                "httpx is required for REST API support. "
+                "Install with: pip install aiobsidian[rest]"
+            ) from None
+        return httpx
+
     def __repr__(self) -> str:
         return (
             f"ObsidianClient(host={self._host!r}, port={self._port!r}, "
@@ -71,6 +82,7 @@ class ObsidianClient:
         )
 
     def _build_http_client(self) -> httpx.AsyncClient:
+        httpx = self._import_httpx()
         return httpx.AsyncClient(
             base_url=self._base_url,
             headers={"Authorization": f"Bearer {self._api_key}"},

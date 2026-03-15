@@ -20,9 +20,13 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "httpx>=0.28",
     "pydantic>=2.0",
 ]
+
+[project.optional-dependencies]
+cli = []
+rest = ["httpx>=0.28"]
+all = ["httpx>=0.28"]
 
 [project.urls]
 Repository = "https://github.com/kudato/aiobsidian"
