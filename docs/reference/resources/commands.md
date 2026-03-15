@@ -1,3 +1,3 @@
 # Commands Resource
 
-::: aiobsidian.resources.commands.CommandsResource
+::: aiobsidian.rest.commands.CommandsResource

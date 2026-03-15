@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from .._base_resource import BaseResource
 from .._types import ContentType
 from ..models.search import SearchResult
+from ._base import BaseResource
 
 
 class SearchResource(BaseResource):

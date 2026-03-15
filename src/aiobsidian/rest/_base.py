@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal, overload
 from urllib.parse import quote
 
-from ._types import ContentType, PatchOperation, TargetType
-from .models.vault import DocumentMap, NoteJson
+from .._types import ContentType, PatchOperation, TargetType
+from ..models.vault import DocumentMap, NoteJson
 
 if TYPE_CHECKING:
-    from ._client import ObsidianClient
+    from .._client import ObsidianClient
 
 
 class BaseResource:

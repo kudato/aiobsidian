@@ -1,3 +1,3 @@
 # Periodic Notes Resource
 
-::: aiobsidian.resources.periodic.PeriodicNotesResource
+::: aiobsidian.rest.periodic.PeriodicNotesResource

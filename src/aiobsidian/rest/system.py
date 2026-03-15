@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from .._base_resource import BaseResource
 from ..models.system import ServerStatus
+from ._base import BaseResource
 
 
 class SystemResource(BaseResource):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .._base_cli_resource import BaseCLIResource
+from ._base import BaseCLIResource
 
 
 class CLIDailyResource(BaseCLIResource):

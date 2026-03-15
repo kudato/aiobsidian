@@ -159,24 +159,24 @@ class TestExecute:
 class TestResources:
     def test_vault_property(self):
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
-        from aiobsidian.cli_resources.vault import CLIVaultResource
+        from aiobsidian.cli.vault import CLIVaultResource
 
         assert isinstance(cli.vault, CLIVaultResource)
 
     def test_daily_property(self):
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
-        from aiobsidian.cli_resources.daily import CLIDailyResource
+        from aiobsidian.cli.daily import CLIDailyResource
 
         assert isinstance(cli.daily, CLIDailyResource)
 
     def test_search_property(self):
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
-        from aiobsidian.cli_resources.search import CLISearchResource
+        from aiobsidian.cli.search import CLISearchResource
 
         assert isinstance(cli.search, CLISearchResource)
 
     def test_properties_property(self):
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
-        from aiobsidian.cli_resources.properties import CLIPropertiesResource
+        from aiobsidian.cli.properties import CLIPropertiesResource
 
         assert isinstance(cli.properties, CLIPropertiesResource)

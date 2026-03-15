@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .._base_cli_resource import BaseCLIResource
+from ._base import BaseCLIResource
 
 
 class CLISearchResource(BaseCLIResource):
@@ -23,4 +23,5 @@ class CLISearchResource(BaseCLIResource):
             List of search result dictionaries.
         """
         output = await self._cli._execute("search", params={"query": query})
-        return json.loads(output)
+        result: list[dict[str, Any]] = json.loads(output)
+        return result

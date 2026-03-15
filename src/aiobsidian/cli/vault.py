@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from .._base_cli_resource import BaseCLIResource
+from ._base import BaseCLIResource
 
 
 class CLIVaultResource(BaseCLIResource):
@@ -92,4 +92,5 @@ class CLIVaultResource(BaseCLIResource):
         """
         params = {"path": path} if path else None
         output = await self._cli._execute("files", params=params)
-        return json.loads(output)
+        result: list[str] = json.loads(output)
+        return result

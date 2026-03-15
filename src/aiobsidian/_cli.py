@@ -10,10 +10,10 @@ from ._constants import DEFAULT_CLI_TIMEOUT
 from ._exceptions import BinaryNotFoundError, CLITimeoutError, CommandError
 
 if TYPE_CHECKING:
-    from .cli_resources.daily import CLIDailyResource
-    from .cli_resources.properties import CLIPropertiesResource
-    from .cli_resources.search import CLISearchResource
-    from .cli_resources.vault import CLIVaultResource
+    from .cli.daily import CLIDailyResource
+    from .cli.properties import CLIPropertiesResource
+    from .cli.search import CLISearchResource
+    from .cli.vault import CLIVaultResource
 
 logger = logging.getLogger(__name__)
 
@@ -143,28 +143,28 @@ class ObsidianCLI:
     @cached_property
     def vault(self) -> CLIVaultResource:
         """Access vault file operations (read, create, append, move, delete, list)."""
-        from .cli_resources.vault import CLIVaultResource
+        from .cli.vault import CLIVaultResource
 
         return CLIVaultResource(self)
 
     @cached_property
     def daily(self) -> CLIDailyResource:
         """Access daily note operations (read, path, create, append, prepend)."""
-        from .cli_resources.daily import CLIDailyResource
+        from .cli.daily import CLIDailyResource
 
         return CLIDailyResource(self)
 
     @cached_property
     def search(self) -> CLISearchResource:
         """Search vault content."""
-        from .cli_resources.search import CLISearchResource
+        from .cli.search import CLISearchResource
 
         return CLISearchResource(self)
 
     @cached_property
     def properties(self) -> CLIPropertiesResource:
         """Access note properties (list, read, set, remove)."""
-        from .cli_resources.properties import CLIPropertiesResource
+        from .cli.properties import CLIPropertiesResource
 
         return CLIPropertiesResource(self)
 

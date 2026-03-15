@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Literal, overload
 
-from .._base_resource import ContentResource
 from .._types import ContentType, PatchOperation, TargetType
 from ..models.vault import DocumentMap, NoteJson, VaultDirectory
+from ._base import ContentResource
 
 
 class VaultResource(ContentResource):

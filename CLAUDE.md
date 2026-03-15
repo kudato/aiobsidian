@@ -2,11 +2,11 @@
 
 ## Project overview
 
-`aiobsidian` — async Python client for the [Obsidian Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin.
+`aiobsidian` — async Python client for Obsidian. CLI-first: works out of the box with the [Obsidian CLI](https://github.com/nicholasgasior/obsidian) (v1.12+). Optional REST support via the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin (`pip install aiobsidian[rest]`).
 
 ## Tech stack
 
-- **Runtime**: Python 3.13+, httpx >=0.28, pydantic >=2.0
+- **Runtime**: Python 3.13+, pydantic >=2.0, httpx >=0.28 (optional, for REST)
 - **Build**: hatchling, uv (package manager)
 - **Lint/Format**: ruff (rules: E, F, I, UP; line-length 88; target py313)
 - **Tests**: pytest >=8.0, pytest-asyncio >=0.25 (`asyncio_mode = "auto"`), respx >=0.22
@@ -17,35 +17,47 @@
 ```
 src/aiobsidian/
 ├── __init__.py            # public API — all exports in __all__
-├── _client.py             # ObsidianClient (entry point, resource properties, request/error dispatch)
-├── _base_resource.py      # BaseResource (__slots__, _client ref) + ContentResource (_get/_append/_patch helpers)
-├── _constants.py          # DEFAULT_HOST/PORT/SCHEME/TIMEOUT
+├── _cli.py                # ObsidianCLI (async subprocess wrapper, CLI entry point)
+├── _client.py             # ObsidianClient (REST entry point, httpx-based)
+├── _constants.py          # DEFAULT_HOST/PORT/SCHEME/TIMEOUT/CLI_TIMEOUT
 ├── _types.py              # StrEnum types: Period, PatchOperation, TargetType, ContentType
-├── _exceptions.py         # ObsidianError → APIError → AuthenticationError / NotFoundError
-├── models/
-│   ├── vault.py           # FileStat, NoteJson, DocumentMap, VaultDirectory
-│   ├── system.py          # ServerStatus, Versions (Field alias "self" → self_)
-│   ├── search.py          # MatchSpan, SearchMatch, SearchResult
-│   └── commands.py        # Command
-└── resources/
-    ├── vault.py           # VaultResource — file CRUD + list (ContentResource)
-    ├── active.py          # ActiveFileResource — active file ops (ContentResource)
-    ├── periodic.py        # PeriodicNotesResource — periodic note ops (ContentResource)
-    ├── commands.py        # CommandsResource — list/execute commands (BaseResource)
-    ├── search.py          # SearchResource — simple/dataview/jsonlogic (BaseResource)
-    ├── open.py            # OpenResource — open file in UI (BaseResource)
-    └── system.py          # SystemResource — server status, OpenAPI spec (BaseResource)
+├── _exceptions.py         # ObsidianError → APIError/CLIError hierarchies
+├── cli/                   # CLI resources (primary interface)
+│   ├── _base.py           # BaseCLIResource (__slots__, _cli ref)
+│   ├── vault.py           # CLIVaultResource — read/create/append/prepend/move/rename/delete/list
+│   ├── daily.py           # CLIDailyResource — read/path/create/append/prepend
+│   ├── search.py          # CLISearchResource — query
+│   └── properties.py      # CLIPropertiesResource — list/read/set/remove
+├── rest/                  # REST resources (optional, requires httpx)
+│   ├── _base.py           # BaseResource + ContentResource (_get/_append/_patch helpers)
+│   ├── vault.py           # VaultResource — file CRUD + list (ContentResource)
+│   ├── active.py          # ActiveFileResource — active file ops (ContentResource)
+│   ├── periodic.py        # PeriodicNotesResource — periodic note ops (ContentResource)
+│   ├── commands.py        # CommandsResource — list/execute commands (BaseResource)
+│   ├── search.py          # SearchResource — simple/dataview/jsonlogic (BaseResource)
+│   ├── open.py            # OpenResource — open file in UI (BaseResource)
+│   └── system.py          # SystemResource — server status, OpenAPI spec (BaseResource)
+└── models/
+    ├── vault.py           # FileStat, NoteJson, DocumentMap, VaultDirectory
+    ├── system.py          # ServerStatus, Versions (Field alias "self" → self_)
+    ├── search.py          # MatchSpan, SearchMatch, SearchResult
+    └── commands.py        # Command
 
 tests/
-├── conftest.py            # mock_api (respx router) + client (ObsidianClient with mocked transport) fixtures
+├── conftest.py            # mock_api + client (REST) + cli (CLI with AsyncMock) fixtures
 ├── test_client.py         # ObsidianClient unit tests
-├── test_vault.py          # VaultResource tests
-├── test_active.py         # ActiveFileResource tests
-├── test_periodic.py       # PeriodicNotesResource tests
-├── test_commands.py       # CommandsResource tests
-├── test_search.py         # SearchResource tests
-├── test_open.py           # OpenResource tests
-└── test_system.py         # SystemResource tests
+├── test_cli.py            # ObsidianCLI unit tests
+├── test_vault.py          # VaultResource (REST) tests
+├── test_active.py         # ActiveFileResource (REST) tests
+├── test_periodic.py       # PeriodicNotesResource (REST) tests
+├── test_commands.py       # CommandsResource (REST) tests
+├── test_search.py         # SearchResource (REST) tests
+├── test_open.py           # OpenResource (REST) tests
+├── test_system.py         # SystemResource (REST) tests
+├── test_cli_vault.py      # CLIVaultResource tests
+├── test_cli_daily.py      # CLIDailyResource tests
+├── test_cli_search.py     # CLISearchResource tests
+└── test_cli_properties.py # CLIPropertiesResource tests
 ```
 
 ## Commands
@@ -55,7 +67,7 @@ uv sync                                # install all deps (dev + docs)
 uv run ruff check src/ tests/          # lint
 uv run ruff format --check src/ tests/ # format check
 uv run ruff format src/ tests/         # auto-format
-uv run pytest                          # run tests (70 tests)
+uv run pytest                          # run tests (119 tests)
 uv run pytest -v                       # verbose test output
 uv run mkdocs serve                    # local docs server
 uv run mkdocs build                    # build static docs
@@ -63,14 +75,24 @@ uv run mkdocs build                    # build static docs
 
 ## Architecture patterns
 
-### Client lifecycle
+### Two entry points
 
-`ObsidianClient` is the single entry point. It builds an internal `httpx.AsyncClient` with base URL, Bearer auth, timeout, and SSL settings. Used as an async context manager:
+- `ObsidianCLI(vault)` — primary, CLI-based. Wraps the Obsidian CLI binary via `asyncio.create_subprocess_exec`. No external dependencies beyond stdlib.
+- `ObsidianClient(api_key)` — optional, REST-based. Requires `httpx` (`pip install aiobsidian[rest]`). Builds an internal `httpx.AsyncClient` with Bearer auth and SSL settings.
+
+Both are async context managers:
 
 ```python
+async with ObsidianCLI("MyVault") as cli:
+    content = await cli.vault.read("note.md")
+
 async with ObsidianClient(api_key="key") as client:
     status = await client.system.status()
 ```
+
+### Optional httpx dependency
+
+`httpx` is imported lazily in `_client.py` via `_import_httpx()`. At import time only `TYPE_CHECKING` imports are used. If a user instantiates `ObsidianClient` without httpx installed, they get a clear `ImportError` with install instructions.
 
 ### External httpx client
 
@@ -78,14 +100,19 @@ When `http_client=` is passed, `ObsidianClient` wraps it without owning it — `
 
 ### Resource access via `@cached_property`
 
-Each resource (`vault`, `active`, `periodic`, `commands`, `search`, `open`, `system`) is a `@cached_property` on `ObsidianClient`. The resource class is imported **inside** the property getter to avoid circular imports.
+Each resource is a `@cached_property` on `ObsidianCLI` or `ObsidianClient`. The resource class is imported **inside** the property getter to avoid circular imports.
 
 ### `TYPE_CHECKING` for type hints
 
-`_client.py` imports resource classes under `TYPE_CHECKING` for return-type annotations. `_base_resource.py` imports `ObsidianClient` under `TYPE_CHECKING` for the `_client` parameter type. This breaks the circular dependency cycle: client → resources → base_resource → client.
+`_client.py` imports REST resource classes under `TYPE_CHECKING`. `_cli.py` imports CLI resource classes under `TYPE_CHECKING`. Base resource modules import their parent client under `TYPE_CHECKING`. This breaks all circular dependency cycles.
 
 ### Resource class hierarchy
 
+**CLI** (`cli/`):
+- `BaseCLIResource` — holds `_cli` reference, uses `__slots__ = ("_cli",)`
+- All CLI resources extend `BaseCLIResource` directly
+
+**REST** (`rest/`):
 - `BaseResource` — holds `_client` reference, uses `__slots__ = ("_client",)`
 - `ContentResource(BaseResource)` — adds `_get_content`, `_append_content`, `_patch_content` helpers with `@overload` for type-safe return types based on `ContentType`
 - Vault, Active, Periodic extend `ContentResource`; Commands, Search, Open, System extend `BaseResource`
@@ -165,9 +192,24 @@ async def client(mock_api):
 
 The `client` fixture creates an `httpx.AsyncClient` manually (no SSL verification issues in tests) and passes it via `http_client=` to `ObsidianClient`. This pairs with `respx.mock(base_url=...)` for route matching.
 
+### CLI fixture (in `conftest.py`)
+
+```python
+@pytest.fixture()
+def cli():
+    instance = ObsidianCLI.__new__(ObsidianCLI)
+    instance._vault = "TestVault"
+    instance._binary = "/usr/local/bin/obsidian"
+    instance._timeout = 30.0
+    instance._execute = AsyncMock()
+    return instance
+```
+
+The `cli` fixture creates `ObsidianCLI` via `__new__` (bypassing `_resolve_binary`) and replaces `_execute` with `AsyncMock`. CLI resource tests set `_execute.return_value` and verify the call args.
+
 ### Test structure
 
-- One test file per resource: `test_vault.py`, `test_active.py`, etc. Plus `test_client.py` for the client itself
+- One test file per resource: `test_vault.py`, `test_active.py`, `test_cli_vault.py`, etc. Plus `test_client.py` and `test_cli.py` for the entry points
 - Test naming: `test_<method>_<scenario>` (e.g., `test_get_markdown`, `test_get_not_found`, `test_patch_prepend_to_block`)
 - No `async def` markers needed — `asyncio_mode = "auto"` handles it
 - Response data constants at module top (e.g., `NOTE_JSON`, `DOC_MAP_JSON`)
@@ -220,11 +262,11 @@ The client imports resources, and resources need the client type. Solved with:
 1. `TYPE_CHECKING` guards for type hints only
 2. Lazy imports inside `@cached_property` getters for runtime
 
-Never import resource classes at the top level of `_client.py` or `ObsidianClient` at the top level of resource modules.
+Never import resource classes at the top level of `_client.py`/`_cli.py` or client classes at the top level of resource modules.
 
 ### PATCH frontmatter Content-Type
 
-When `target_type == TargetType.FRONTMATTER`, the Content-Type must be `application/json`, not `text/markdown`. This is handled in `ContentResource._patch_content()` — see `_base_resource.py:85-86`.
+When `target_type == TargetType.FRONTMATTER`, the Content-Type must be `application/json`, not `text/markdown`. This is handled in `ContentResource._patch_content()` — see `rest/_base.py`.
 
 ### respx base_url matching
 
@@ -246,17 +288,28 @@ chore: add project configuration and license
 
 ## Common tasks
 
-### Adding a new resource
+### Adding a new CLI resource
 
-1. Create `src/aiobsidian/resources/<name>.py`
-   - Extend `BaseResource` (or `ContentResource` if it needs get/append/patch)
+1. Create `src/aiobsidian/cli/<name>.py`
+   - Extend `BaseCLIResource` from `._base`
+   - Add async methods that call `self._cli._execute()`
+   - Annotate `json.loads()` return values to satisfy mypy
+2. Add `@cached_property` in `_cli.py`
+   - Import resource class inside the property body (not at top level)
+   - Add `TYPE_CHECKING` import at the top for the return type annotation
+3. Create `tests/test_cli_<name>.py` using the `cli` fixture (AsyncMock)
+
+### Adding a new REST resource
+
+1. Create `src/aiobsidian/rest/<name>.py`
+   - Extend `BaseResource` (or `ContentResource` if it needs get/append/patch) from `._base`
    - Define `_BASE_URL` class variable
    - Add async methods with docstrings
 2. Add `@cached_property` in `_client.py`
    - Import resource class inside the property body (not at top level)
    - Add `TYPE_CHECKING` import at the top for the return type annotation
 3. Export the resource in `__init__.py` if it should be part of the public API
-4. Create `tests/test_<name>.py` with route mocking
+4. Create `tests/test_<name>.py` with respx route mocking
 
 ### Adding a new model
 

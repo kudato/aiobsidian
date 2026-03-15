@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .._base_cli_resource import BaseCLIResource
+from ._base import BaseCLIResource
 
 
 class CLIPropertiesResource(BaseCLIResource):
@@ -23,7 +23,8 @@ class CLIPropertiesResource(BaseCLIResource):
             Dictionary of property names to their values.
         """
         output = await self._cli._execute("properties", params={"path": path})
-        return json.loads(output)
+        result: dict[str, Any] = json.loads(output)
+        return result
 
     async def read(self, path: str, property_name: str) -> Any:
         """Read a single property from a note.

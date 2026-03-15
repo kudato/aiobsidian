@@ -89,13 +89,14 @@ uv run mkdocs serve
 
 ```
 src/aiobsidian/
-├── _client.py          # ObsidianClient entry point
-├── _base_resource.py   # BaseResource + ContentResource
+├── _cli.py             # ObsidianCLI entry point (CLI, primary)
+├── _client.py          # ObsidianClient entry point (REST, optional)
 ├── _constants.py       # Default configuration
 ├── _types.py           # StrEnum types
 ├── _exceptions.py      # Exception hierarchy
-├── models/             # Pydantic response models
-└── resources/          # API resource classes
+├── cli/                # CLI resource classes (primary)
+├── rest/               # REST resource classes (optional, requires httpx)
+└── models/             # Pydantic response models
 ```
 
 ## Releasing (maintainers)

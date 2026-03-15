@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from .._base_resource import BaseResource
 from ..models.commands import Command
+from ._base import BaseResource
 
 
 class CommandsResource(BaseResource):

@@ -1,3 +1,3 @@
 # Search Resource
 
-::: aiobsidian.resources.search.SearchResource
+::: aiobsidian.rest.search.SearchResource
