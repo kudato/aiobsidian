@@ -198,3 +198,21 @@ class TestResources:
         from aiobsidian.cli.tasks import CLITasksResource
 
         assert isinstance(cli.tasks, CLITasksResource)
+
+    def test_commands_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.commands import CLICommandsResource
+
+        assert isinstance(cli.commands, CLICommandsResource)
+
+    def test_templates_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.templates import CLITemplatesResource
+
+        assert isinstance(cli.templates, CLITemplatesResource)
+
+    def test_bookmarks_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.bookmarks import CLIBookmarksResource
+
+        assert isinstance(cli.bookmarks, CLIBookmarksResource)

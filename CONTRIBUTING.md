@@ -102,7 +102,10 @@ src/aiobsidian/
 │   ├── properties.py   # YAML frontmatter properties
 │   ├── tags.py         # Tag operations
 │   ├── links.py        # Links and backlinks
-│   └── tasks.py        # Task operations
+│   ├── tasks.py        # Task operations
+│   ├── commands.py     # Command execution
+│   ├── templates.py    # Template operations
+│   └── bookmarks.py    # Bookmark operations
 ├── rest/               # REST resource classes (optional, requires httpx)
 │   ├── _base.py        # BaseResource + ContentResource
 │   ├── vault.py        # File CRUD + list

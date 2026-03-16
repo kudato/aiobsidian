@@ -76,6 +76,9 @@ nav:
           - Tags: reference/resources/cli-tags.md
           - Links: reference/resources/cli-links.md
           - Tasks: reference/resources/cli-tasks.md
+          - Commands: reference/resources/cli-commands.md
+          - Templates: reference/resources/cli-templates.md
+          - Bookmarks: reference/resources/cli-bookmarks.md
       - ObsidianClient (REST): reference/client.md
       - REST Resources:
           - Vault: reference/resources/vault.md

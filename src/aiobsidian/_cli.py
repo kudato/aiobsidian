@@ -10,12 +10,15 @@ from ._constants import DEFAULT_CLI_TIMEOUT
 from ._exceptions import BinaryNotFoundError, CLITimeoutError, CommandError
 
 if TYPE_CHECKING:
+    from .cli.bookmarks import CLIBookmarksResource
+    from .cli.commands import CLICommandsResource
     from .cli.daily import CLIDailyResource
     from .cli.links import CLILinksResource
     from .cli.properties import CLIPropertiesResource
     from .cli.search import CLISearchResource
     from .cli.tags import CLITagsResource
     from .cli.tasks import CLITasksResource
+    from .cli.templates import CLITemplatesResource
     from .cli.vault import CLIVaultResource
 
 logger = logging.getLogger(__name__)
@@ -25,7 +28,8 @@ class ObsidianCLI:
     """Async wrapper for the Obsidian CLI.
 
     Provides access to vault files, daily notes, search, properties,
-    tags, links, and tasks through resource properties.
+    tags, links, tasks, commands, templates, and bookmarks through
+    resource properties.
 
     Can be used as an async context manager:
 
@@ -191,6 +195,27 @@ class ObsidianCLI:
         from .cli.tasks import CLITasksResource
 
         return CLITasksResource(self)
+
+    @cached_property
+    def commands(self) -> CLICommandsResource:
+        """Access Obsidian command operations (list, execute)."""
+        from .cli.commands import CLICommandsResource
+
+        return CLICommandsResource(self)
+
+    @cached_property
+    def templates(self) -> CLITemplatesResource:
+        """Access template operations (list, read)."""
+        from .cli.templates import CLITemplatesResource
+
+        return CLITemplatesResource(self)
+
+    @cached_property
+    def bookmarks(self) -> CLIBookmarksResource:
+        """Access bookmark operations (list, add)."""
+        from .cli.bookmarks import CLIBookmarksResource
+
+        return CLIBookmarksResource(self)
 
     # -- lifecycle ---------------------------------------------------------
 
