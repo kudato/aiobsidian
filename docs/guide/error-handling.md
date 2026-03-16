@@ -1,17 +1,50 @@
 # Error Handling
 
-aiobsidian uses a simple exception hierarchy for API errors.
+aiobsidian uses a structured exception hierarchy for both CLI and REST errors.
 
 ## Exception hierarchy
 
 ```
-ObsidianError          # Base exception for all aiobsidian errors
-└── APIError           # HTTP error from the REST API
-    ├── AuthenticationError  # 401 Unauthorized
-    └── NotFoundError        # 404 Not Found
+ObsidianError              # Base exception for all aiobsidian errors
+├── CLIError               # Base exception for CLI errors
+│   ├── BinaryNotFoundError    # CLI binary not found on PATH
+│   ├── CommandError           # Command exited with non-zero status
+│   └── CLITimeoutError        # Command exceeded timeout
+└── APIError               # HTTP error from the REST API
+    ├── AuthenticationError    # 401 Unauthorized
+    └── NotFoundError          # 404 Not Found
 ```
 
-## Catching errors
+## CLI errors
+
+```python
+from aiobsidian import (
+    ObsidianCLI,
+    BinaryNotFoundError,
+    CommandError,
+    CLITimeoutError,
+)
+
+try:
+    async with ObsidianCLI("MyVault") as cli:
+        content = await cli.vault.read("note.md")
+except BinaryNotFoundError:
+    print("Obsidian CLI binary not found. Install Obsidian v1.12+ or pass binary= explicitly.")
+except CommandError as e:
+    print(f"Command {e.command!r} failed (exit code {e.exit_code}): {e.stderr}")
+except CLITimeoutError as e:
+    print(f"Command {e.command!r} timed out after {e.timeout}s")
+```
+
+### CLIError attributes
+
+| Exception | Attributes |
+|-----------|-----------|
+| `BinaryNotFoundError` | `message` |
+| `CommandError` | `command`, `exit_code`, `stderr` |
+| `CLITimeoutError` | `command`, `timeout` |
+
+## REST API errors
 
 ```python
 from aiobsidian import (
@@ -32,7 +65,7 @@ async with ObsidianClient(api_key="your-api-key") as client:
         print(f"API error [{e.status_code}]: {e.message}")
 ```
 
-## APIError attributes
+### APIError attributes
 
 All API exceptions (`APIError`, `AuthenticationError`, `NotFoundError`) have these attributes:
 
@@ -42,17 +75,16 @@ All API exceptions (`APIError`, `AuthenticationError`, `NotFoundError`) have the
 | `message` | `str` | Error message from the API response |
 | `error_code` | `int \| None` | Optional numeric error code from the API |
 
-## Example: retry on transient errors
+## Catching all aiobsidian errors
+
+Use `ObsidianError` to catch any exception from the library:
 
 ```python
-from aiobsidian import APIError
+from aiobsidian import ObsidianError
 
-async def get_with_retry(client, path, retries=3):
-    for attempt in range(retries):
-        try:
-            return await client.vault.get(path)
-        except APIError as e:
-            if e.status_code >= 500 and attempt < retries - 1:
-                continue
-            raise
+try:
+    # CLI or REST operations
+    ...
+except ObsidianError as e:
+    print(f"aiobsidian error: {e}")
 ```

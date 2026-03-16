@@ -27,7 +27,10 @@ src/aiobsidian/
 │   ├── vault.py           # CLIVaultResource — read/create/append/prepend/move/rename/delete/list
 │   ├── daily.py           # CLIDailyResource — read/path/create/append/prepend
 │   ├── search.py          # CLISearchResource — query
-│   └── properties.py      # CLIPropertiesResource — list/read/set/remove
+│   ├── properties.py      # CLIPropertiesResource — list/read/set/remove
+│   ├── tags.py            # CLITagsResource — get/rename/list
+│   ├── links.py           # CLILinksResource — outgoing/incoming/unresolved/orphans
+│   └── tasks.py           # CLITasksResource — list/create/complete
 ├── rest/                  # REST resources (optional, requires httpx)
 │   ├── _base.py           # BaseResource + ContentResource (_get/_append/_patch helpers)
 │   ├── vault.py           # VaultResource — file CRUD + list (ContentResource)
@@ -57,7 +60,10 @@ tests/
 ├── test_cli_vault.py      # CLIVaultResource tests
 ├── test_cli_daily.py      # CLIDailyResource tests
 ├── test_cli_search.py     # CLISearchResource tests
-└── test_cli_properties.py # CLIPropertiesResource tests
+├── test_cli_properties.py # CLIPropertiesResource tests
+├── test_cli_tags.py       # CLITagsResource tests
+├── test_cli_links.py      # CLILinksResource tests
+└── test_cli_tasks.py      # CLITasksResource tests
 ```
 
 ## Commands
@@ -67,7 +73,7 @@ uv sync                                # install all deps (dev + docs)
 uv run ruff check src/ tests/          # lint
 uv run ruff format --check src/ tests/ # format check
 uv run ruff format src/ tests/         # auto-format
-uv run pytest                          # run tests (119 tests)
+uv run pytest                          # run tests (134 tests)
 uv run pytest -v                       # verbose test output
 uv run mkdocs serve                    # local docs server
 uv run mkdocs build                    # build static docs

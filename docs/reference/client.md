@@ -1,3 +1,3 @@
-# Client
+# ObsidianClient (REST)
 
 ::: aiobsidian.ObsidianClient

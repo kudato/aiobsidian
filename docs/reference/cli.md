@@ -1,0 +1,3 @@
+# ObsidianCLI
+
+::: aiobsidian.ObsidianCLI

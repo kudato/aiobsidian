@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/github/license/kudato/aiobsidian)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-mkdocs-blue)](https://kudato.github.io/aiobsidian)
 
-Async Python client for the [Obsidian Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin.
+Async Python client for [Obsidian](https://obsidian.md). CLI-first: works out of the box with the [Obsidian CLI](https://obsidian.md/cli) (v1.12+). Optional REST support via the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin.
 
 ---
 
@@ -16,13 +16,39 @@ Async Python client for the [Obsidian Local REST API](https://github.com/codding
 pip install aiobsidian
 ```
 
-Or with [uv](https://docs.astral.sh/uv/):
+For REST API support (requires [httpx](https://www.python-httpx.org/)):
 
 ```bash
-uv add aiobsidian
+pip install aiobsidian[rest]
 ```
 
 ## Quick start
+
+### CLI (primary)
+
+```python
+import asyncio
+from aiobsidian import ObsidianCLI
+
+async def main():
+    async with ObsidianCLI("MyVault") as cli:
+        # Read a note
+        content = await cli.vault.read("notes/hello.md")
+        print(content)
+
+        # Search the vault
+        results = await cli.search.query("python")
+
+        # List tags
+        tags = await cli.tags.list()
+
+        # Daily note
+        await cli.daily.append("- [ ] New task")
+
+asyncio.run(main())
+```
+
+### REST (optional)
 
 ```python
 import asyncio
@@ -30,75 +56,48 @@ from aiobsidian import ObsidianClient
 
 async def main():
     async with ObsidianClient("your-api-key") as client:
-        # Server status
         status = await client.system.status()
         print(status.versions.obsidian)
 
-        # Read a note
         content = await client.vault.get("notes/hello.md")
         print(content)
-
-        # Create a note
-        await client.vault.update("notes/new.md", "# New Note\n\nContent here.")
-
-        # Search
-        results = await client.search.simple("hello")
-        for r in results:
-            print(r.filename, r.score)
-
-        # Execute a command
-        await client.commands.execute("daily-notes")
 
 asyncio.run(main())
 ```
 
 ## Features
 
-- **Full async/await** support via [httpx](https://www.python-httpx.org/)
-- **Complete API coverage** — all Obsidian Local REST API endpoints:
+### CLI resources
 
-  | Resource | Description |
-  |----------|-------------|
-  | **Vault** | CRUD operations on any file |
-  | **Active** | Operations on the currently open file |
-  | **Periodic** | Daily, weekly, monthly, quarterly, yearly notes |
-  | **Commands** | List and execute Obsidian commands |
-  | **Search** | Simple text search, Dataview DQL, JsonLogic |
-  | **Open** | Open files in Obsidian UI |
-  | **System** | Server status, OpenAPI spec |
+| Resource | Access | Description |
+|----------|--------|-------------|
+| **vault** | `cli.vault` | Read, create, append, prepend, move, rename, delete, list |
+| **daily** | `cli.daily` | Daily note operations |
+| **search** | `cli.search` | Full-text search |
+| **properties** | `cli.properties` | YAML frontmatter properties |
+| **tags** | `cli.tags` | Tag listing, lookup, rename |
+| **links** | `cli.links` | Outgoing links, backlinks, unresolved, orphans |
+| **tasks** | `cli.tasks` | Task listing, creation, completion |
 
+### REST resources
+
+| Resource | Access | Description |
+|----------|--------|-------------|
+| **vault** | `client.vault` | CRUD operations on any file |
+| **active** | `client.active` | Operations on the currently open file |
+| **periodic** | `client.periodic` | Daily, weekly, monthly, quarterly, yearly notes |
+| **commands** | `client.commands` | List and execute Obsidian commands |
+| **search** | `client.search` | Simple text search, Dataview DQL, JsonLogic |
+| **open** | `client.open` | Open files in Obsidian UI |
+| **system** | `client.system` | Server status, OpenAPI spec |
+
+### General
+
+- **Full async/await** support
 - **Pydantic v2** models for type-safe responses
-- **Custom exception hierarchy** with error codes
-- **Bring-your-own `httpx.AsyncClient`** support
+- **Custom exception hierarchy** for both CLI and REST errors
 - **Context manager** lifecycle management
-
-## Configuration
-
-```python
-client = ObsidianClient(
-    "your-api-key",
-    host="127.0.0.1",      # default
-    port=27124,             # default (HTTPS)
-    scheme="https",         # default
-    timeout=30.0,           # default
-    verify_ssl=False,       # default (self-signed cert)
-)
-```
-
-### External HTTP client
-
-You can provide your own `httpx.AsyncClient` for full control over transport settings:
-
-```python
-import httpx
-from aiobsidian import ObsidianClient
-
-async with httpx.AsyncClient(timeout=60.0, verify=False) as http:
-    async with ObsidianClient("your-api-key", http_client=http) as client:
-        status = await client.system.status()
-```
-
-When an external client is provided, `aiobsidian` will not close it — you manage its lifecycle.
+- **No external dependencies** for CLI (only stdlib)
 
 ## Documentation
 

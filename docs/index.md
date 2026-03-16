@@ -1,45 +1,57 @@
 # aiobsidian
 
-**Async Python client for the [Obsidian](https://obsidian.md) Local REST API plugin.**
+**Async Python client for [Obsidian](https://obsidian.md).**
 
-aiobsidian provides a clean, fully-typed async interface to interact with your Obsidian vault programmatically — read and write notes, search content, execute commands, and more.
+CLI-first: works out of the box with the [Obsidian CLI](https://obsidian.md/cli) (v1.12+). Optional REST support via the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin.
 
 ## Features
 
-- **Async/await** — built on [httpx](https://www.python-httpx.org/) for high-performance async HTTP
+- **CLI-first** — works directly with the Obsidian CLI binary, no plugins required
+- **Optional REST** — full REST API support via `pip install aiobsidian[rest]`
+- **Async/await** — built for modern async Python
 - **Fully typed** — complete type annotations and a `py.typed` marker
-- **Resource-based API** — intuitive access through `client.vault`, `client.search`, etc.
+- **Resource-based API** — intuitive access through `cli.vault`, `cli.tags`, `client.search`, etc.
 - **Pydantic v2 models** — structured, validated response objects
-- **Multiple content formats** — Markdown, JSON, and document maps
-- **Flexible search** — simple text, Dataview DQL, and JsonLogic queries
 
 ## Quick example
 
-```python
-import asyncio
-from aiobsidian import ObsidianClient
+=== "CLI"
 
-async def main():
-    async with ObsidianClient(api_key="your-api-key") as client:
-        # Check server status
-        status = await client.system.status()
-        print(f"Obsidian v{status.versions.obsidian}")
+    ```python
+    import asyncio
+    from aiobsidian import ObsidianCLI
 
-        # Read a note
-        content = await client.vault.get("Notes/hello.md")
-        print(content)
+    async def main():
+        async with ObsidianCLI("MyVault") as cli:
+            content = await cli.vault.read("notes/hello.md")
+            print(content)
 
-        # Search the vault
-        results = await client.search.simple("python")
-        for result in results:
-            print(result.filename)
+            tags = await cli.tags.list()
+            results = await cli.search.query("python")
 
-asyncio.run(main())
-```
+    asyncio.run(main())
+    ```
+
+=== "REST"
+
+    ```python
+    import asyncio
+    from aiobsidian import ObsidianClient
+
+    async def main():
+        async with ObsidianClient(api_key="your-api-key") as client:
+            status = await client.system.status()
+            print(f"Obsidian v{status.versions.obsidian}")
+
+            content = await client.vault.get("Notes/hello.md")
+            print(content)
+
+    asyncio.run(main())
+    ```
 
 ## Next steps
 
-- [Installation](getting-started/installation.md) — install aiobsidian and set up the Obsidian plugin
+- [Installation](getting-started/installation.md) — install aiobsidian and set up Obsidian CLI or the REST plugin
 - [Quick Start](getting-started/quickstart.md) — get up and running in minutes
 - [User Guide](guide/vault.md) — learn all the operations available
-- [API Reference](reference/client.md) — full API documentation
+- [API Reference](reference/cli.md) — full API documentation

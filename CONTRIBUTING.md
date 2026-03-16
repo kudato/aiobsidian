@@ -93,9 +93,25 @@ src/aiobsidian/
 ├── _client.py          # ObsidianClient entry point (REST, optional)
 ├── _constants.py       # Default configuration
 ├── _types.py           # StrEnum types
-├── _exceptions.py      # Exception hierarchy
+├── _exceptions.py      # Exception hierarchy (CLIError + APIError)
 ├── cli/                # CLI resource classes (primary)
+│   ├── _base.py        # BaseCLIResource
+│   ├── vault.py        # File operations
+│   ├── daily.py        # Daily notes
+│   ├── search.py       # Full-text search
+│   ├── properties.py   # YAML frontmatter properties
+│   ├── tags.py         # Tag operations
+│   ├── links.py        # Links and backlinks
+│   └── tasks.py        # Task operations
 ├── rest/               # REST resource classes (optional, requires httpx)
+│   ├── _base.py        # BaseResource + ContentResource
+│   ├── vault.py        # File CRUD + list
+│   ├── active.py       # Active file operations
+│   ├── periodic.py     # Periodic notes
+│   ├── commands.py     # Command execution
+│   ├── search.py       # Search (simple, Dataview, JsonLogic)
+│   ├── open.py         # Open files in UI
+│   └── system.py       # Server status
 └── models/             # Pydantic response models
 ```
 
