@@ -216,3 +216,75 @@ class TestResources:
         from aiobsidian.cli.bookmarks import CLIBookmarksResource
 
         assert isinstance(cli.bookmarks, CLIBookmarksResource)
+
+    def test_plugins_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.plugins import CLIPluginsResource
+
+        assert isinstance(cli.plugins, CLIPluginsResource)
+
+    def test_themes_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.themes import CLIThemesResource
+
+        assert isinstance(cli.themes, CLIThemesResource)
+
+    def test_snippets_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.snippets import CLISnippetsResource
+
+        assert isinstance(cli.snippets, CLISnippetsResource)
+
+    def test_sync_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.sync import CLISyncResource
+
+        assert isinstance(cli.sync, CLISyncResource)
+
+    def test_publish_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.publish import CLIPublishResource
+
+        assert isinstance(cli.publish, CLIPublishResource)
+
+    def test_history_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.history import CLIHistoryResource
+
+        assert isinstance(cli.history, CLIHistoryResource)
+
+    def test_workspaces_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.workspaces import CLIWorkspacesResource
+
+        assert isinstance(cli.workspaces, CLIWorkspacesResource)
+
+    def test_hotkeys_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.hotkeys import CLIHotkeysResource
+
+        assert isinstance(cli.hotkeys, CLIHotkeysResource)
+
+    def test_outline_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.outline import CLIOutlineResource
+
+        assert isinstance(cli.outline, CLIOutlineResource)
+
+    def test_random_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.random_note import CLIRandomResource
+
+        assert isinstance(cli.random, CLIRandomResource)
+
+    def test_aliases_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.aliases import CLIAliasesResource
+
+        assert isinstance(cli.aliases, CLIAliasesResource)
+
+    def test_bases_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.bases import CLIBasesResource
+
+        assert isinstance(cli.bases, CLIBasesResource)

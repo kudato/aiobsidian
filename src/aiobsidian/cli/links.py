@@ -58,3 +58,13 @@ class CLILinksResource(BaseCLIResource):
         output = await self._cli._execute("orphans")
         result: list[dict[str, Any]] = json.loads(output)
         return result
+
+    async def deadends(self) -> list[dict[str, Any]]:
+        """Get notes with no outgoing links (dead ends).
+
+        Returns:
+            List of dead-end note objects.
+        """
+        output = await self._cli._execute("deadends")
+        result: list[dict[str, Any]] = json.loads(output)
+        return result

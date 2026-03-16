@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from ._base import BaseCLIResource
 
@@ -79,6 +80,70 @@ class CLIVaultResource(BaseCLIResource):
             path: Path to the file relative to the vault root.
         """
         await self._cli._execute("delete", params={"path": path})
+
+    async def info(self) -> dict[str, Any]:
+        """Get vault information.
+
+        Returns:
+            Vault details including name and configuration.
+        """
+        output = await self._cli._execute("vault")
+        result: dict[str, Any] = json.loads(output)
+        return result
+
+    async def file_info(self, path: str) -> dict[str, Any]:
+        """Get information about a file.
+
+        Args:
+            path: Path to the file relative to the vault root.
+
+        Returns:
+            File metadata.
+        """
+        output = await self._cli._execute("file", params={"path": path})
+        result: dict[str, Any] = json.loads(output)
+        return result
+
+    async def folder_info(self, path: str) -> dict[str, Any]:
+        """Get information about a folder.
+
+        Args:
+            path: Path to the folder relative to the vault root.
+
+        Returns:
+            Folder metadata.
+        """
+        output = await self._cli._execute("folder", params={"path": path})
+        result: dict[str, Any] = json.loads(output)
+        return result
+
+    async def folders(self, path: str = "") -> list[str]:
+        """List folders in the vault.
+
+        Args:
+            path: Directory path relative to the vault root.
+                  Empty string lists all folders.
+
+        Returns:
+            List of folder paths.
+        """
+        params = {"path": path} if path else None
+        output = await self._cli._execute("folders", params=params)
+        result: list[str] = json.loads(output)
+        return result
+
+    async def wordcount(self, path: str) -> dict[str, Any]:
+        """Get word and character count for a file.
+
+        Args:
+            path: Path to the file relative to the vault root.
+
+        Returns:
+            Word count statistics.
+        """
+        output = await self._cli._execute("wordcount", params={"file": path})
+        result: dict[str, Any] = json.loads(output)
+        return result
 
     async def list(self, path: str = "") -> list[str]:
         """List files in the vault.

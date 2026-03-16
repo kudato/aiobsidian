@@ -46,3 +46,15 @@ async def test_orphans(cli):
     result = await cli.links.orphans()
     assert result == ORPHANS
     cli._execute.assert_awaited_once_with("orphans")
+
+
+DEADENDS = [
+    {"path": "notes/leaf.md", "name": "leaf"},
+]
+
+
+async def test_deadends(cli):
+    cli._execute.return_value = json.dumps(DEADENDS)
+    result = await cli.links.deadends()
+    assert result == DEADENDS
+    cli._execute.assert_awaited_once_with("deadends")

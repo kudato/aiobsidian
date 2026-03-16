@@ -105,7 +105,19 @@ src/aiobsidian/
 │   ├── tasks.py        # Task operations
 │   ├── commands.py     # Command execution
 │   ├── templates.py    # Template operations
-│   └── bookmarks.py    # Bookmark operations
+│   ├── bookmarks.py    # Bookmark operations
+│   ├── plugins.py      # Plugin management
+│   ├── themes.py       # Theme management
+│   ├── snippets.py     # CSS snippet management
+│   ├── sync.py         # Obsidian Sync operations
+│   ├── publish.py      # Obsidian Publish operations
+│   ├── history.py      # Local file history
+│   ├── workspaces.py   # Workspace management
+│   ├── hotkeys.py      # Hotkey operations
+│   ├── outline.py      # Document outline
+│   ├── random_note.py  # Random note operations
+│   ├── aliases.py      # Note alias operations
+│   └── bases.py        # Bases (database) operations
 ├── rest/               # REST resource classes (optional, requires httpx)
 │   ├── _base.py        # BaseResource + ContentResource
 │   ├── vault.py        # File CRUD + list

@@ -24,16 +24,28 @@ src/aiobsidian/
 ├── _exceptions.py         # ObsidianError → APIError/CLIError hierarchies
 ├── cli/                   # CLI resources (primary interface)
 │   ├── _base.py           # BaseCLIResource (__slots__, _cli ref)
-│   ├── vault.py           # CLIVaultResource — read/create/append/prepend/move/rename/delete/list
+│   ├── vault.py           # CLIVaultResource — read/create/append/prepend/move/rename/delete/list/info/file_info/folder_info/folders/wordcount
 │   ├── daily.py           # CLIDailyResource — read/path/create/append/prepend
-│   ├── search.py          # CLISearchResource — query
+│   ├── search.py          # CLISearchResource — query/context
 │   ├── properties.py      # CLIPropertiesResource — list/read/set/remove
 │   ├── tags.py            # CLITagsResource — get/rename/list
-│   ├── links.py           # CLILinksResource — outgoing/incoming/unresolved/orphans
+│   ├── links.py           # CLILinksResource — outgoing/incoming/unresolved/orphans/deadends
 │   ├── tasks.py           # CLITasksResource — list/create/complete
 │   ├── commands.py        # CLICommandsResource — list/execute
 │   ├── templates.py       # CLITemplatesResource — list/read
-│   └── bookmarks.py       # CLIBookmarksResource — list/add
+│   ├── bookmarks.py       # CLIBookmarksResource — list/add
+│   ├── plugins.py         # CLIPluginsResource — list/enabled/enable/disable/install/uninstall/reload
+│   ├── themes.py          # CLIThemesResource — list/current/set/install/uninstall
+│   ├── snippets.py        # CLISnippetsResource — list/enabled/enable/disable
+│   ├── sync.py            # CLISyncResource — status/history/read/restore/deleted
+│   ├── publish.py         # CLIPublishResource — site/list/status/add/remove
+│   ├── history.py         # CLIHistoryResource — list/read/restore
+│   ├── workspaces.py      # CLIWorkspacesResource — list/current/save/load/delete
+│   ├── hotkeys.py         # CLIHotkeysResource — list/get
+│   ├── outline.py         # CLIOutlineResource — get
+│   ├── random_note.py     # CLIRandomResource — read
+│   ├── aliases.py         # CLIAliasesResource — get
+│   └── bases.py           # CLIBasesResource — list/views/create/query
 ├── rest/                  # REST resources (optional, requires httpx)
 │   ├── _base.py           # BaseResource + ContentResource (_get/_append/_patch helpers)
 │   ├── vault.py           # VaultResource — file CRUD + list (ContentResource)
@@ -69,7 +81,19 @@ tests/
 ├── test_cli_tasks.py      # CLITasksResource tests
 ├── test_cli_commands.py   # CLICommandsResource tests
 ├── test_cli_templates.py  # CLITemplatesResource tests
-└── test_cli_bookmarks.py  # CLIBookmarksResource tests
+├── test_cli_bookmarks.py  # CLIBookmarksResource tests
+├── test_cli_plugins.py    # CLIPluginsResource tests
+├── test_cli_themes.py     # CLIThemesResource tests
+├── test_cli_snippets.py   # CLISnippetsResource tests
+├── test_cli_sync.py       # CLISyncResource tests
+├── test_cli_publish.py    # CLIPublishResource tests
+├── test_cli_history.py    # CLIHistoryResource tests
+├── test_cli_workspaces.py # CLIWorkspacesResource tests
+├── test_cli_hotkeys.py    # CLIHotkeysResource tests
+├── test_cli_outline.py    # CLIOutlineResource tests
+├── test_cli_random_note.py # CLIRandomResource tests
+├── test_cli_aliases.py    # CLIAliasesResource tests
+└── test_cli_bases.py      # CLIBasesResource tests
 ```
 
 ## Commands
@@ -79,7 +103,7 @@ uv sync                                # install all deps (dev + docs)
 uv run ruff check src/ tests/          # lint
 uv run ruff format --check src/ tests/ # format check
 uv run ruff format src/ tests/         # auto-format
-uv run pytest                          # run tests (150 tests)
+uv run pytest                          # run tests (217 tests)
 uv run pytest -v                       # verbose test output
 uv run mkdocs serve                    # local docs server
 uv run mkdocs build                    # build static docs

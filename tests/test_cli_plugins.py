@@ -1,0 +1,56 @@
+from __future__ import annotations
+
+import json
+
+PLUGINS = [
+    {"id": "dataview", "name": "Dataview", "enabled": True},
+    {"id": "templater", "name": "Templater", "enabled": False},
+]
+
+ENABLED_PLUGINS = [
+    {"id": "dataview", "name": "Dataview"},
+]
+
+
+async def test_list(cli):
+    cli._execute.return_value = json.dumps(PLUGINS)
+    result = await cli.plugins.list()
+    assert result == PLUGINS
+    cli._execute.assert_awaited_once_with("plugins")
+
+
+async def test_enabled(cli):
+    cli._execute.return_value = json.dumps(ENABLED_PLUGINS)
+    result = await cli.plugins.enabled()
+    assert result == ENABLED_PLUGINS
+    cli._execute.assert_awaited_once_with("plugins:enabled")
+
+
+async def test_enable(cli):
+    cli._execute.return_value = ""
+    await cli.plugins.enable("dataview")
+    cli._execute.assert_awaited_once_with("plugin:enable", params={"id": "dataview"})
+
+
+async def test_disable(cli):
+    cli._execute.return_value = ""
+    await cli.plugins.disable("dataview")
+    cli._execute.assert_awaited_once_with("plugin:disable", params={"id": "dataview"})
+
+
+async def test_install(cli):
+    cli._execute.return_value = ""
+    await cli.plugins.install("dataview")
+    cli._execute.assert_awaited_once_with("plugin:install", params={"id": "dataview"})
+
+
+async def test_uninstall(cli):
+    cli._execute.return_value = ""
+    await cli.plugins.uninstall("dataview")
+    cli._execute.assert_awaited_once_with("plugin:uninstall", params={"id": "dataview"})
+
+
+async def test_reload(cli):
+    cli._execute.return_value = ""
+    await cli.plugins.reload("dataview")
+    cli._execute.assert_awaited_once_with("plugin:reload", params={"id": "dataview"})

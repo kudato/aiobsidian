@@ -10,16 +10,28 @@ from ._constants import DEFAULT_CLI_TIMEOUT
 from ._exceptions import BinaryNotFoundError, CLITimeoutError, CommandError
 
 if TYPE_CHECKING:
+    from .cli.aliases import CLIAliasesResource
+    from .cli.bases import CLIBasesResource
     from .cli.bookmarks import CLIBookmarksResource
     from .cli.commands import CLICommandsResource
     from .cli.daily import CLIDailyResource
+    from .cli.history import CLIHistoryResource
+    from .cli.hotkeys import CLIHotkeysResource
     from .cli.links import CLILinksResource
+    from .cli.outline import CLIOutlineResource
+    from .cli.plugins import CLIPluginsResource
     from .cli.properties import CLIPropertiesResource
+    from .cli.publish import CLIPublishResource
+    from .cli.random_note import CLIRandomResource
     from .cli.search import CLISearchResource
+    from .cli.snippets import CLISnippetsResource
+    from .cli.sync import CLISyncResource
     from .cli.tags import CLITagsResource
     from .cli.tasks import CLITasksResource
     from .cli.templates import CLITemplatesResource
+    from .cli.themes import CLIThemesResource
     from .cli.vault import CLIVaultResource
+    from .cli.workspaces import CLIWorkspacesResource
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +39,10 @@ logger = logging.getLogger(__name__)
 class ObsidianCLI:
     """Async wrapper for the Obsidian CLI.
 
-    Provides access to vault files, daily notes, search, properties,
-    tags, links, tasks, commands, templates, and bookmarks through
-    resource properties.
+    Provides access to vault operations, daily notes, search, properties,
+    tags, links, tasks, commands, templates, bookmarks, plugins, themes,
+    snippets, sync, publish, history, workspaces, hotkeys, outline,
+    random notes, aliases, and bases through resource properties.
 
     Can be used as an async context manager:
 
@@ -216,6 +229,90 @@ class ObsidianCLI:
         from .cli.bookmarks import CLIBookmarksResource
 
         return CLIBookmarksResource(self)
+
+    @cached_property
+    def plugins(self) -> CLIPluginsResource:
+        """Access plugin management."""
+        from .cli.plugins import CLIPluginsResource
+
+        return CLIPluginsResource(self)
+
+    @cached_property
+    def themes(self) -> CLIThemesResource:
+        """Access theme management (list, current, set, install, uninstall)."""
+        from .cli.themes import CLIThemesResource
+
+        return CLIThemesResource(self)
+
+    @cached_property
+    def snippets(self) -> CLISnippetsResource:
+        """Access CSS snippet management (list, enabled, enable, disable)."""
+        from .cli.snippets import CLISnippetsResource
+
+        return CLISnippetsResource(self)
+
+    @cached_property
+    def sync(self) -> CLISyncResource:
+        """Access Obsidian Sync operations (status, history, read, restore, deleted)."""
+        from .cli.sync import CLISyncResource
+
+        return CLISyncResource(self)
+
+    @cached_property
+    def publish(self) -> CLIPublishResource:
+        """Access Obsidian Publish operations (site, list, status, add, remove)."""
+        from .cli.publish import CLIPublishResource
+
+        return CLIPublishResource(self)
+
+    @cached_property
+    def history(self) -> CLIHistoryResource:
+        """Access local file history (list, read, restore)."""
+        from .cli.history import CLIHistoryResource
+
+        return CLIHistoryResource(self)
+
+    @cached_property
+    def workspaces(self) -> CLIWorkspacesResource:
+        """Access workspace management (list, current, save, load, delete)."""
+        from .cli.workspaces import CLIWorkspacesResource
+
+        return CLIWorkspacesResource(self)
+
+    @cached_property
+    def hotkeys(self) -> CLIHotkeysResource:
+        """Access hotkey operations (list, get)."""
+        from .cli.hotkeys import CLIHotkeysResource
+
+        return CLIHotkeysResource(self)
+
+    @cached_property
+    def outline(self) -> CLIOutlineResource:
+        """Access document outline (headings)."""
+        from .cli.outline import CLIOutlineResource
+
+        return CLIOutlineResource(self)
+
+    @cached_property
+    def random(self) -> CLIRandomResource:
+        """Access random note operations (read)."""
+        from .cli.random_note import CLIRandomResource
+
+        return CLIRandomResource(self)
+
+    @cached_property
+    def aliases(self) -> CLIAliasesResource:
+        """Access note alias operations (get)."""
+        from .cli.aliases import CLIAliasesResource
+
+        return CLIAliasesResource(self)
+
+    @cached_property
+    def bases(self) -> CLIBasesResource:
+        """Access Obsidian Bases / database operations (list, views, create, query)."""
+        from .cli.bases import CLIBasesResource
+
+        return CLIBasesResource(self)
 
     # -- lifecycle ---------------------------------------------------------
 

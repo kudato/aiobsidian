@@ -79,6 +79,18 @@ nav:
           - Commands: reference/resources/cli-commands.md
           - Templates: reference/resources/cli-templates.md
           - Bookmarks: reference/resources/cli-bookmarks.md
+          - Plugins: reference/resources/cli-plugins.md
+          - Themes: reference/resources/cli-themes.md
+          - Snippets: reference/resources/cli-snippets.md
+          - Sync: reference/resources/cli-sync.md
+          - Publish: reference/resources/cli-publish.md
+          - History: reference/resources/cli-history.md
+          - Workspaces: reference/resources/cli-workspaces.md
+          - Hotkeys: reference/resources/cli-hotkeys.md
+          - Outline: reference/resources/cli-outline.md
+          - Random: reference/resources/cli-random.md
+          - Aliases: reference/resources/cli-aliases.md
+          - Bases: reference/resources/cli-bases.md
       - ObsidianClient (REST): reference/client.md
       - REST Resources:
           - Vault: reference/resources/vault.md

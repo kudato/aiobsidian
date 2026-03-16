@@ -78,3 +78,49 @@ async def test_list_with_path(cli):
     result = await cli.vault.list("folder")
     assert result == ["folder/a.md"]
     cli._execute.assert_awaited_once_with("files", params={"path": "folder"})
+
+
+async def test_info(cli):
+    vault_info = {"name": "TestVault", "path": "/vaults/TestVault"}
+    cli._execute.return_value = json.dumps(vault_info)
+    result = await cli.vault.info()
+    assert result == vault_info
+    cli._execute.assert_awaited_once_with("vault")
+
+
+async def test_file_info(cli):
+    file_meta = {"path": "note.md", "size": 1024, "ctime": 1710000000}
+    cli._execute.return_value = json.dumps(file_meta)
+    result = await cli.vault.file_info("note.md")
+    assert result == file_meta
+    cli._execute.assert_awaited_once_with("file", params={"path": "note.md"})
+
+
+async def test_folder_info(cli):
+    folder_meta = {"path": "notes", "children": 5}
+    cli._execute.return_value = json.dumps(folder_meta)
+    result = await cli.vault.folder_info("notes")
+    assert result == folder_meta
+    cli._execute.assert_awaited_once_with("folder", params={"path": "notes"})
+
+
+async def test_folders(cli):
+    cli._execute.return_value = json.dumps(["notes", "archive", "templates"])
+    result = await cli.vault.folders()
+    assert result == ["notes", "archive", "templates"]
+    cli._execute.assert_awaited_once_with("folders", params=None)
+
+
+async def test_folders_with_path(cli):
+    cli._execute.return_value = json.dumps(["notes/sub1", "notes/sub2"])
+    result = await cli.vault.folders("notes")
+    assert result == ["notes/sub1", "notes/sub2"]
+    cli._execute.assert_awaited_once_with("folders", params={"path": "notes"})
+
+
+async def test_wordcount(cli):
+    counts = {"words": 500, "characters": 2800}
+    cli._execute.return_value = json.dumps(counts)
+    result = await cli.vault.wordcount("note.md")
+    assert result == counts
+    cli._execute.assert_awaited_once_with("wordcount", params={"file": "note.md"})
