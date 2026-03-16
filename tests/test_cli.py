@@ -180,3 +180,21 @@ class TestResources:
         from aiobsidian.cli.properties import CLIPropertiesResource
 
         assert isinstance(cli.properties, CLIPropertiesResource)
+
+    def test_tags_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.tags import CLITagsResource
+
+        assert isinstance(cli.tags, CLITagsResource)
+
+    def test_links_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.links import CLILinksResource
+
+        assert isinstance(cli.links, CLILinksResource)
+
+    def test_tasks_property(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        from aiobsidian.cli.tasks import CLITasksResource
+
+        assert isinstance(cli.tasks, CLITasksResource)

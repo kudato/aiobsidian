@@ -11,8 +11,11 @@ from ._exceptions import BinaryNotFoundError, CLITimeoutError, CommandError
 
 if TYPE_CHECKING:
     from .cli.daily import CLIDailyResource
+    from .cli.links import CLILinksResource
     from .cli.properties import CLIPropertiesResource
     from .cli.search import CLISearchResource
+    from .cli.tags import CLITagsResource
+    from .cli.tasks import CLITasksResource
     from .cli.vault import CLIVaultResource
 
 logger = logging.getLogger(__name__)
@@ -21,8 +24,8 @@ logger = logging.getLogger(__name__)
 class ObsidianCLI:
     """Async wrapper for the Obsidian CLI.
 
-    Provides access to vault files, daily notes, search, and properties
-    through resource properties.
+    Provides access to vault files, daily notes, search, properties,
+    tags, links, and tasks through resource properties.
 
     Can be used as an async context manager:
 
@@ -167,6 +170,27 @@ class ObsidianCLI:
         from .cli.properties import CLIPropertiesResource
 
         return CLIPropertiesResource(self)
+
+    @cached_property
+    def tags(self) -> CLITagsResource:
+        """Access tag operations (list, get, rename)."""
+        from .cli.tags import CLITagsResource
+
+        return CLITagsResource(self)
+
+    @cached_property
+    def links(self) -> CLILinksResource:
+        """Access link operations (outgoing, incoming, unresolved, orphans)."""
+        from .cli.links import CLILinksResource
+
+        return CLILinksResource(self)
+
+    @cached_property
+    def tasks(self) -> CLITasksResource:
+        """Access task operations (list, create, complete)."""
+        from .cli.tasks import CLITasksResource
+
+        return CLITasksResource(self)
 
     # -- lifecycle ---------------------------------------------------------
 
