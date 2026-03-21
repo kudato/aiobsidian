@@ -3,19 +3,19 @@ from __future__ import annotations
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-import httpx
-
 from ._constants import DEFAULT_HOST, DEFAULT_PORT, DEFAULT_SCHEME, DEFAULT_TIMEOUT
 from ._exceptions import APIError, AuthenticationError, NotFoundError
 
 if TYPE_CHECKING:
-    from .resources.active import ActiveFileResource
-    from .resources.commands import CommandsResource
-    from .resources.open import OpenResource
-    from .resources.periodic import PeriodicNotesResource
-    from .resources.search import SearchResource
-    from .resources.system import SystemResource
-    from .resources.vault import VaultResource
+    import httpx
+
+    from .rest.active import ActiveFileResource
+    from .rest.commands import CommandsResource
+    from .rest.open import OpenResource
+    from .rest.periodic import PeriodicNotesResource
+    from .rest.search import SearchResource
+    from .rest.system import SystemResource
+    from .rest.vault import VaultResource
 
 
 class ObsidianClient:
@@ -64,6 +64,17 @@ class ObsidianClient:
         self._external_client = http_client is not None
         self._http = http_client or self._build_http_client()
 
+    @staticmethod
+    def _import_httpx() -> Any:
+        try:
+            import httpx
+        except ImportError:
+            raise ImportError(
+                "httpx is required for REST API support. "
+                "Install with: pip install aiobsidian[rest]"
+            ) from None
+        return httpx
+
     def __repr__(self) -> str:
         return (
             f"ObsidianClient(host={self._host!r}, port={self._port!r}, "
@@ -71,7 +82,8 @@ class ObsidianClient:
         )
 
     def _build_http_client(self) -> httpx.AsyncClient:
-        return httpx.AsyncClient(
+        httpx = self._import_httpx()
+        return httpx.AsyncClient(  # type: ignore[no-any-return]
             base_url=self._base_url,
             headers={"Authorization": f"Bearer {self._api_key}"},
             timeout=self._timeout,
@@ -145,49 +157,49 @@ class ObsidianClient:
     @cached_property
     def vault(self) -> VaultResource:
         """Access vault file operations (read, create, append, patch, delete, list)."""
-        from .resources.vault import VaultResource
+        from .rest.vault import VaultResource
 
         return VaultResource(self)
 
     @cached_property
     def active(self) -> ActiveFileResource:
         """Access the currently active file in Obsidian."""
-        from .resources.active import ActiveFileResource
+        from .rest.active import ActiveFileResource
 
         return ActiveFileResource(self)
 
     @cached_property
     def periodic(self) -> PeriodicNotesResource:
         """Access periodic notes (daily, weekly, monthly, quarterly, yearly)."""
-        from .resources.periodic import PeriodicNotesResource
+        from .rest.periodic import PeriodicNotesResource
 
         return PeriodicNotesResource(self)
 
     @cached_property
     def commands(self) -> CommandsResource:
         """List and execute Obsidian commands."""
-        from .resources.commands import CommandsResource
+        from .rest.commands import CommandsResource
 
         return CommandsResource(self)
 
     @cached_property
     def search(self) -> SearchResource:
         """Search vault content (simple text, Dataview DQL, JsonLogic)."""
-        from .resources.search import SearchResource
+        from .rest.search import SearchResource
 
         return SearchResource(self)
 
     @cached_property
     def open(self) -> OpenResource:
         """Open files in the Obsidian UI."""
-        from .resources.open import OpenResource
+        from .rest.open import OpenResource
 
         return OpenResource(self)
 
     @cached_property
     def system(self) -> SystemResource:
         """Access server status and OpenAPI specification."""
-        from .resources.system import SystemResource
+        from .rest.system import SystemResource
 
         return SystemResource(self)
 

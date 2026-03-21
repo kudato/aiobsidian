@@ -1,15 +1,24 @@
 # Installation
 
-## Prerequisites
+## Choose your interface
+
+aiobsidian supports two interfaces for interacting with Obsidian:
+
+| Interface | Requirements | Install |
+|-----------|-------------|---------|
+| **CLI** (primary) | [Obsidian CLI](https://obsidian.md/cli) v1.12+ | `pip install aiobsidian` |
+| **REST** (optional) | [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin + httpx | `pip install aiobsidian[rest]` |
+
+## CLI setup
 
 1. **Obsidian** — download from [obsidian.md](https://obsidian.md)
-2. **Local REST API plugin** — install from the Obsidian Community Plugins:
-    - Open Obsidian Settings → Community Plugins → Browse
-    - Search for "Local REST API"
-    - Install and enable the plugin
-    - Copy the API key from the plugin settings
+2. **Obsidian CLI** — included with Obsidian v1.12+. Verify installation:
 
-## Install aiobsidian
+    ```bash
+    obsidian version
+    ```
+
+3. **Install aiobsidian**:
 
 === "pip"
 
@@ -29,7 +38,53 @@
     poetry add aiobsidian
     ```
 
-## SSL certificates
+### Verify CLI setup
+
+```python
+import asyncio
+from aiobsidian import ObsidianCLI
+
+async def main():
+    async with ObsidianCLI("MyVault") as cli:
+        files = await cli.vault.list()
+        print(f"Found {len(files)} files")
+
+asyncio.run(main())
+```
+
+!!! note
+    Obsidian must be running in the background for the CLI to work — it communicates with the desktop app via IPC.
+
+## REST setup
+
+1. **Obsidian** — download from [obsidian.md](https://obsidian.md)
+2. **Local REST API plugin** — install from the Obsidian Community Plugins:
+    - Open Obsidian Settings → Community Plugins → Browse
+    - Search for "Local REST API"
+    - Install and enable the plugin
+    - Copy the API key from the plugin settings
+
+3. **Install aiobsidian with REST support**:
+
+=== "pip"
+
+    ```bash
+    pip install aiobsidian[rest]
+    ```
+
+=== "uv"
+
+    ```bash
+    uv add aiobsidian[rest]
+    ```
+
+=== "Poetry"
+
+    ```bash
+    poetry add aiobsidian[rest]
+    ```
+
+### SSL certificates
 
 The Local REST API plugin uses **self-signed HTTPS certificates** by default. aiobsidian disables SSL verification (`verify_ssl=False`) to handle this automatically.
 
@@ -40,7 +95,7 @@ The Local REST API plugin uses **self-signed HTTPS certificates** by default. ai
     client = ObsidianClient(api_key="...", verify_ssl=True)
     ```
 
-## Verify the installation
+### Verify REST setup
 
 ```python
 import asyncio
@@ -53,5 +108,3 @@ async def main():
 
 asyncio.run(main())
 ```
-
-If you see the Obsidian version printed, you're all set!

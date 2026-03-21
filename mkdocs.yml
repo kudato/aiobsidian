@@ -1,6 +1,6 @@
 site_name: aiobsidian
 site_url: https://kudato.github.io/aiobsidian
-site_description: Async Python client for Obsidian Local REST API
+site_description: Async Python client for Obsidian — CLI-first with optional REST support
 repo_url: https://github.com/kudato/aiobsidian
 repo_name: kudato/aiobsidian
 
@@ -21,6 +21,7 @@ theme:
         name: Switch to light mode
   features:
     - content.code.copy
+    - content.tabs.link
     - navigation.sections
     - navigation.expand
     - navigation.top
@@ -66,8 +67,32 @@ nav:
       - Open Files: guide/open.md
       - Error Handling: guide/error-handling.md
   - API Reference:
-      - Client: reference/client.md
-      - Resources:
+      - ObsidianCLI: reference/cli.md
+      - CLI Resources:
+          - Vault: reference/resources/cli-vault.md
+          - Daily: reference/resources/cli-daily.md
+          - Search: reference/resources/cli-search.md
+          - Properties: reference/resources/cli-properties.md
+          - Tags: reference/resources/cli-tags.md
+          - Links: reference/resources/cli-links.md
+          - Tasks: reference/resources/cli-tasks.md
+          - Commands: reference/resources/cli-commands.md
+          - Templates: reference/resources/cli-templates.md
+          - Bookmarks: reference/resources/cli-bookmarks.md
+          - Plugins: reference/resources/cli-plugins.md
+          - Themes: reference/resources/cli-themes.md
+          - Snippets: reference/resources/cli-snippets.md
+          - Sync: reference/resources/cli-sync.md
+          - Publish: reference/resources/cli-publish.md
+          - History: reference/resources/cli-history.md
+          - Workspaces: reference/resources/cli-workspaces.md
+          - Hotkeys: reference/resources/cli-hotkeys.md
+          - Outline: reference/resources/cli-outline.md
+          - Random: reference/resources/cli-random.md
+          - Aliases: reference/resources/cli-aliases.md
+          - Bases: reference/resources/cli-bases.md
+      - ObsidianClient (REST): reference/client.md
+      - REST Resources:
           - Vault: reference/resources/vault.md
           - Active File: reference/resources/active.md
           - Periodic Notes: reference/resources/periodic.md

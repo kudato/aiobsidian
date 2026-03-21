@@ -1,3 +1,3 @@
 # Open Resource
 
-::: aiobsidian.resources.open.OpenResource
+::: aiobsidian.rest.open.OpenResource

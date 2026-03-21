@@ -1,3 +1,3 @@
 # System Resource
 
-::: aiobsidian.resources.system.SystemResource
+::: aiobsidian.rest.system.SystemResource

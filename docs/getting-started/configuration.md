@@ -1,6 +1,45 @@
 # Configuration
 
-## Constructor parameters
+## ObsidianCLI
+
+### Constructor parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `vault` | `str` | *required* | Name of the Obsidian vault to operate on |
+| `binary` | `str` | `"auto"` | Path to the CLI binary, or `"auto"` for automatic lookup |
+| `timeout` | `float` | `30.0` | Default command timeout in seconds |
+
+### Basic usage
+
+```python
+from aiobsidian import ObsidianCLI
+
+async with ObsidianCLI("MyVault") as cli:
+    content = await cli.vault.read("note.md")
+```
+
+### Custom binary path
+
+If the `obsidian` binary is not on your `PATH`, specify it explicitly:
+
+```python
+cli = ObsidianCLI("MyVault", binary="/opt/obsidian/bin/obsidian")
+```
+
+### Custom timeout
+
+```python
+cli = ObsidianCLI("MyVault", timeout=60.0)
+```
+
+Per-command timeout override is also available via the `_execute` method internally.
+
+---
+
+## ObsidianClient (REST)
+
+### Constructor parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -12,15 +51,16 @@
 | `verify_ssl` | `bool` | `False` | Whether to verify SSL certificates |
 | `http_client` | `httpx.AsyncClient \| None` | `None` | Optional pre-configured HTTP client |
 
-## Basic usage
+### Basic usage
 
 ```python
 from aiobsidian import ObsidianClient
 
-client = ObsidianClient(api_key="your-api-key")
+async with ObsidianClient(api_key="your-api-key") as client:
+    status = await client.system.status()
 ```
 
-## Custom host and port
+### Custom host and port
 
 If the REST API plugin is configured to use a different host or port:
 
@@ -32,7 +72,7 @@ client = ObsidianClient(
 )
 ```
 
-## Using HTTP instead of HTTPS
+### Using HTTP instead of HTTPS
 
 ```python
 client = ObsidianClient(
@@ -41,7 +81,7 @@ client = ObsidianClient(
 )
 ```
 
-## Custom httpx client
+### Custom httpx client
 
 You can provide your own `httpx.AsyncClient` for advanced use cases like custom middleware, proxies, or connection pooling:
 
@@ -68,15 +108,21 @@ client = ObsidianClient(
 
 ## Lifecycle management
 
+Both `ObsidianCLI` and `ObsidianClient` support async context managers:
+
 ### Context manager (recommended)
 
 ```python
+async with ObsidianCLI("MyVault") as cli:
+    files = await cli.vault.list()
+# CLI instance is cleaned up here
+
 async with ObsidianClient(api_key="your-api-key") as client:
     status = await client.system.status()
-# Client is automatically closed here
+# HTTP client is automatically closed here
 ```
 
-### Manual close
+### Manual close (REST only)
 
 ```python
 client = ObsidianClient(api_key="your-api-key")

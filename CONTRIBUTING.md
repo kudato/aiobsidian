@@ -89,13 +89,45 @@ uv run mkdocs serve
 
 ```
 src/aiobsidian/
-├── _client.py          # ObsidianClient entry point
-├── _base_resource.py   # BaseResource + ContentResource
+├── _cli.py             # ObsidianCLI entry point (CLI, primary)
+├── _client.py          # ObsidianClient entry point (REST, optional)
 ├── _constants.py       # Default configuration
 ├── _types.py           # StrEnum types
-├── _exceptions.py      # Exception hierarchy
-├── models/             # Pydantic response models
-└── resources/          # API resource classes
+├── _exceptions.py      # Exception hierarchy (CLIError + APIError)
+├── cli/                # CLI resource classes (primary)
+│   ├── _base.py        # BaseCLIResource
+│   ├── vault.py        # File operations
+│   ├── daily.py        # Daily notes
+│   ├── search.py       # Full-text search
+│   ├── properties.py   # YAML frontmatter properties
+│   ├── tags.py         # Tag operations
+│   ├── links.py        # Links and backlinks
+│   ├── tasks.py        # Task operations
+│   ├── commands.py     # Command execution
+│   ├── templates.py    # Template operations
+│   ├── bookmarks.py    # Bookmark operations
+│   ├── plugins.py      # Plugin management
+│   ├── themes.py       # Theme management
+│   ├── snippets.py     # CSS snippet management
+│   ├── sync.py         # Obsidian Sync operations
+│   ├── publish.py      # Obsidian Publish operations
+│   ├── history.py      # Local file history
+│   ├── workspaces.py   # Workspace management
+│   ├── hotkeys.py      # Hotkey operations
+│   ├── outline.py      # Document outline
+│   ├── random_note.py  # Random note operations
+│   ├── aliases.py      # Note alias operations
+│   └── bases.py        # Bases (database) operations
+├── rest/               # REST resource classes (optional, requires httpx)
+│   ├── _base.py        # BaseResource + ContentResource
+│   ├── vault.py        # File CRUD + list
+│   ├── active.py       # Active file operations
+│   ├── periodic.py     # Periodic notes
+│   ├── commands.py     # Command execution
+│   ├── search.py       # Search (simple, Dataview, JsonLogic)
+│   ├── open.py         # Open files in UI
+│   └── system.py       # Server status
+└── models/             # Pydantic response models
 ```
 
 ## Releasing (maintainers)

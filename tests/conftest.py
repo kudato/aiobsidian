@@ -1,7 +1,10 @@
+from unittest.mock import AsyncMock
+
 import httpx
 import pytest
 import respx
 
+from aiobsidian._cli import ObsidianCLI
 from aiobsidian._client import ObsidianClient
 
 
@@ -19,3 +22,13 @@ async def client(mock_api):
     )
     async with ObsidianClient("test-key", http_client=http) as c:
         yield c
+
+
+@pytest.fixture()
+def cli():
+    instance = ObsidianCLI.__new__(ObsidianCLI)
+    instance._vault = "TestVault"
+    instance._binary = "/usr/local/bin/obsidian"
+    instance._timeout = 30.0
+    instance._execute = AsyncMock()
+    return instance

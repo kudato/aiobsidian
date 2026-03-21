@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .._base_resource import BaseResource
+from ._base import BaseResource
 
 
 class OpenResource(BaseResource):
