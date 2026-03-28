@@ -37,13 +37,15 @@ class CLIPublishResource(BaseCLIResource):
         result: dict[str, Any] = json.loads(output)
         return result
 
-    async def add(self, path: str) -> None:
-        """Publish a file.
+    async def add(self, path: str | None = None) -> None:
+        """Publish a file or all changed files.
 
         Args:
-            path: Path to the file to publish.
+            path: Path to the file to publish. If ``None``, publishes
+                all changed files.
         """
-        await self._cli._execute("publish:add", params={"path": path})
+        params = {"path": path} if path is not None else None
+        await self._cli._execute("publish:add", params=params)
 
     async def remove(self, path: str) -> None:
         """Unpublish a file.

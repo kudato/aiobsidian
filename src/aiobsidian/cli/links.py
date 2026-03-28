@@ -26,16 +26,22 @@ class CLILinksResource(BaseCLIResource):
         result: list[dict[str, Any]] = json.loads(output)
         return result
 
-    async def incoming(self, path: str) -> list[dict[str, Any]]:
+    async def incoming(
+        self, path: str, *, counts: bool = False
+    ) -> list[dict[str, Any]]:
         """Get backlinks (incoming links) to a note.
 
         Args:
             path: Path or name of the note.
+            counts: If ``True``, include reference counts.
 
         Returns:
             List of backlink objects.
         """
-        output = await self._cli._execute("backlinks", params={"file": path})
+        flags = ["--counts"] if counts else None
+        output = await self._cli._execute(
+            "backlinks", params={"file": path}, flags=flags
+        )
         result: list[dict[str, Any]] = json.loads(output)
         return result
 

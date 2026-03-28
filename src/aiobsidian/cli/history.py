@@ -13,19 +13,20 @@ class CLIHistoryResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
-    async def read(self, path: str, *, version: str) -> str:
-        """Read a specific version from local history.
+    async def read(self, path: str, *, version: str | None = None) -> str:
+        """Read a version from local history.
 
         Args:
             path: Path to the file relative to the vault root.
-            version: Version identifier.
+            version: Version identifier. Defaults to the latest version.
 
         Returns:
             File content at the specified version.
         """
-        return await self._cli._execute(
-            "history:read", params={"path": path, "version": version}
-        )
+        params: dict[str, str] = {"path": path}
+        if version is not None:
+            params["version"] = version
+        return await self._cli._execute("history:read", params=params)
 
     async def restore(self, path: str, *, version: str) -> None:
         """Restore a file from local history.

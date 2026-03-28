@@ -63,12 +63,16 @@ class CLIPluginsResource(BaseCLIResource):
         """
         await self._cli._execute("plugin:reload", params={"id": plugin_id})
 
-    async def list(self) -> list[dict[str, Any]]:
+    async def list(self, *, versions: bool = False) -> list[dict[str, Any]]:
         """List all installed plugins.
+
+        Args:
+            versions: If ``True``, include version information.
 
         Returns:
             List of plugin objects.
         """
-        output = await self._cli._execute("plugins")
+        flags = ["--versions"] if versions else None
+        output = await self._cli._execute("plugins", flags=flags)
         result: list[dict[str, Any]] = json.loads(output)
         return result

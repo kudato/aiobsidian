@@ -16,7 +16,14 @@ async def test_list(cli):
     cli._execute.return_value = json.dumps(PLUGINS)
     result = await cli.plugins.list()
     assert result == PLUGINS
-    cli._execute.assert_awaited_once_with("plugins")
+    cli._execute.assert_awaited_once_with("plugins", flags=None)
+
+
+async def test_list_with_versions(cli):
+    cli._execute.return_value = json.dumps(PLUGINS)
+    result = await cli.plugins.list(versions=True)
+    assert result == PLUGINS
+    cli._execute.assert_awaited_once_with("plugins", flags=["--versions"])
 
 
 async def test_enabled(cli):

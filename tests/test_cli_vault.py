@@ -28,11 +28,71 @@ async def test_create_overwrite(cli):
     )
 
 
+async def test_create_with_name(cli):
+    cli._execute.return_value = ""
+    await cli.vault.create("note.md", "content", name="My Note")
+    cli._execute.assert_awaited_once_with(
+        "create",
+        params={"path": "note.md", "content": "content", "name": "My Note"},
+        flags=None,
+    )
+
+
+async def test_create_with_template(cli):
+    cli._execute.return_value = ""
+    await cli.vault.create("note.md", "content", template="daily")
+    cli._execute.assert_awaited_once_with(
+        "create",
+        params={"path": "note.md", "content": "content", "template": "daily"},
+        flags=None,
+    )
+
+
+async def test_create_silent(cli):
+    cli._execute.return_value = ""
+    await cli.vault.create("note.md", "content", silent=True)
+    cli._execute.assert_awaited_once_with(
+        "create",
+        params={"path": "note.md", "content": "content"},
+        flags=["--silent"],
+    )
+
+
+async def test_create_all_params(cli):
+    cli._execute.return_value = ""
+    await cli.vault.create(
+        "note.md",
+        "content",
+        name="My Note",
+        template="daily",
+        overwrite=True,
+        silent=True,
+    )
+    cli._execute.assert_awaited_once_with(
+        "create",
+        params={
+            "path": "note.md",
+            "content": "content",
+            "name": "My Note",
+            "template": "daily",
+        },
+        flags=["--overwrite", "--silent"],
+    )
+
+
 async def test_append(cli):
     cli._execute.return_value = ""
     await cli.vault.append("note.md", "extra")
     cli._execute.assert_awaited_once_with(
-        "append", params={"path": "note.md", "content": "extra"}
+        "append", params={"path": "note.md", "content": "extra"}, flags=None
+    )
+
+
+async def test_append_inline(cli):
+    cli._execute.return_value = ""
+    await cli.vault.append("note.md", "extra", inline=True)
+    cli._execute.assert_awaited_once_with(
+        "append", params={"path": "note.md", "content": "extra"}, flags=["--inline"]
     )
 
 
@@ -48,7 +108,7 @@ async def test_move(cli):
     cli._execute.return_value = ""
     await cli.vault.move("old.md", "new.md")
     cli._execute.assert_awaited_once_with(
-        "move", params={"path": "old.md", "new-path": "new.md"}
+        "move", params={"path": "old.md", "to": "new.md"}
     )
 
 
@@ -63,7 +123,17 @@ async def test_rename(cli):
 async def test_delete(cli):
     cli._execute.return_value = ""
     await cli.vault.delete("note.md")
-    cli._execute.assert_awaited_once_with("delete", params={"path": "note.md"})
+    cli._execute.assert_awaited_once_with(
+        "delete", params={"path": "note.md"}, flags=None
+    )
+
+
+async def test_delete_permanent(cli):
+    cli._execute.return_value = ""
+    await cli.vault.delete("note.md", permanent=True)
+    cli._execute.assert_awaited_once_with(
+        "delete", params={"path": "note.md"}, flags=["--permanent"]
+    )
 
 
 async def test_list(cli):
@@ -78,6 +148,29 @@ async def test_list_with_path(cli):
     result = await cli.vault.list("folder")
     assert result == ["folder/a.md"]
     cli._execute.assert_awaited_once_with("files", params={"path": "folder"})
+
+
+async def test_list_with_ext(cli):
+    cli._execute.return_value = json.dumps(["a.md", "b.md"])
+    result = await cli.vault.list(ext="md")
+    assert result == ["a.md", "b.md"]
+    cli._execute.assert_awaited_once_with("files", params={"ext": "md"})
+
+
+async def test_list_with_folder(cli):
+    cli._execute.return_value = json.dumps(["notes/a.md"])
+    result = await cli.vault.list(folder="notes")
+    assert result == ["notes/a.md"]
+    cli._execute.assert_awaited_once_with("files", params={"folder": "notes"})
+
+
+async def test_list_with_all_params(cli):
+    cli._execute.return_value = json.dumps(["notes/a.md"])
+    result = await cli.vault.list("notes", ext="md", folder="notes")
+    assert result == ["notes/a.md"]
+    cli._execute.assert_awaited_once_with(
+        "files", params={"path": "notes", "ext": "md", "folder": "notes"}
+    )
 
 
 async def test_info(cli):

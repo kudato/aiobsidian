@@ -31,7 +31,18 @@ async def test_incoming(cli):
     cli._execute.return_value = json.dumps(INCOMING)
     result = await cli.links.incoming("note.md")
     assert result == INCOMING
-    cli._execute.assert_awaited_once_with("backlinks", params={"file": "note.md"})
+    cli._execute.assert_awaited_once_with(
+        "backlinks", params={"file": "note.md"}, flags=None
+    )
+
+
+async def test_incoming_with_counts(cli):
+    cli._execute.return_value = json.dumps(INCOMING)
+    result = await cli.links.incoming("note.md", counts=True)
+    assert result == INCOMING
+    cli._execute.assert_awaited_once_with(
+        "backlinks", params={"file": "note.md"}, flags=["--counts"]
+    )
 
 
 async def test_unresolved(cli):

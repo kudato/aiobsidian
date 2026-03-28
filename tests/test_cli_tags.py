@@ -17,14 +17,28 @@ async def test_list(cli):
     cli._execute.return_value = json.dumps(TAGS_LIST)
     result = await cli.tags.list()
     assert result == TAGS_LIST
-    cli._execute.assert_awaited_once_with("tags", params=None)
+    cli._execute.assert_awaited_once_with("tags", params=None, flags=None)
 
 
 async def test_list_sorted(cli):
     cli._execute.return_value = json.dumps(TAGS_LIST)
     result = await cli.tags.list(sort="count")
     assert result == TAGS_LIST
-    cli._execute.assert_awaited_once_with("tags", params={"sort": "count"})
+    cli._execute.assert_awaited_once_with("tags", params={"sort": "count"}, flags=None)
+
+
+async def test_list_with_path(cli):
+    cli._execute.return_value = json.dumps(TAGS_LIST)
+    result = await cli.tags.list(path="notes")
+    assert result == TAGS_LIST
+    cli._execute.assert_awaited_once_with("tags", params={"path": "notes"}, flags=None)
+
+
+async def test_list_with_counts(cli):
+    cli._execute.return_value = json.dumps(TAGS_LIST)
+    result = await cli.tags.list(counts=True)
+    assert result == TAGS_LIST
+    cli._execute.assert_awaited_once_with("tags", params=None, flags=["--counts"])
 
 
 async def test_get(cli):

@@ -24,6 +24,15 @@ async def test_read(cli):
     )
 
 
+async def test_read_latest(cli):
+    cli._execute.return_value = "# Latest content"
+    result = await cli.history.read("notes/todo.md")
+    assert result == "# Latest content"
+    cli._execute.assert_awaited_once_with(
+        "history:read", params={"path": "notes/todo.md"}
+    )
+
+
 async def test_restore(cli):
     cli._execute.return_value = ""
     await cli.history.restore("notes/todo.md", version="v1")
