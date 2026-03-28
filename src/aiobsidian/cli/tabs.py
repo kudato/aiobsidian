@@ -13,16 +13,6 @@ class CLITabsResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
-    async def list(self) -> list[dict[str, Any]]:
-        """List open tabs.
-
-        Returns:
-            List of open tab objects.
-        """
-        output = await self._cli._execute("tabs")
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
-
     async def open(self, *, file: str | None = None, view: str | None = None) -> None:
         """Open a file or view in a new tab.
 
@@ -44,5 +34,15 @@ class CLITabsResource(BaseCLIResource):
             List of recently opened file objects.
         """
         output = await self._cli._execute("recents")
+        result: list[dict[str, Any]] = json.loads(output)
+        return result
+
+    async def list(self) -> list[dict[str, Any]]:
+        """List open tabs.
+
+        Returns:
+            List of open tab objects.
+        """
+        output = await self._cli._execute("tabs")
         result: list[dict[str, Any]] = json.loads(output)
         return result
