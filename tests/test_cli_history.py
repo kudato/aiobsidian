@@ -8,6 +8,49 @@ HISTORY_FILES = [
 ]
 
 
+async def test_versions(cli):
+    versions = [
+        {"version": "v1", "date": "2026-03-16T09:00:00Z"},
+        {"version": "v2", "date": "2026-03-16T10:00:00Z"},
+    ]
+    cli._execute.return_value = json.dumps(versions)
+    result = await cli.history.versions("notes/todo.md")
+    assert result == versions
+    cli._execute.assert_awaited_once_with("history", params={"path": "notes/todo.md"})
+
+
+async def test_open(cli):
+    cli._execute.return_value = ""
+    await cli.history.open("notes/todo.md")
+    cli._execute.assert_awaited_once_with(
+        "history:open", params={"path": "notes/todo.md"}
+    )
+
+
+async def test_diff(cli):
+    cli._execute.return_value = "- old line\n+ new line"
+    result = await cli.history.diff("notes/todo.md")
+    assert result == "- old line\n+ new line"
+    cli._execute.assert_awaited_once_with("diff", params={"path": "notes/todo.md"})
+
+
+async def test_diff_all_params(cli):
+    cli._execute.return_value = "- old\n+ new"
+    result = await cli.history.diff(
+        "notes/todo.md", from_version="v1", to_version="v2", filter="added"
+    )
+    assert result == "- old\n+ new"
+    cli._execute.assert_awaited_once_with(
+        "diff",
+        params={
+            "path": "notes/todo.md",
+            "from": "v1",
+            "to": "v2",
+            "filter": "added",
+        },
+    )
+
+
 async def test_list(cli):
     cli._execute.return_value = json.dumps(HISTORY_FILES)
     result = await cli.history.list()

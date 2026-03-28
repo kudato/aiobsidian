@@ -3,6 +3,12 @@ from __future__ import annotations
 import json
 
 
+async def test_open(cli):
+    cli._execute.return_value = ""
+    await cli.vault.open("note.md")
+    cli._execute.assert_awaited_once_with("open", params={"path": "note.md"})
+
+
 async def test_read(cli):
     cli._execute.return_value = "# Hello"
     result = await cli.vault.read("note.md")

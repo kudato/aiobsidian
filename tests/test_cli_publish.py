@@ -12,6 +12,20 @@ PUBLISHED_FILES = [
 PUBLISH_STATUS = {"path": "index.md", "published": True, "changed": False}
 
 
+async def test_open(cli):
+    cli._execute.return_value = ""
+    await cli.publish.open("notes/index.md")
+    cli._execute.assert_awaited_once_with(
+        "publish:open", params={"path": "notes/index.md"}
+    )
+
+
+async def test_open_no_path(cli):
+    cli._execute.return_value = ""
+    await cli.publish.open()
+    cli._execute.assert_awaited_once_with("publish:open", params=None)
+
+
 async def test_site(cli):
     cli._execute.return_value = json.dumps(SITE_INFO)
     result = await cli.publish.site()

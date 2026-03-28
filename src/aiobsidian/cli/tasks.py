@@ -40,6 +40,17 @@ class CLITasksResource(BaseCLIResource):
         result: list[dict[str, Any]] = json.loads(output)
         return result
 
+    async def toggle(self, path: str, line: int) -> None:
+        """Toggle a task's completion status.
+
+        Args:
+            path: Path to the file containing the task.
+            line: Line number of the task in the file.
+        """
+        await self._cli._execute(
+            "task", params={"path": path, "line": str(line)}, flags=["--toggle"]
+        )
+
     async def create(self, content: str, *, tags: str | None = None) -> None:
         """Create a new task.
 

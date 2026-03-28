@@ -13,6 +13,18 @@ class CLISyncResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    async def toggle(self, *, on: bool) -> None:
+        """Pause or resume Obsidian Sync.
+
+        Args:
+            on: If ``True``, resume sync; if ``False``, pause sync.
+        """
+        await self._cli._execute("sync:on" if on else "sync:off")
+
+    async def open(self) -> None:
+        """Open the Sync history UI."""
+        await self._cli._execute("sync:open")
+
     async def status(self) -> dict[str, Any]:
         """Get sync status information.
 

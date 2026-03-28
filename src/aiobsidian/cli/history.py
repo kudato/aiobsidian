@@ -13,6 +13,55 @@ class CLIHistoryResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    async def versions(self, path: str) -> list[dict[str, Any]]:
+        """List versions of a specific file in local history.
+
+        Args:
+            path: Path to the file relative to the vault root.
+
+        Returns:
+            List of version objects for the file.
+        """
+        output = await self._cli._execute("history", params={"path": path})
+        result: list[dict[str, Any]] = json.loads(output)
+        return result
+
+    async def open(self, path: str) -> None:
+        """Open the File Recovery UI for a file.
+
+        Args:
+            path: Path to the file relative to the vault root.
+        """
+        await self._cli._execute("history:open", params={"path": path})
+
+    async def diff(
+        self,
+        path: str,
+        *,
+        from_version: str | None = None,
+        to_version: str | None = None,
+        filter: str | None = None,
+    ) -> str:
+        """Get a diff between file versions.
+
+        Args:
+            path: Path to the file relative to the vault root.
+            from_version: Starting version identifier.
+            to_version: Ending version identifier.
+            filter: Filter expression for the diff output.
+
+        Returns:
+            Diff output as a string.
+        """
+        params: dict[str, str] = {"path": path}
+        if from_version is not None:
+            params["from"] = from_version
+        if to_version is not None:
+            params["to"] = to_version
+        if filter is not None:
+            params["filter"] = filter
+        return await self._cli._execute("diff", params=params)
+
     async def read(self, path: str, *, version: str | None = None) -> str:
         """Read a version from local history.
 

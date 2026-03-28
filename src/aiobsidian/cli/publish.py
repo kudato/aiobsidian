@@ -13,6 +13,16 @@ class CLIPublishResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    async def open(self, path: str | None = None) -> None:
+        """Open a file on the published site.
+
+        Args:
+            path: Path to the file to open. If ``None``, opens the
+                site root.
+        """
+        params = {"path": path} if path is not None else None
+        await self._cli._execute("publish:open", params=params)
+
     async def site(self) -> dict[str, Any]:
         """Get Publish site information.
 

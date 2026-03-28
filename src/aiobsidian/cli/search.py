@@ -13,6 +13,14 @@ class CLISearchResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    async def open(self, query: str) -> None:
+        """Open the search panel in the Obsidian UI with a query.
+
+        Args:
+            query: Search query string.
+        """
+        await self._cli._execute("search:open", params={"query": query})
+
     async def query(
         self,
         query: str,

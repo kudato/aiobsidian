@@ -13,6 +13,14 @@ class CLIVaultResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    async def open(self, path: str) -> None:
+        """Open a file in the Obsidian UI.
+
+        Args:
+            path: Path to the file relative to the vault root.
+        """
+        await self._cli._execute("open", params={"path": path})
+
     async def read(self, path: str) -> str:
         """Read the content of a vault file.
 

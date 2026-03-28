@@ -3,6 +3,12 @@ from __future__ import annotations
 import json
 
 
+async def test_open(cli):
+    cli._execute.return_value = ""
+    await cli.search.open("test query")
+    cli._execute.assert_awaited_once_with("search:open", params={"query": "test query"})
+
+
 async def test_query(cli):
     results = [{"file": "note.md", "score": 1.0}]
     cli._execute.return_value = json.dumps(results)

@@ -14,6 +14,24 @@ DELETED_FILES = [
 ]
 
 
+async def test_toggle_on(cli):
+    cli._execute.return_value = ""
+    await cli.sync.toggle(on=True)
+    cli._execute.assert_awaited_once_with("sync:on")
+
+
+async def test_toggle_off(cli):
+    cli._execute.return_value = ""
+    await cli.sync.toggle(on=False)
+    cli._execute.assert_awaited_once_with("sync:off")
+
+
+async def test_open(cli):
+    cli._execute.return_value = ""
+    await cli.sync.open()
+    cli._execute.assert_awaited_once_with("sync:open")
+
+
 async def test_status(cli):
     cli._execute.return_value = json.dumps(SYNC_STATUS)
     result = await cli.sync.status()
