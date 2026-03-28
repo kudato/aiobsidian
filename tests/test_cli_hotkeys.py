@@ -21,4 +21,15 @@ async def test_get(cli):
     cli._execute.return_value = json.dumps(HOTKEY)
     result = await cli.hotkeys.get("editor:toggle-bold")
     assert result == HOTKEY
-    cli._execute.assert_awaited_once_with("hotkey", params={"id": "editor:toggle-bold"})
+    cli._execute.assert_awaited_once_with(
+        "hotkey", params={"id": "editor:toggle-bold"}, flags=None
+    )
+
+
+async def test_get_verbose(cli):
+    cli._execute.return_value = json.dumps(HOTKEY)
+    result = await cli.hotkeys.get("editor:toggle-bold", verbose=True)
+    assert result == HOTKEY
+    cli._execute.assert_awaited_once_with(
+        "hotkey", params={"id": "editor:toggle-bold"}, flags=["--verbose"]
+    )

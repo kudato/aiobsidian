@@ -31,13 +31,15 @@ class CLIThemesResource(BaseCLIResource):
         """
         await self._cli._execute("theme:set", params={"name": name})
 
-    async def install(self, name: str) -> None:
+    async def install(self, name: str, *, enable: bool = False) -> None:
         """Install a theme from the community registry.
 
         Args:
             name: Theme name to install.
+            enable: If ``True``, activate the theme after installation.
         """
-        await self._cli._execute("theme:install", params={"name": name})
+        flags = ["--enable"] if enable else None
+        await self._cli._execute("theme:install", params={"name": name}, flags=flags)
 
     async def uninstall(self, name: str) -> None:
         """Uninstall a theme.
@@ -47,12 +49,16 @@ class CLIThemesResource(BaseCLIResource):
         """
         await self._cli._execute("theme:uninstall", params={"name": name})
 
-    async def list(self) -> list[dict[str, Any]]:
+    async def list(self, *, versions: bool = False) -> list[dict[str, Any]]:
         """List all installed themes.
+
+        Args:
+            versions: If ``True``, include version information.
 
         Returns:
             List of theme objects.
         """
-        output = await self._cli._execute("themes")
+        flags = ["--versions"] if versions else None
+        output = await self._cli._execute("themes", flags=flags)
         result: list[dict[str, Any]] = json.loads(output)
         return result

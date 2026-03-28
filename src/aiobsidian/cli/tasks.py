@@ -13,13 +13,30 @@ class CLITasksResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
-    async def list(self) -> list[dict[str, Any]]:
-        """List all tasks across the vault.
+    async def list(
+        self,
+        *,
+        path: str | None = None,
+        daily: bool = False,
+        done: bool = False,
+    ) -> list[dict[str, Any]]:
+        """List tasks across the vault.
+
+        Args:
+            path: Restrict to tasks in files under this path.
+            daily: If ``True``, only list tasks from the daily note.
+            done: If ``True``, include completed tasks.
 
         Returns:
             List of task objects.
         """
-        output = await self._cli._execute("tasks")
+        params = {"path": path} if path is not None else None
+        flags: list[str] = []
+        if daily:
+            flags.append("--daily")
+        if done:
+            flags.append("--done")
+        output = await self._cli._execute("tasks", params=params, flags=flags or None)
         result: list[dict[str, Any]] = json.loads(output)
         return result
 

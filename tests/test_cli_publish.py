@@ -48,6 +48,12 @@ async def test_add(cli):
     )
 
 
+async def test_add_all(cli):
+    cli._execute.return_value = ""
+    await cli.publish.add()
+    cli._execute.assert_awaited_once_with("publish:add", params=None)
+
+
 async def test_remove(cli):
     cli._execute.return_value = ""
     await cli.publish.remove("notes/old.md")

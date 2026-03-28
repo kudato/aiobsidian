@@ -35,16 +35,29 @@ class CLITagsResource(BaseCLIResource):
         """
         await self._cli._execute("tags:rename", params={"old": old, "new": new})
 
-    async def list(self, *, sort: str | None = None) -> list[dict[str, Any]]:
+    async def list(
+        self,
+        *,
+        sort: str | None = None,
+        path: str | None = None,
+        counts: bool = False,
+    ) -> list[dict[str, Any]]:
         """List all tags in the vault.
 
         Args:
             sort: Sort order (e.g. ``"count"`` to sort by frequency).
+            path: Restrict to tags found under this path.
+            counts: If ``True``, include usage counts per tag.
 
         Returns:
             List of tag objects.
         """
-        params = {"sort": sort} if sort else None
-        output = await self._cli._execute("tags", params=params)
+        params: dict[str, str] = {}
+        if sort:
+            params["sort"] = sort
+        if path is not None:
+            params["path"] = path
+        flags = ["--counts"] if counts else None
+        output = await self._cli._execute("tags", params=params or None, flags=flags)
         result: list[dict[str, Any]] = json.loads(output)
         return result
