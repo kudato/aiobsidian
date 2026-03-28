@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from .cli.templates import CLITemplatesResource
     from .cli.themes import CLIThemesResource
     from .cli.vault import CLIVaultResource
+    from .cli.web import CLIWebResource
     from .cli.workspaces import CLIWorkspacesResource
 
 logger = logging.getLogger(__name__)
@@ -329,6 +330,13 @@ class ObsidianCLI:
         from .cli.bases import CLIBasesResource
 
         return CLIBasesResource(self)
+
+    @cached_property
+    def web(self) -> CLIWebResource:
+        """Access web viewer operations (open)."""
+        from .cli.web import CLIWebResource
+
+        return CLIWebResource(self)
 
     # -- lifecycle ---------------------------------------------------------
 
