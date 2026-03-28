@@ -45,6 +45,14 @@ async def test_list_all_flags(cli):
     )
 
 
+async def test_toggle(cli):
+    cli._execute.return_value = ""
+    await cli.tasks.toggle("todo.md", 5)
+    cli._execute.assert_awaited_once_with(
+        "task", params={"path": "todo.md", "line": "5"}, flags=["--toggle"]
+    )
+
+
 async def test_create(cli):
     cli._execute.return_value = ""
     await cli.tasks.create("Buy milk")

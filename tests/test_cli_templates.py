@@ -8,6 +8,14 @@ TEMPLATES_LIST = [
 ]
 
 
+async def test_insert(cli):
+    cli._execute.return_value = ""
+    await cli.templates.insert("Daily Note")
+    cli._execute.assert_awaited_once_with(
+        "template:insert", params={"name": "Daily Note"}
+    )
+
+
 async def test_list(cli):
     cli._execute.return_value = json.dumps(TEMPLATES_LIST)
     result = await cli.templates.list()

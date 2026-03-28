@@ -36,6 +36,14 @@ class CLITemplatesResource(BaseCLIResource):
         flags = ["--resolve"] if resolve else None
         return await self._cli._execute("template:read", params=params, flags=flags)
 
+    async def insert(self, name: str) -> None:
+        """Insert a template into the active file.
+
+        Args:
+            name: Template name to insert.
+        """
+        await self._cli._execute("template:insert", params={"name": name})
+
     async def list(self) -> list[dict[str, Any]]:
         """List available templates.
 

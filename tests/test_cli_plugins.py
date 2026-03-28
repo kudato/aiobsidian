@@ -12,6 +12,26 @@ ENABLED_PLUGINS = [
 ]
 
 
+async def test_info(cli):
+    plugin_info = {"id": "dataview", "name": "Dataview", "version": "0.5.66"}
+    cli._execute.return_value = json.dumps(plugin_info)
+    result = await cli.plugins.info("dataview")
+    assert result == plugin_info
+    cli._execute.assert_awaited_once_with("plugin", params={"id": "dataview"})
+
+
+async def test_restrict_on(cli):
+    cli._execute.return_value = ""
+    await cli.plugins.restrict(on=True)
+    cli._execute.assert_awaited_once_with("plugins:restrict", flags=["--on"])
+
+
+async def test_restrict_off(cli):
+    cli._execute.return_value = ""
+    await cli.plugins.restrict(on=False)
+    cli._execute.assert_awaited_once_with("plugins:restrict", flags=["--off"])
+
+
 async def test_list(cli):
     cli._execute.return_value = json.dumps(PLUGINS)
     result = await cli.plugins.list()

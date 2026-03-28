@@ -13,6 +13,29 @@ class CLIPluginsResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    async def info(self, plugin_id: str) -> dict[str, Any]:
+        """Get details about a plugin.
+
+        Args:
+            plugin_id: Plugin identifier.
+
+        Returns:
+            Plugin details.
+        """
+        output = await self._cli._execute("plugin", params={"id": plugin_id})
+        result: dict[str, Any] = json.loads(output)
+        return result
+
+    async def restrict(self, *, on: bool) -> None:
+        """Toggle restricted mode for plugins.
+
+        Args:
+            on: If ``True``, enable restricted mode;
+                if ``False``, disable it.
+        """
+        flags = ["--on"] if on else ["--off"]
+        await self._cli._execute("plugins:restrict", flags=flags)
+
     async def enabled(self) -> list[dict[str, Any]]:
         """List enabled plugins.
 
