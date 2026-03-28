@@ -10,13 +10,17 @@ class CLIDailyResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
-    async def read(self) -> str:
-        """Read the content of today's daily note.
+    async def read(self, *, date: str | None = None) -> str:
+        """Read the content of a daily note.
+
+        Args:
+            date: Date in ``YYYY-MM-DD`` format. Defaults to today.
 
         Returns:
             Daily note content as a string.
         """
-        return await self._cli._execute("daily:read")
+        params = {"date": date} if date is not None else None
+        return await self._cli._execute("daily:read", params=params)
 
     async def path(self) -> str:
         """Get the file path of today's daily note.
