@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from .cli.bookmarks import CLIBookmarksResource
     from .cli.commands import CLICommandsResource
     from .cli.daily import CLIDailyResource
+    from .cli.dev import CLIDevResource
     from .cli.history import CLIHistoryResource
     from .cli.hotkeys import CLIHotkeysResource
     from .cli.links import CLILinksResource
@@ -337,6 +338,13 @@ class ObsidianCLI:
         from .cli.web import CLIWebResource
 
         return CLIWebResource(self)
+
+    @cached_property
+    def dev(self) -> CLIDevResource:
+        """Access developer/debugging tools."""
+        from .cli.dev import CLIDevResource
+
+        return CLIDevResource(self)
 
     # -- lifecycle ---------------------------------------------------------
 
