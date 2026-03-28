@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from .cli.snippets import CLISnippetsResource
     from .cli.sync import CLISyncResource
     from .cli.system import CLISystemResource
+    from .cli.tabs import CLITabsResource
     from .cli.tags import CLITagsResource
     from .cli.tasks import CLITasksResource
     from .cli.templates import CLITemplatesResource
@@ -307,6 +308,13 @@ class ObsidianCLI:
         from .cli.aliases import CLIAliasesResource
 
         return CLIAliasesResource(self)
+
+    @cached_property
+    def tabs(self) -> CLITabsResource:
+        """Access workspace tabs management (list, open, recents)."""
+        from .cli.tabs import CLITabsResource
+
+        return CLITabsResource(self)
 
     @cached_property
     def system(self) -> CLISystemResource:
