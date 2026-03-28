@@ -9,6 +9,7 @@
 - **Runtime**: Python 3.13+, pydantic >=2.0, httpx >=0.28 (optional, for REST)
 - **Build**: hatchling, uv (package manager)
 - **Lint/Format**: ruff (rules: E, F, I, UP; line-length 88; target py313)
+- **Audit**: `uv audit` (OSV-based dependency vulnerability scanning)
 - **Tests**: pytest >=8.0, pytest-asyncio >=0.25 (`asyncio_mode = "auto"`), respx >=0.22
 - **Docs**: mkdocs + mkdocs-material + mkdocstrings[python]
 

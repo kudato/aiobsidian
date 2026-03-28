@@ -20,7 +20,7 @@ jobs:
       - run: uv sync --group dev
 
       - name: Audit dependencies
-        run: uv run pip-audit
+        run: uv audit --frozen --preview-features audit
 
       - name: Lint
         run: uv run ruff check src/ tests/

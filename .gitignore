@@ -12,7 +12,8 @@ build/
 .ruff_cache/
 .pytest_cache/
 .mypy_cache/
-*.lock
 .coverage
 coverage.xml
 site/
+.DS_Store
+.claude/settings.local.json
