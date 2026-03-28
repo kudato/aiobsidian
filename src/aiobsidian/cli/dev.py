@@ -96,9 +96,7 @@ class CLIDevResource(BaseCLIResource):
             flags.append("--all")
         if text:
             flags.append("--text")
-        return await self._cli._execute(
-            "dev:dom", params=params, flags=flags or None
-        )
+        return await self._cli._execute("dev:dom", params=params, flags=flags or None)
 
     async def css(self, selector: str, *, prop: str | None = None) -> str:
         """Inspect CSS styles.

@@ -66,9 +66,7 @@ async def test_dom(cli):
 
 async def test_dom_all_flags(cli):
     cli._execute.return_value = "text content"
-    result = await cli.dev.dom(
-        "#app", all=True, text=True, attr="data-id", css="color"
-    )
+    result = await cli.dev.dom("#app", all=True, text=True, attr="data-id", css="color")
     assert result == "text content"
     cli._execute.assert_awaited_once_with(
         "dev:dom",
