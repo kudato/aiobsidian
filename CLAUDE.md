@@ -13,90 +13,6 @@
 - **Tests**: pytest >=8.0, pytest-asyncio >=0.25 (`asyncio_mode = "auto"`), respx >=0.22
 - **Docs**: mkdocs + mkdocs-material + mkdocstrings[python]
 
-## Project structure
-
-```
-src/aiobsidian/
-├── __init__.py            # public API — all exports in __all__
-├── _cli.py                # ObsidianCLI (async subprocess wrapper, CLI entry point)
-├── _client.py             # ObsidianClient (REST entry point, httpx-based)
-├── _constants.py          # DEFAULT_HOST/PORT/SCHEME/TIMEOUT/CLI_TIMEOUT
-├── _types.py              # StrEnum types: Period, PatchOperation, TargetType, ContentType
-├── _exceptions.py         # ObsidianError → APIError/CLIError hierarchies
-├── cli/                   # CLI resources (primary interface)
-│   ├── _base.py           # BaseCLIResource (__slots__, _cli ref)
-│   ├── vault.py           # CLIVaultResource — read/create/append/prepend/move/rename/delete/list/info/file_info/folder_info/folders/wordcount
-│   ├── daily.py           # CLIDailyResource — read/path/create/append/prepend
-│   ├── search.py          # CLISearchResource — query/context
-│   ├── properties.py      # CLIPropertiesResource — list/read/set/remove
-│   ├── tags.py            # CLITagsResource — get/rename/list
-│   ├── links.py           # CLILinksResource — outgoing/incoming/unresolved/orphans/deadends
-│   ├── tasks.py           # CLITasksResource — list/create/complete
-│   ├── commands.py        # CLICommandsResource — list/execute
-│   ├── templates.py       # CLITemplatesResource — list/read
-│   ├── bookmarks.py       # CLIBookmarksResource — list/add
-│   ├── plugins.py         # CLIPluginsResource — list/enabled/enable/disable/install/uninstall/reload
-│   ├── themes.py          # CLIThemesResource — list/current/set/install/uninstall
-│   ├── snippets.py        # CLISnippetsResource — list/enabled/enable/disable
-│   ├── sync.py            # CLISyncResource — status/history/read/restore/deleted
-│   ├── publish.py         # CLIPublishResource — site/list/status/add/remove
-│   ├── history.py         # CLIHistoryResource — list/read/restore
-│   ├── workspaces.py      # CLIWorkspacesResource — list/current/save/load/delete
-│   ├── hotkeys.py         # CLIHotkeysResource — list/get
-│   ├── outline.py         # CLIOutlineResource — get
-│   ├── random_note.py     # CLIRandomResource — read
-│   ├── aliases.py         # CLIAliasesResource — get
-│   └── bases.py           # CLIBasesResource — list/views/create/query
-├── rest/                  # REST resources (optional, requires httpx)
-│   ├── _base.py           # BaseResource + ContentResource (_get/_append/_patch helpers)
-│   ├── vault.py           # VaultResource — file CRUD + list (ContentResource)
-│   ├── active.py          # ActiveFileResource — active file ops (ContentResource)
-│   ├── periodic.py        # PeriodicNotesResource — periodic note ops (ContentResource)
-│   ├── commands.py        # CommandsResource — list/execute commands (BaseResource)
-│   ├── search.py          # SearchResource — simple/dataview/jsonlogic (BaseResource)
-│   ├── open.py            # OpenResource — open file in UI (BaseResource)
-│   └── system.py          # SystemResource — server status, OpenAPI spec (BaseResource)
-└── models/
-    ├── vault.py           # FileStat, NoteJson, DocumentMap, VaultDirectory
-    ├── system.py          # ServerStatus, Versions (Field alias "self" → self_)
-    ├── search.py          # MatchSpan, SearchMatch, SearchResult
-    └── commands.py        # Command
-
-tests/
-├── conftest.py            # mock_api + client (REST) + cli (CLI with AsyncMock) fixtures
-├── test_client.py         # ObsidianClient unit tests
-├── test_cli.py            # ObsidianCLI unit tests
-├── test_vault.py          # VaultResource (REST) tests
-├── test_active.py         # ActiveFileResource (REST) tests
-├── test_periodic.py       # PeriodicNotesResource (REST) tests
-├── test_commands.py       # CommandsResource (REST) tests
-├── test_search.py         # SearchResource (REST) tests
-├── test_open.py           # OpenResource (REST) tests
-├── test_system.py         # SystemResource (REST) tests
-├── test_cli_vault.py      # CLIVaultResource tests
-├── test_cli_daily.py      # CLIDailyResource tests
-├── test_cli_search.py     # CLISearchResource tests
-├── test_cli_properties.py # CLIPropertiesResource tests
-├── test_cli_tags.py       # CLITagsResource tests
-├── test_cli_links.py      # CLILinksResource tests
-├── test_cli_tasks.py      # CLITasksResource tests
-├── test_cli_commands.py   # CLICommandsResource tests
-├── test_cli_templates.py  # CLITemplatesResource tests
-├── test_cli_bookmarks.py  # CLIBookmarksResource tests
-├── test_cli_plugins.py    # CLIPluginsResource tests
-├── test_cli_themes.py     # CLIThemesResource tests
-├── test_cli_snippets.py   # CLISnippetsResource tests
-├── test_cli_sync.py       # CLISyncResource tests
-├── test_cli_publish.py    # CLIPublishResource tests
-├── test_cli_history.py    # CLIHistoryResource tests
-├── test_cli_workspaces.py # CLIWorkspacesResource tests
-├── test_cli_hotkeys.py    # CLIHotkeysResource tests
-├── test_cli_outline.py    # CLIOutlineResource tests
-├── test_cli_random_note.py # CLIRandomResource tests
-├── test_cli_aliases.py    # CLIAliasesResource tests
-└── test_cli_bases.py      # CLIBasesResource tests
-```
-
 ## Commands
 
 ```bash
@@ -104,7 +20,7 @@ uv sync                                # install all deps (dev + docs)
 uv run ruff check src/ tests/          # lint
 uv run ruff format --check src/ tests/ # format check
 uv run ruff format src/ tests/         # auto-format
-uv run pytest                          # run tests (217 tests)
+uv run pytest                          # run tests
 uv run pytest -v                       # verbose test output
 uv run mkdocs serve                    # local docs server
 uv run mkdocs build                    # build static docs
@@ -209,73 +125,11 @@ Used in `ContentResource` and its subclasses for `get()` methods. The pattern:
 
 ## Testing patterns
 
-### Fixtures (in `conftest.py`)
-
-```python
-@pytest.fixture()
-def mock_api():
-    with respx.mock(base_url="https://127.0.0.1:27124") as api:
-        yield api
-
-@pytest.fixture()
-async def client(mock_api):
-    http = httpx.AsyncClient(
-        base_url="https://127.0.0.1:27124",
-        headers={"Authorization": "Bearer test-key"},
-    )
-    async with ObsidianClient("test-key", http_client=http) as c:
-        yield c
-```
-
-The `client` fixture creates an `httpx.AsyncClient` manually (no SSL verification issues in tests) and passes it via `http_client=` to `ObsidianClient`. This pairs with `respx.mock(base_url=...)` for route matching.
-
-### CLI fixture (in `conftest.py`)
-
-```python
-@pytest.fixture()
-def cli():
-    instance = ObsidianCLI.__new__(ObsidianCLI)
-    instance._vault = "TestVault"
-    instance._binary = "/usr/local/bin/obsidian"
-    instance._timeout = 30.0
-    instance._execute = AsyncMock()
-    return instance
-```
-
-The `cli` fixture creates `ObsidianCLI` via `__new__` (bypassing `_resolve_binary`) and replaces `_execute` with `AsyncMock`. CLI resource tests set `_execute.return_value` and verify the call args.
-
-### Test structure
-
-- One test file per resource: `test_vault.py`, `test_active.py`, `test_cli_vault.py`, etc. Plus `test_client.py` and `test_cli.py` for the entry points
-- Test naming: `test_<method>_<scenario>` (e.g., `test_get_markdown`, `test_get_not_found`, `test_patch_prepend_to_block`)
-- No `async def` markers needed — `asyncio_mode = "auto"` handles it
-- Response data constants at module top (e.g., `NOTE_JSON`, `DOC_MAP_JSON`)
-
-### Mocking routes
-
-```python
-# Simple response
-mock_api.get("/vault/hello.md").respond(200, text="# Hello")
-
-# JSON response
-mock_api.get("/vault/hello.md").respond(200, json=NOTE_JSON)
-
-# Verify request details
-route = mock_api.patch("/vault/note.md").respond(200)
-await client.vault.patch(...)
-request = route.calls[0].request
-assert request.headers["operation"] == "replace"
-```
-
-### Exception testing
-
-```python
-async def test_get_not_found(mock_api, client):
-    mock_api.get("/vault/missing.md").respond(404, json={"message": "File not found"})
-    with pytest.raises(NotFoundError) as exc_info:
-        await client.vault.get("missing.md")
-    assert exc_info.value.status_code == 404
-```
+- One test file per resource, plus `test_client.py` and `test_cli.py` for entry points
+- Test naming: `test_<method>_<scenario>`
+- `asyncio_mode = "auto"` — no async markers needed
+- REST tests: `respx.mock` + `client` fixture (see `conftest.py`)
+- CLI tests: `cli` fixture with `AsyncMock` on `_execute` (see `conftest.py`)
 
 ## Gotchas
 
