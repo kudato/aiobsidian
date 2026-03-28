@@ -54,13 +54,9 @@ class CLIVaultResource(BaseCLIResource):
             flags.append("--overwrite")
         if silent:
             flags.append("--silent")
-        await self._cli._execute(
-            "create", params=params, flags=flags or None
-        )
+        await self._cli._execute("create", params=params, flags=flags or None)
 
-    async def append(
-        self, path: str, content: str, *, inline: bool = False
-    ) -> None:
+    async def append(self, path: str, content: str, *, inline: bool = False) -> None:
         """Append content to a vault file.
 
         Args:
