@@ -40,7 +40,6 @@ dev = [
     "respx>=0.22",
     "ruff>=0.9",
     "mypy>=1.14",
-    "pip-audit>=2.7",
 ]
 docs = [
     "mkdocs>=1.6",
