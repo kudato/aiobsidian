@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from .cli.search import CLISearchResource
     from .cli.snippets import CLISnippetsResource
     from .cli.sync import CLISyncResource
+    from .cli.system import CLISystemResource
     from .cli.tags import CLITagsResource
     from .cli.tasks import CLITasksResource
     from .cli.templates import CLITemplatesResource
@@ -306,6 +307,13 @@ class ObsidianCLI:
         from .cli.aliases import CLIAliasesResource
 
         return CLIAliasesResource(self)
+
+    @cached_property
+    def system(self) -> CLISystemResource:
+        """Access system commands (version, help, reload, restart, vaults)."""
+        from .cli.system import CLISystemResource
+
+        return CLISystemResource(self)
 
     @cached_property
     def bases(self) -> CLIBasesResource:
