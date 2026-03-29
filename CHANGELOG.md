@@ -4,12 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.3.0] — 2026-03-29
+## [0.4.0] — 2026-03-29
+
+### Added
+- 4 new CLI resources: system, tabs, web, dev
+- Full Obsidian CLI v1.12+ coverage with all flags and parameters across all resources
+- New methods in existing resources: vault.open, search.open, tasks.toggle, templates.insert, plugins.info, plugins.restrict, history.versions, history.open, history.diff, sync.toggle, sync.open, publish.open, random.open
+
+## [0.3.0] — 2026-03-22
 
 ### Added
 - CLI-first architecture with `ObsidianCLI` async subprocess wrapper
-- 26 CLI resources: vault, daily, search, properties, tags, links, tasks, commands, templates, bookmarks, plugins, themes, snippets, sync, publish, history, workspaces, hotkeys, outline, random, aliases, bases, system, tabs, web, dev
-- Full Obsidian CLI v1.12+ coverage with all flags and parameters
+- 22 CLI resources: vault, daily, search, properties, tags, links, tasks, commands, templates, bookmarks, plugins, themes, snippets, sync, publish, history, workspaces, hotkeys, outline, random, aliases, bases
 - Migrated to `uv audit` for dependency vulnerability scanning
 
 ### Changed
