@@ -91,6 +91,10 @@ nav:
           - Random: reference/resources/cli-random.md
           - Aliases: reference/resources/cli-aliases.md
           - Bases: reference/resources/cli-bases.md
+          - System: reference/resources/cli-system.md
+          - Tabs: reference/resources/cli-tabs.md
+          - Web: reference/resources/cli-web.md
+          - Dev: reference/resources/cli-dev.md
       - ObsidianClient (REST): reference/client.md
       - REST Resources:
           - Vault: reference/resources/vault.md

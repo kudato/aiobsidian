@@ -46,7 +46,8 @@ class ObsidianCLI:
     Provides access to vault operations, daily notes, search, properties,
     tags, links, tasks, commands, templates, bookmarks, plugins, themes,
     snippets, sync, publish, history, workspaces, hotkeys, outline,
-    random notes, aliases, and bases through resource properties.
+    random notes, aliases, bases, system, tabs, web, and dev
+    through resource properties.
 
     Can be used as an async context manager:
 
