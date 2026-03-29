@@ -30,7 +30,26 @@ asyncio.run(main())
 | **properties** | `cli.properties` | YAML frontmatter properties: list, read, set, remove |
 | **tags** | `cli.tags` | Tags: list, get notes by tag, rename |
 | **links** | `cli.links` | Outgoing links, backlinks, unresolved, orphans |
-| **tasks** | `cli.tasks` | Tasks: list, create, complete |
+| **tasks** | `cli.tasks` | Tasks: list, create, complete, toggle |
+| **commands** | `cli.commands` | List and execute Obsidian commands |
+| **templates** | `cli.templates` | List, read, insert templates |
+| **bookmarks** | `cli.bookmarks` | List and add bookmarks |
+| **plugins** | `cli.plugins` | Plugin management |
+| **themes** | `cli.themes` | Theme management |
+| **snippets** | `cli.snippets` | CSS snippet management |
+| **sync** | `cli.sync` | Obsidian Sync operations |
+| **publish** | `cli.publish` | Obsidian Publish operations |
+| **history** | `cli.history` | Local file history |
+| **workspaces** | `cli.workspaces` | Workspace management |
+| **hotkeys** | `cli.hotkeys` | Hotkey operations |
+| **outline** | `cli.outline` | Document outline (headings) |
+| **random** | `cli.random` | Random note |
+| **aliases** | `cli.aliases` | Note aliases |
+| **bases** | `cli.bases` | Obsidian Bases / databases |
+| **system** | `cli.system` | Version, reload, restart, vaults |
+| **tabs** | `cli.tabs` | Tab management, recents |
+| **web** | `cli.web` | Open URLs in web viewer |
+| **dev** | `cli.dev` | Developer/debugging tools |
 
 ### Reading and writing notes
 
