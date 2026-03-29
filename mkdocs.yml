@@ -1,6 +1,6 @@
 site_name: aiobsidian
 site_url: https://kudato.github.io/aiobsidian
-site_description: Async Python client for Obsidian — CLI-first with optional REST support
+site_description: Async Python client for Obsidian CLI and Local REST API plugin
 repo_url: https://github.com/kudato/aiobsidian
 repo_name: kudato/aiobsidian
 
