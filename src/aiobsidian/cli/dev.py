@@ -69,7 +69,7 @@ class CLIDevResource(BaseCLIResource):
         self,
         selector: str,
         *,
-        all: bool = False,
+        match_all: bool = False,
         text: bool = False,
         attr: str | None = None,
         css: str | None = None,
@@ -78,7 +78,7 @@ class CLIDevResource(BaseCLIResource):
 
         Args:
             selector: CSS selector for the element(s).
-            all: If ``True``, match all elements instead of just the first.
+            match_all: If ``True``, match all elements instead of just the first.
             text: If ``True``, return text content only.
             attr: Return this attribute value from matched elements.
             css: Return this CSS property value from matched elements.
@@ -92,7 +92,7 @@ class CLIDevResource(BaseCLIResource):
         if css is not None:
             params["css"] = css
         flags: list[str] = []
-        if all:
+        if match_all:
             flags.append("--all")
         if text:
             flags.append("--text")
