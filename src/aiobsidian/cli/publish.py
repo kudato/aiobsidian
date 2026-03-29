@@ -42,7 +42,7 @@ class CLIPublishResource(BaseCLIResource):
         Returns:
             Publication status details.
         """
-        params = {"path": path} if path else None
+        params = {"path": path} if path is not None else None
         output = await self._cli._execute("publish:status", params=params)
         result: dict[str, Any] = json.loads(output)
         return result
