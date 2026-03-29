@@ -1,4 +1,4 @@
-"""Async Python client for Obsidian Local REST API and CLI."""
+"""Async Python client for Obsidian CLI and Local REST API plugin."""
 
 from ._cli import ObsidianCLI
 from ._client import ObsidianClient
