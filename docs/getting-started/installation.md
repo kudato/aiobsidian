@@ -12,11 +12,10 @@ aiobsidian supports two interfaces for interacting with Obsidian:
 ## CLI setup
 
 1. **Obsidian** — download from [obsidian.md](https://obsidian.md)
-2. **Obsidian CLI** — included with Obsidian v1.12+. Verify installation:
+2. **Enable the CLI** (v1.12+) — open Obsidian → Settings → General → enable "Command line interface"
 
-    ```bash
-    obsidian version
-    ```
+    !!! note
+        On macOS, creating the CLI symlink at `/usr/local/bin/obsidian` requires administrator privileges. On Linux, the binary is placed at `~/.local/bin/obsidian` — ensure this directory is in your `PATH`.
 
 3. **Install aiobsidian**:
 

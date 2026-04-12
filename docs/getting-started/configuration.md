@@ -33,8 +33,6 @@ cli = ObsidianCLI("MyVault", binary="/opt/obsidian/bin/obsidian")
 cli = ObsidianCLI("MyVault", timeout=60.0)
 ```
 
-Per-command timeout override is also available via the `_execute` method internally.
-
 ---
 
 ## ObsidianClient (REST)

@@ -29,7 +29,7 @@ try:
     async with ObsidianCLI("MyVault") as cli:
         content = await cli.vault.read("note.md")
 except BinaryNotFoundError:
-    print("Obsidian CLI binary not found. Install Obsidian v1.12+ or pass binary= explicitly.")
+    print("Obsidian CLI binary not found. Install Obsidian v1.12+ and enable the CLI, or pass binary= explicitly.")
 except CommandError as e:
     print(f"Command {e.command!r} failed (exit code {e.exit_code}): {e.stderr}")
 except CLITimeoutError as e:

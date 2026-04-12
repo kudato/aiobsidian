@@ -55,7 +55,7 @@ import asyncio
 from aiobsidian import ObsidianClient
 
 async def main():
-    async with ObsidianClient("your-api-key") as client:
+    async with ObsidianClient(api_key="your-api-key") as client:
         status = await client.system.status()
         print(status.versions.obsidian)
 
