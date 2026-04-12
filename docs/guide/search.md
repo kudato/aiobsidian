@@ -55,11 +55,11 @@ Each search method returns a list of `SearchResult` objects:
 | `filename` | `str` | Path to the matching file |
 | `score` | `float \| None` | Relevance score (simple search only) |
 | `matches` | `list[SearchMatch] \| None` | Match locations with context (simple search only) |
-| `result` | `Any` | Raw result data (Dataview/JsonLogic only) |
+| `result` | `dict[str, Any] \| list[Any] \| None` | Raw result data (Dataview/JsonLogic only) |
 
 Each `SearchMatch` contains:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `match` | `dict[str, int]` | Match start/end positions |
+| `match` | `MatchSpan` | Match start/end positions |
 | `context` | `str` | Surrounding text context |

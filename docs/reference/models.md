@@ -12,6 +12,8 @@
 
 ## Search Models
 
+::: aiobsidian.models.search.MatchSpan
+
 ::: aiobsidian.models.search.SearchMatch
 
 ::: aiobsidian.models.search.SearchResult
