@@ -2,7 +2,7 @@
 
 ## Project overview
 
-`aiobsidian` — async Python client for Obsidian. CLI-first: works out of the box with the [Obsidian CLI](https://github.com/nicholasgasior/obsidian) (v1.12+). Optional REST support via the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin (`pip install aiobsidian[rest]`).
+`aiobsidian` — async Python client for Obsidian. CLI-first: works out of the box with the [Obsidian CLI](https://obsidian.md/cli) (v1.12+). Optional REST support via the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin (`pip install aiobsidian[rest]`).
 
 ## Tech stack
 
