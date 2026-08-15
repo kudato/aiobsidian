@@ -34,17 +34,17 @@ Documentation = "https://kudato.github.io/aiobsidian"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0",
-    "pytest-asyncio>=0.25",
-    "pytest-cov>=6.0",
-    "respx>=0.22",
-    "ruff>=0.9",
-    "mypy>=1.14",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
+    "respx>=0.23.1",
+    "ruff>=0.16.2",
+    "mypy>=2.3.0",
 ]
 docs = [
-    "mkdocs>=1.6",
-    "mkdocs-material>=9.5",
-    "mkdocstrings[python]>=0.27",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.7.7",
+    "mkdocstrings[python]>=1.0.6",
 ]
 
 [tool.pytest.ini_options]
