@@ -50,7 +50,7 @@ class CLIBasesResource(BaseCLIResource):
             List of record objects.
         """
         params: dict[str, str] = {"file": path}
-        if view:
+        if view is not None:
             params["view"] = view
         output = await self._cli._execute("base:query", params=params)
         result: list[dict[str, Any]] = json.loads(output)

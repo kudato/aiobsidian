@@ -27,6 +27,13 @@ async def test_list_sorted(cli):
     cli._execute.assert_awaited_once_with("tags", params={"sort": "count"}, flags=None)
 
 
+async def test_list_empty_sort(cli):
+    cli._execute.return_value = json.dumps(TAGS_LIST)
+    result = await cli.tags.list(sort="")
+    assert result == TAGS_LIST
+    cli._execute.assert_awaited_once_with("tags", params={"sort": ""}, flags=None)
+
+
 async def test_list_with_path(cli):
     cli._execute.return_value = json.dumps(TAGS_LIST)
     result = await cli.tags.list(path="notes")

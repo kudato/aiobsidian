@@ -53,7 +53,7 @@ class CLITagsResource(BaseCLIResource):
             List of tag objects.
         """
         params: dict[str, str] = {}
-        if sort:
+        if sort is not None:
             params["sort"] = sort
         if path is not None:
             params["path"] = path

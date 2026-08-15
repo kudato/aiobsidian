@@ -43,6 +43,17 @@ async def test_read_with_title(cli):
     )
 
 
+async def test_read_empty_title(cli):
+    cli._execute.return_value = "# Template content"
+    result = await cli.templates.read("Daily Note", title="")
+    assert result == "# Template content"
+    cli._execute.assert_awaited_once_with(
+        "template:read",
+        params={"name": "Daily Note", "title": ""},
+        flags=None,
+    )
+
+
 async def test_read_with_resolve(cli):
     cli._execute.return_value = "# 2025-01-01"
     result = await cli.templates.read("Daily Note", resolve=True)

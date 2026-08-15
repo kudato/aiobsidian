@@ -37,17 +37,17 @@ class CLIBookmarksResource(BaseCLIResource):
             subpath: Subpath within the file (e.g. heading or block).
         """
         params: dict[str, str] = {}
-        if file:
+        if file is not None:
             params["file"] = file
-        if folder:
+        if folder is not None:
             params["folder"] = folder
-        if url:
+        if url is not None:
             params["url"] = url
-        if title:
+        if title is not None:
             params["title"] = title
-        if search:
+        if search is not None:
             params["search"] = search
-        if subpath:
+        if subpath is not None:
             params["subpath"] = subpath
         await self._cli._execute("bookmark", params=params or None)
 

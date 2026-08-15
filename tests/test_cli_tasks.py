@@ -67,6 +67,14 @@ async def test_create_with_tags(cli):
     )
 
 
+async def test_create_empty_tags(cli):
+    cli._execute.return_value = ""
+    await cli.tasks.create("Buy milk", tags="")
+    cli._execute.assert_awaited_once_with(
+        "task:create", params={"content": "Buy milk", "tags": ""}
+    )
+
+
 async def test_complete(cli):
     cli._execute.return_value = ""
     await cli.tasks.complete("1")

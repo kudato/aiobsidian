@@ -59,7 +59,7 @@ class CLITasksResource(BaseCLIResource):
             tags: Comma-separated tag names to attach to the task.
         """
         params: dict[str, str] = {"content": content}
-        if tags:
+        if tags is not None:
             params["tags"] = tags
         await self._cli._execute("task:create", params=params)
 
