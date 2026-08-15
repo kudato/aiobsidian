@@ -45,7 +45,7 @@ async def test_get(cli):
     cli._execute.return_value = json.dumps(TAG_NOTES)
     result = await cli.tags.get("python")
     assert result == TAG_NOTES
-    cli._execute.assert_awaited_once_with("tag", params={"tagname": "python"})
+    cli._execute.assert_awaited_once_with("tag", params={"name": "python"})
 
 
 async def test_rename(cli):

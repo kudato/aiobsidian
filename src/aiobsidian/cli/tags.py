@@ -22,7 +22,7 @@ class CLITagsResource(BaseCLIResource):
         Returns:
             List of matching note objects.
         """
-        output = await self._cli._execute("tag", params={"tagname": name})
+        output = await self._cli._execute("tag", params={"name": name})
         result: list[dict[str, Any]] = json.loads(output)
         return result
 
