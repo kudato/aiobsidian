@@ -19,7 +19,8 @@ class CLISystemResource(BaseCLIResource):
         Returns:
             Obsidian version string.
         """
-        return await self._cli._execute("version")
+        output = await self._cli._execute("version")
+        return output.strip()
 
     async def help(self) -> list[dict[str, Any]]:
         """List all available CLI commands.

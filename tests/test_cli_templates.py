@@ -24,7 +24,7 @@ async def test_list(cli):
 
 
 async def test_read(cli):
-    cli._execute.return_value = "# Template content"
+    cli._execute.return_value = "# Template content\n"
     result = await cli.templates.read("Daily Note")
     assert result == "# Template content"
     cli._execute.assert_awaited_once_with(
