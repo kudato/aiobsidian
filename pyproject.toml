@@ -25,8 +25,8 @@ dependencies = [
 
 [project.optional-dependencies]
 cli = []
-rest = ["httpx>=0.28"]
-all = ["httpx>=0.28"]
+rest = ["httpx>=0.28.1"]
+all = ["httpx>=0.28.1"]
 
 [project.urls]
 Repository = "https://github.com/kudato/aiobsidian"
