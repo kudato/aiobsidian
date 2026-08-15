@@ -89,6 +89,14 @@ async def test_raise_for_status_json_without_message_key(mock_api, client):
     assert "detail" in exc_info.value.message
 
 
+async def test_raise_for_status_json_array_body(mock_api, client):
+    """A JSON array body must not leak AttributeError; APIError is raised instead."""
+    mock_api.get("/x").respond(500, json=[{"error": "boom"}])
+    with pytest.raises(APIError) as exc_info:
+        await client.request("GET", "/x")
+    assert exc_info.value.status_code == 500
+
+
 async def test_api_error_str_with_error_code():
     err = APIError(404, "Not found", 40401)
     assert str(err) == "[404] Not found (error_code=40401)"

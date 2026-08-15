@@ -142,7 +142,7 @@ class ObsidianClient:
             data = response.json()
             message = data.get("message", message)
             error_code = data.get("errorCode")
-        except (ValueError, KeyError):
+        except (ValueError, AttributeError):
             pass
 
         status = response.status_code
