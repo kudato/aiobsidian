@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class FileStat(BaseModel):
@@ -50,6 +50,8 @@ class DocumentMap(BaseModel):
         blocks: List of block reference IDs.
         frontmatter_fields: List of frontmatter field names.
     """
+
+    model_config = ConfigDict(populate_by_name=True)
 
     headings: list[str]
     blocks: list[str]
