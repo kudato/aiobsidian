@@ -31,10 +31,11 @@ class CLITemplatesResource(BaseCLIResource):
             Template content as a string.
         """
         params: dict[str, str] = {"name": name}
-        if title:
+        if title is not None:
             params["title"] = title
-        flags = ["--resolve"] if resolve else None
-        return await self._cli._execute("template:read", params=params, flags=flags)
+        flags = ["resolve"] if resolve else None
+        output = await self._cli._execute("template:read", params=params, flags=flags)
+        return output.strip()
 
     async def insert(self, name: str) -> None:
         """Insert a template into the active file.

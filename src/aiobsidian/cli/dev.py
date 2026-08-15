@@ -26,7 +26,8 @@ class CLIDevResource(BaseCLIResource):
         Returns:
             Evaluation result as a string.
         """
-        return await self._cli._execute("eval", params={"code": code})
+        output = await self._cli._execute("eval", params={"code": code})
+        return output.strip()
 
     async def console(self, *, limit: int | None = None) -> list[dict[str, Any]]:
         """Show console messages.
@@ -63,7 +64,8 @@ class CLIDevResource(BaseCLIResource):
         Returns:
             Base64-encoded PNG data.
         """
-        return await self._cli._execute("dev:screenshot", params={"path": path})
+        output = await self._cli._execute("dev:screenshot", params={"path": path})
+        return output.strip()
 
     async def dom(
         self,
@@ -93,10 +95,11 @@ class CLIDevResource(BaseCLIResource):
             params["css"] = css
         flags: list[str] = []
         if match_all:
-            flags.append("--all")
+            flags.append("all")
         if text:
-            flags.append("--text")
-        return await self._cli._execute("dev:dom", params=params, flags=flags or None)
+            flags.append("text")
+        output = await self._cli._execute("dev:dom", params=params, flags=flags or None)
+        return output.strip()
 
     async def css(self, selector: str, *, prop: str | None = None) -> str:
         """Inspect CSS styles.
@@ -111,7 +114,8 @@ class CLIDevResource(BaseCLIResource):
         params: dict[str, str] = {"selector": selector}
         if prop is not None:
             params["prop"] = prop
-        return await self._cli._execute("dev:css", params=params)
+        output = await self._cli._execute("dev:css", params=params)
+        return output.strip()
 
     async def mobile(self, *, on: bool) -> None:
         """Toggle mobile emulation.
@@ -119,7 +123,7 @@ class CLIDevResource(BaseCLIResource):
         Args:
             on: ``True`` to enable, ``False`` to disable.
         """
-        flags = ["--on"] if on else ["--off"]
+        flags = ["on"] if on else ["off"]
         await self._cli._execute("dev:mobile", flags=flags)
 
     async def debug(self, *, on: bool) -> None:
@@ -128,7 +132,7 @@ class CLIDevResource(BaseCLIResource):
         Args:
             on: ``True`` to start, ``False`` to stop capture.
         """
-        flags = ["--on"] if on else ["--off"]
+        flags = ["on"] if on else ["off"]
         await self._cli._execute("dev:debug", flags=flags)
 
     async def cdp(self, method: str, params: str) -> str:
@@ -141,6 +145,7 @@ class CLIDevResource(BaseCLIResource):
         Returns:
             CDP command result.
         """
-        return await self._cli._execute(
+        output = await self._cli._execute(
             "dev:cdp", params={"method": method, "params": params}
         )
+        return output.strip()

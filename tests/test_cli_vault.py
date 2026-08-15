@@ -30,7 +30,7 @@ async def test_create_overwrite(cli):
     cli._execute.assert_awaited_once_with(
         "create",
         params={"path": "note.md", "content": "content"},
-        flags=["--overwrite"],
+        flags=["overwrite"],
     )
 
 
@@ -60,7 +60,7 @@ async def test_create_silent(cli):
     cli._execute.assert_awaited_once_with(
         "create",
         params={"path": "note.md", "content": "content"},
-        flags=["--silent"],
+        flags=["silent"],
     )
 
 
@@ -82,7 +82,7 @@ async def test_create_all_params(cli):
             "name": "My Note",
             "template": "daily",
         },
-        flags=["--overwrite", "--silent"],
+        flags=["overwrite", "silent"],
     )
 
 
@@ -98,7 +98,7 @@ async def test_append_inline(cli):
     cli._execute.return_value = ""
     await cli.vault.append("note.md", "extra", inline=True)
     cli._execute.assert_awaited_once_with(
-        "append", params={"path": "note.md", "content": "extra"}, flags=["--inline"]
+        "append", params={"path": "note.md", "content": "extra"}, flags=["inline"]
     )
 
 
@@ -138,7 +138,7 @@ async def test_delete_permanent(cli):
     cli._execute.return_value = ""
     await cli.vault.delete("note.md", permanent=True)
     cli._execute.assert_awaited_once_with(
-        "delete", params={"path": "note.md"}, flags=["--permanent"]
+        "delete", params={"path": "note.md"}, flags=["permanent"]
     )
 
 

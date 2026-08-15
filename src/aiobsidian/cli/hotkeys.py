@@ -23,7 +23,7 @@ class CLIHotkeysResource(BaseCLIResource):
         Returns:
             Hotkey binding details.
         """
-        flags = ["--verbose"] if verbose else None
+        flags = ["verbose"] if verbose else None
         output = await self._cli._execute(
             "hotkey", params={"id": command_id}, flags=flags
         )

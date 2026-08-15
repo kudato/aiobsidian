@@ -51,7 +51,7 @@ async def test_query_case_sensitive(cli):
     result = await cli.search.query("Test", case=True)
     assert result == results
     cli._execute.assert_awaited_once_with(
-        "search", params={"query": "Test"}, flags=["--case"]
+        "search", params={"query": "Test"}, flags=["case"]
     )
 
 
@@ -61,7 +61,7 @@ async def test_query_with_matches(cli):
     result = await cli.search.query("test", matches=True)
     assert result == results
     cli._execute.assert_awaited_once_with(
-        "search", params={"query": "test"}, flags=["--matches"]
+        "search", params={"query": "test"}, flags=["matches"]
     )
 
 
@@ -75,7 +75,7 @@ async def test_query_all_params(cli):
     cli._execute.assert_awaited_once_with(
         "search",
         params={"query": "test", "path": "notes", "limit": "10"},
-        flags=["--case", "--matches"],
+        flags=["case", "matches"],
     )
 
 
@@ -129,7 +129,7 @@ async def test_context_case_sensitive(cli):
     result = await cli.search.context("Test", case=True)
     assert result == results
     cli._execute.assert_awaited_once_with(
-        "search:context", params={"query": "Test"}, flags=["--case"]
+        "search:context", params={"query": "Test"}, flags=["case"]
     )
 
 
@@ -143,5 +143,5 @@ async def test_context_all_params(cli):
     cli._execute.assert_awaited_once_with(
         "search:context",
         params={"query": "test", "lines": "2", "path": "notes", "limit": "10"},
-        flags=["--case"],
+        flags=["case"],
     )

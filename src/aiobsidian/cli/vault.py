@@ -59,9 +59,9 @@ class CLIVaultResource(BaseCLIResource):
             params["template"] = template
         flags: list[str] = []
         if overwrite:
-            flags.append("--overwrite")
+            flags.append("overwrite")
         if silent:
-            flags.append("--silent")
+            flags.append("silent")
         await self._cli._execute("create", params=params, flags=flags or None)
 
     async def append(self, path: str, content: str, *, inline: bool = False) -> None:
@@ -72,7 +72,7 @@ class CLIVaultResource(BaseCLIResource):
             content: Content to append.
             inline: If ``True``, append inline without a newline separator.
         """
-        flags = ["--inline"] if inline else None
+        flags = ["inline"] if inline else None
         await self._cli._execute(
             "append", params={"path": path, "content": content}, flags=flags
         )
@@ -112,7 +112,7 @@ class CLIVaultResource(BaseCLIResource):
             permanent: If ``True``, permanently delete instead of moving
                 to trash.
         """
-        flags = ["--permanent"] if permanent else None
+        flags = ["permanent"] if permanent else None
         await self._cli._execute("delete", params={"path": path}, flags=flags)
 
     async def info(self) -> dict[str, Any]:

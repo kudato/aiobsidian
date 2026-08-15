@@ -22,7 +22,7 @@ class CLITagsResource(BaseCLIResource):
         Returns:
             List of matching note objects.
         """
-        output = await self._cli._execute("tag", params={"tagname": name})
+        output = await self._cli._execute("tag", params={"name": name})
         result: list[dict[str, Any]] = json.loads(output)
         return result
 
@@ -53,11 +53,11 @@ class CLITagsResource(BaseCLIResource):
             List of tag objects.
         """
         params: dict[str, str] = {}
-        if sort:
+        if sort is not None:
             params["sort"] = sort
         if path is not None:
             params["path"] = path
-        flags = ["--counts"] if counts else None
+        flags = ["counts"] if counts else None
         output = await self._cli._execute("tags", params=params or None, flags=flags)
         result: list[dict[str, Any]] = json.loads(output)
         return result

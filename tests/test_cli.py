@@ -127,7 +127,7 @@ class TestExecute:
             await cli._execute(
                 "create",
                 params={"path": "note.md"},
-                flags=["--overwrite"],
+                flags=["overwrite"],
             )
 
         mock_exec.assert_awaited_once_with(
@@ -136,7 +136,7 @@ class TestExecute:
             "vault=TestVault",
             "format=json",
             "path=note.md",
-            "--overwrite",
+            "overwrite",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )

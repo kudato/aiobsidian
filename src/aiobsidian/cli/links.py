@@ -38,7 +38,7 @@ class CLILinksResource(BaseCLIResource):
         Returns:
             List of backlink objects.
         """
-        flags = ["--counts"] if counts else None
+        flags = ["counts"] if counts else None
         output = await self._cli._execute(
             "backlinks", params={"file": path}, flags=flags
         )

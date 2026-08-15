@@ -27,6 +27,13 @@ async def test_list_sorted(cli):
     cli._execute.assert_awaited_once_with("tags", params={"sort": "count"}, flags=None)
 
 
+async def test_list_empty_sort(cli):
+    cli._execute.return_value = json.dumps(TAGS_LIST)
+    result = await cli.tags.list(sort="")
+    assert result == TAGS_LIST
+    cli._execute.assert_awaited_once_with("tags", params={"sort": ""}, flags=None)
+
+
 async def test_list_with_path(cli):
     cli._execute.return_value = json.dumps(TAGS_LIST)
     result = await cli.tags.list(path="notes")
@@ -38,14 +45,14 @@ async def test_list_with_counts(cli):
     cli._execute.return_value = json.dumps(TAGS_LIST)
     result = await cli.tags.list(counts=True)
     assert result == TAGS_LIST
-    cli._execute.assert_awaited_once_with("tags", params=None, flags=["--counts"])
+    cli._execute.assert_awaited_once_with("tags", params=None, flags=["counts"])
 
 
 async def test_get(cli):
     cli._execute.return_value = json.dumps(TAG_NOTES)
     result = await cli.tags.get("python")
     assert result == TAG_NOTES
-    cli._execute.assert_awaited_once_with("tag", params={"tagname": "python"})
+    cli._execute.assert_awaited_once_with("tag", params={"name": "python"})
 
 
 async def test_rename(cli):

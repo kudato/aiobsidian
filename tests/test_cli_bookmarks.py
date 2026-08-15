@@ -43,6 +43,14 @@ async def test_add_search(cli):
     cli._execute.assert_awaited_once_with("bookmark", params={"search": "TODO"})
 
 
+async def test_add_empty_title(cli):
+    cli._execute.return_value = ""
+    await cli.bookmarks.add(file="note.md", title="")
+    cli._execute.assert_awaited_once_with(
+        "bookmark", params={"file": "note.md", "title": ""}
+    )
+
+
 async def test_add_with_subpath(cli):
     cli._execute.return_value = ""
     await cli.bookmarks.add(file="note.md", subpath="#heading")

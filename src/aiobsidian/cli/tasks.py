@@ -33,9 +33,9 @@ class CLITasksResource(BaseCLIResource):
         params = {"path": path} if path is not None else None
         flags: list[str] = []
         if daily:
-            flags.append("--daily")
+            flags.append("daily")
         if done:
-            flags.append("--done")
+            flags.append("done")
         output = await self._cli._execute("tasks", params=params, flags=flags or None)
         result: list[dict[str, Any]] = json.loads(output)
         return result
@@ -48,7 +48,7 @@ class CLITasksResource(BaseCLIResource):
             line: Line number of the task in the file.
         """
         await self._cli._execute(
-            "task", params={"path": path, "line": str(line)}, flags=["--toggle"]
+            "task", params={"path": path, "line": str(line)}, flags=["toggle"]
         )
 
     async def create(self, content: str, *, tags: str | None = None) -> None:
@@ -59,7 +59,7 @@ class CLITasksResource(BaseCLIResource):
             tags: Comma-separated tag names to attach to the task.
         """
         params: dict[str, str] = {"content": content}
-        if tags:
+        if tags is not None:
             params["tags"] = tags
         await self._cli._execute("task:create", params=params)
 

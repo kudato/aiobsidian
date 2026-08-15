@@ -21,7 +21,7 @@ async def test_list_with_versions(cli):
     cli._execute.return_value = json.dumps(THEMES)
     result = await cli.themes.list(versions=True)
     assert result == THEMES
-    cli._execute.assert_awaited_once_with("themes", flags=["--versions"])
+    cli._execute.assert_awaited_once_with("themes", flags=["versions"])
 
 
 async def test_current(cli):
@@ -49,7 +49,7 @@ async def test_install_with_enable(cli):
     cli._execute.return_value = ""
     await cli.themes.install("Minimal", enable=True)
     cli._execute.assert_awaited_once_with(
-        "theme:install", params={"name": "Minimal"}, flags=["--enable"]
+        "theme:install", params={"name": "Minimal"}, flags=["enable"]
     )
 
 

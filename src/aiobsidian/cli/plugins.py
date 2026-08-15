@@ -33,7 +33,7 @@ class CLIPluginsResource(BaseCLIResource):
             on: If ``True``, enable restricted mode;
                 if ``False``, disable it.
         """
-        flags = ["--on"] if on else ["--off"]
+        flags = ["on"] if on else ["off"]
         await self._cli._execute("plugins:restrict", flags=flags)
 
     async def enabled(self) -> list[dict[str, Any]]:
@@ -95,7 +95,7 @@ class CLIPluginsResource(BaseCLIResource):
         Returns:
             List of plugin objects.
         """
-        flags = ["--versions"] if versions else None
+        flags = ["versions"] if versions else None
         output = await self._cli._execute("plugins", flags=flags)
         result: list[dict[str, Any]] = json.loads(output)
         return result

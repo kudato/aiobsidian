@@ -23,13 +23,13 @@ async def test_info(cli):
 async def test_restrict_on(cli):
     cli._execute.return_value = ""
     await cli.plugins.restrict(on=True)
-    cli._execute.assert_awaited_once_with("plugins:restrict", flags=["--on"])
+    cli._execute.assert_awaited_once_with("plugins:restrict", flags=["on"])
 
 
 async def test_restrict_off(cli):
     cli._execute.return_value = ""
     await cli.plugins.restrict(on=False)
-    cli._execute.assert_awaited_once_with("plugins:restrict", flags=["--off"])
+    cli._execute.assert_awaited_once_with("plugins:restrict", flags=["off"])
 
 
 async def test_list(cli):
@@ -43,7 +43,7 @@ async def test_list_with_versions(cli):
     cli._execute.return_value = json.dumps(PLUGINS)
     result = await cli.plugins.list(versions=True)
     assert result == PLUGINS
-    cli._execute.assert_awaited_once_with("plugins", flags=["--versions"])
+    cli._execute.assert_awaited_once_with("plugins", flags=["versions"])
 
 
 async def test_enabled(cli):

@@ -114,7 +114,7 @@ class ObsidianCLI:
         Args:
             command: CLI command name (e.g. `"read"`, `"daily:path"`).
             params: Key-value parameters passed as `key=value` arguments.
-            flags: Extra CLI flags (e.g. `["--overwrite"]`).
+            flags: Extra CLI flags (e.g. `["overwrite"]`).
             timeout: Override the default timeout for this command.
 
         Returns:

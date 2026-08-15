@@ -52,6 +52,16 @@ async def test_query(cli):
     )
 
 
+async def test_query_empty_view(cli):
+    cli._execute.return_value = json.dumps(RECORDS)
+    result = await cli.bases.query("databases/tasks.md", view="")
+    assert result == RECORDS
+    cli._execute.assert_awaited_once_with(
+        "base:query",
+        params={"file": "databases/tasks.md", "view": ""},
+    )
+
+
 async def test_query_with_view(cli):
     cli._execute.return_value = json.dumps(RECORDS)
     result = await cli.bases.query("databases/tasks.md", view="Active")

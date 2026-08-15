@@ -14,7 +14,7 @@ VAULTS = [
 
 
 async def test_version(cli):
-    cli._execute.return_value = "1.8.0"
+    cli._execute.return_value = "1.8.0\n"
     result = await cli.system.version()
     assert result == "1.8.0"
     cli._execute.assert_awaited_once_with("version")

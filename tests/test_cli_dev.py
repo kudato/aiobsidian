@@ -19,7 +19,7 @@ async def test_devtools(cli):
 
 
 async def test_eval(cli):
-    cli._execute.return_value = "42"
+    cli._execute.return_value = "42\n"
     result = await cli.dev.eval("1+1")
     assert result == "42"
     cli._execute.assert_awaited_once_with("eval", params={"code": "1+1"})
@@ -47,7 +47,7 @@ async def test_errors(cli):
 
 
 async def test_screenshot(cli):
-    cli._execute.return_value = "base64data"
+    cli._execute.return_value = "base64data\n"
     result = await cli.dev.screenshot("/tmp/shot.png")
     assert result == "base64data"
     cli._execute.assert_awaited_once_with(
@@ -56,7 +56,7 @@ async def test_screenshot(cli):
 
 
 async def test_dom(cli):
-    cli._execute.return_value = "<div>hello</div>"
+    cli._execute.return_value = "<div>hello</div>\n"
     result = await cli.dev.dom(".my-class")
     assert result == "<div>hello</div>"
     cli._execute.assert_awaited_once_with(
@@ -73,12 +73,12 @@ async def test_dom_all_flags(cli):
     cli._execute.assert_awaited_once_with(
         "dev:dom",
         params={"selector": "#app", "attr": "data-id", "css": "color"},
-        flags=["--all", "--text"],
+        flags=["all", "text"],
     )
 
 
 async def test_css(cli):
-    cli._execute.return_value = "rgb(0, 0, 0)"
+    cli._execute.return_value = "rgb(0, 0, 0)\n"
     result = await cli.dev.css(".el")
     assert result == "rgb(0, 0, 0)"
     cli._execute.assert_awaited_once_with("dev:css", params={"selector": ".el"})
@@ -96,29 +96,29 @@ async def test_css_with_prop(cli):
 async def test_mobile_on(cli):
     cli._execute.return_value = ""
     await cli.dev.mobile(on=True)
-    cli._execute.assert_awaited_once_with("dev:mobile", flags=["--on"])
+    cli._execute.assert_awaited_once_with("dev:mobile", flags=["on"])
 
 
 async def test_mobile_off(cli):
     cli._execute.return_value = ""
     await cli.dev.mobile(on=False)
-    cli._execute.assert_awaited_once_with("dev:mobile", flags=["--off"])
+    cli._execute.assert_awaited_once_with("dev:mobile", flags=["off"])
 
 
 async def test_debug_on(cli):
     cli._execute.return_value = ""
     await cli.dev.debug(on=True)
-    cli._execute.assert_awaited_once_with("dev:debug", flags=["--on"])
+    cli._execute.assert_awaited_once_with("dev:debug", flags=["on"])
 
 
 async def test_debug_off(cli):
     cli._execute.return_value = ""
     await cli.dev.debug(on=False)
-    cli._execute.assert_awaited_once_with("dev:debug", flags=["--off"])
+    cli._execute.assert_awaited_once_with("dev:debug", flags=["off"])
 
 
 async def test_cdp(cli):
-    cli._execute.return_value = '{"result": {}}'
+    cli._execute.return_value = '{"result": {}}\n'
     result = await cli.dev.cdp("Page.navigate", '{"url": "https://example.com"}')
     assert result == '{"result": {}}'
     cli._execute.assert_awaited_once_with(
