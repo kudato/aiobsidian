@@ -93,9 +93,9 @@ class CLIDevResource(BaseCLIResource):
             params["css"] = css
         flags: list[str] = []
         if match_all:
-            flags.append("--all")
+            flags.append("all")
         if text:
-            flags.append("--text")
+            flags.append("text")
         return await self._cli._execute("dev:dom", params=params, flags=flags or None)
 
     async def css(self, selector: str, *, prop: str | None = None) -> str:
@@ -119,7 +119,7 @@ class CLIDevResource(BaseCLIResource):
         Args:
             on: ``True`` to enable, ``False`` to disable.
         """
-        flags = ["--on"] if on else ["--off"]
+        flags = ["on"] if on else ["off"]
         await self._cli._execute("dev:mobile", flags=flags)
 
     async def debug(self, *, on: bool) -> None:
@@ -128,7 +128,7 @@ class CLIDevResource(BaseCLIResource):
         Args:
             on: ``True`` to start, ``False`` to stop capture.
         """
-        flags = ["--on"] if on else ["--off"]
+        flags = ["on"] if on else ["off"]
         await self._cli._execute("dev:debug", flags=flags)
 
     async def cdp(self, method: str, params: str) -> str:

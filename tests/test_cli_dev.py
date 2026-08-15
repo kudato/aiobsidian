@@ -73,7 +73,7 @@ async def test_dom_all_flags(cli):
     cli._execute.assert_awaited_once_with(
         "dev:dom",
         params={"selector": "#app", "attr": "data-id", "css": "color"},
-        flags=["--all", "--text"],
+        flags=["all", "text"],
     )
 
 
@@ -96,25 +96,25 @@ async def test_css_with_prop(cli):
 async def test_mobile_on(cli):
     cli._execute.return_value = ""
     await cli.dev.mobile(on=True)
-    cli._execute.assert_awaited_once_with("dev:mobile", flags=["--on"])
+    cli._execute.assert_awaited_once_with("dev:mobile", flags=["on"])
 
 
 async def test_mobile_off(cli):
     cli._execute.return_value = ""
     await cli.dev.mobile(on=False)
-    cli._execute.assert_awaited_once_with("dev:mobile", flags=["--off"])
+    cli._execute.assert_awaited_once_with("dev:mobile", flags=["off"])
 
 
 async def test_debug_on(cli):
     cli._execute.return_value = ""
     await cli.dev.debug(on=True)
-    cli._execute.assert_awaited_once_with("dev:debug", flags=["--on"])
+    cli._execute.assert_awaited_once_with("dev:debug", flags=["on"])
 
 
 async def test_debug_off(cli):
     cli._execute.return_value = ""
     await cli.dev.debug(on=False)
-    cli._execute.assert_awaited_once_with("dev:debug", flags=["--off"])
+    cli._execute.assert_awaited_once_with("dev:debug", flags=["off"])
 
 
 async def test_cdp(cli):

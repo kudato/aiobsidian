@@ -41,7 +41,7 @@ async def test_incoming_with_counts(cli):
     result = await cli.links.incoming("note.md", counts=True)
     assert result == INCOMING
     cli._execute.assert_awaited_once_with(
-        "backlinks", params={"file": "note.md"}, flags=["--counts"]
+        "backlinks", params={"file": "note.md"}, flags=["counts"]
     )
 
 

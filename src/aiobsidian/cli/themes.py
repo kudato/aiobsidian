@@ -38,7 +38,7 @@ class CLIThemesResource(BaseCLIResource):
             name: Theme name to install.
             enable: If ``True``, activate the theme after installation.
         """
-        flags = ["--enable"] if enable else None
+        flags = ["enable"] if enable else None
         await self._cli._execute("theme:install", params={"name": name}, flags=flags)
 
     async def uninstall(self, name: str) -> None:
@@ -58,7 +58,7 @@ class CLIThemesResource(BaseCLIResource):
         Returns:
             List of theme objects.
         """
-        flags = ["--versions"] if versions else None
+        flags = ["versions"] if versions else None
         output = await self._cli._execute("themes", flags=flags)
         result: list[dict[str, Any]] = json.loads(output)
         return result

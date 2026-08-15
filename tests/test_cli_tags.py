@@ -38,7 +38,7 @@ async def test_list_with_counts(cli):
     cli._execute.return_value = json.dumps(TAGS_LIST)
     result = await cli.tags.list(counts=True)
     assert result == TAGS_LIST
-    cli._execute.assert_awaited_once_with("tags", params=None, flags=["--counts"])
+    cli._execute.assert_awaited_once_with("tags", params=None, flags=["counts"])
 
 
 async def test_get(cli):

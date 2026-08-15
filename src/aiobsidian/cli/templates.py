@@ -33,7 +33,7 @@ class CLITemplatesResource(BaseCLIResource):
         params: dict[str, str] = {"name": name}
         if title:
             params["title"] = title
-        flags = ["--resolve"] if resolve else None
+        flags = ["resolve"] if resolve else None
         return await self._cli._execute("template:read", params=params, flags=flags)
 
     async def insert(self, name: str) -> None:

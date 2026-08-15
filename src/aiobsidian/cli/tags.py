@@ -57,7 +57,7 @@ class CLITagsResource(BaseCLIResource):
             params["sort"] = sort
         if path is not None:
             params["path"] = path
-        flags = ["--counts"] if counts else None
+        flags = ["counts"] if counts else None
         output = await self._cli._execute("tags", params=params or None, flags=flags)
         result: list[dict[str, Any]] = json.loads(output)
         return result

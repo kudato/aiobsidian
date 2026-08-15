@@ -49,9 +49,9 @@ class CLISearchResource(BaseCLIResource):
             params["limit"] = str(limit)
         flags: list[str] = []
         if case:
-            flags.append("--case")
+            flags.append("case")
         if matches:
-            flags.append("--matches")
+            flags.append("matches")
         output = await self._cli._execute("search", params=params, flags=flags or None)
         result: list[dict[str, Any]] = json.loads(output)
         return result
@@ -84,7 +84,7 @@ class CLISearchResource(BaseCLIResource):
             params["path"] = path
         if limit is not None:
             params["limit"] = str(limit)
-        flags = ["--case"] if case else None
+        flags = ["case"] if case else None
         output = await self._cli._execute("search:context", params=params, flags=flags)
         result: list[dict[str, Any]] = json.loads(output)
         return result

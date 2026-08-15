@@ -26,14 +26,14 @@ async def test_list_daily(cli):
     cli._execute.return_value = json.dumps(TASKS)
     result = await cli.tasks.list(daily=True)
     assert result == TASKS
-    cli._execute.assert_awaited_once_with("tasks", params=None, flags=["--daily"])
+    cli._execute.assert_awaited_once_with("tasks", params=None, flags=["daily"])
 
 
 async def test_list_done(cli):
     cli._execute.return_value = json.dumps(TASKS)
     result = await cli.tasks.list(done=True)
     assert result == TASKS
-    cli._execute.assert_awaited_once_with("tasks", params=None, flags=["--done"])
+    cli._execute.assert_awaited_once_with("tasks", params=None, flags=["done"])
 
 
 async def test_list_all_flags(cli):
@@ -41,7 +41,7 @@ async def test_list_all_flags(cli):
     result = await cli.tasks.list(path="notes", daily=True, done=True)
     assert result == TASKS
     cli._execute.assert_awaited_once_with(
-        "tasks", params={"path": "notes"}, flags=["--daily", "--done"]
+        "tasks", params={"path": "notes"}, flags=["daily", "done"]
     )
 
 
@@ -49,7 +49,7 @@ async def test_toggle(cli):
     cli._execute.return_value = ""
     await cli.tasks.toggle("todo.md", 5)
     cli._execute.assert_awaited_once_with(
-        "task", params={"path": "todo.md", "line": "5"}, flags=["--toggle"]
+        "task", params={"path": "todo.md", "line": "5"}, flags=["toggle"]
     )
 
 

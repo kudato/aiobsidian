@@ -31,5 +31,5 @@ async def test_get_verbose(cli):
     result = await cli.hotkeys.get("editor:toggle-bold", verbose=True)
     assert result == HOTKEY
     cli._execute.assert_awaited_once_with(
-        "hotkey", params={"id": "editor:toggle-bold"}, flags=["--verbose"]
+        "hotkey", params={"id": "editor:toggle-bold"}, flags=["verbose"]
     )

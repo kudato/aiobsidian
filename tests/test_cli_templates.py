@@ -50,5 +50,5 @@ async def test_read_with_resolve(cli):
     cli._execute.assert_awaited_once_with(
         "template:read",
         params={"name": "Daily Note"},
-        flags=["--resolve"],
+        flags=["resolve"],
     )
