@@ -48,6 +48,12 @@ async def test_get_document_map(mock_api, client):
     assert result.frontmatter_fields == ["title"]
 
 
+def test_document_map_populate_by_name():
+    result = DocumentMap(headings=[], blocks=[], frontmatter_fields=["title"])
+
+    assert result.frontmatter_fields == ["title"]
+
+
 async def test_update(mock_api, client):
     route = mock_api.put("/vault/new.md").respond(204)
 
