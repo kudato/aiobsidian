@@ -94,6 +94,30 @@ class TestParseFields:
         }
 
 
+class TestSplitContent:
+    def test_plain_content_is_one_part(self):
+        assert BaseCLIResource._split_content("# Title\n\ntext") == ["# Title\n\ntext"]
+
+    def test_empty_content(self):
+        assert BaseCLIResource._split_content("") == [""]
+
+    def test_splits_before_n_and_t(self):
+        assert BaseCLIResource._split_content(r"C:\notes\temp") == [
+            "C:\\",
+            "notes\\",
+            "temp",
+        ]
+
+    def test_double_backslash(self):
+        assert BaseCLIResource._split_content(r"a\\nb") == ["a\\\\", "nb"]
+
+    def test_other_escapes_are_left_alone(self):
+        assert BaseCLIResource._split_content(r"a\rb \alpha") == [r"a\rb \alpha"]
+
+    def test_trailing_backslash(self):
+        assert BaseCLIResource._split_content("path\\") == ["path\\"]
+
+
 class TestParseRows:
     def test_rows(self):
         output = "welcome.md\n1\t2026-08-16 02:38\t431 B\n"

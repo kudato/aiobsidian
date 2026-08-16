@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from .._cli import ObsidianCLI
 
 _EMPTY_RESULT_PATTERN = re.compile(r"^No [^\n]+\.$")
+_ESCAPE_BOUNDARY_PATTERN = re.compile(r"(?<=\\)(?=[nt])")
 
 
 class BaseCLIResource:
@@ -19,6 +20,46 @@ class BaseCLIResource:
 
     def __init__(self, cli: ObsidianCLI) -> None:
         self._cli = cli
+
+    @staticmethod
+    def _split_content(content: str) -> list[str]:
+        """Split content where the CLI would reinterpret a backslash escape.
+
+        The CLI replaces the two-character sequences `\\n` and `\\t` in content
+        values with a newline and a tab, and offers no way to escape a literal
+        backslash. Cutting the content between the backslash and the following
+        `n` or `t` keeps the sequence out of any single value, so writing the
+        parts one after another round-trips.
+
+        Args:
+            content: Content as given by the caller.
+
+        Returns:
+            Content parts in write order. A single part when nothing would be
+            reinterpreted.
+        """
+        return _ESCAPE_BOUNDARY_PATTERN.split(content)
+
+    async def _write_parts(
+        self,
+        command: str,
+        parts: list[str],
+        *,
+        params: dict[str, str] | None = None,
+    ) -> None:
+        """Write content parts one call each, without adding separators.
+
+        Args:
+            command: CLI command to run for every part (e.g. `"append"`).
+            parts: Content parts to write, in call order.
+            params: Extra parameters passed to every call.
+        """
+        for part in parts:
+            await self._cli._execute(
+                command,
+                params={**(params or {}), "content": part},
+                flags=["inline"],
+            )
 
     @staticmethod
     def _is_empty_result(output: str) -> bool:

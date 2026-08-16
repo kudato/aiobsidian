@@ -38,15 +38,25 @@ class CLIDailyResource(BaseCLIResource):
     async def append(self, content: str) -> None:
         """Append content to today's daily note.
 
+        Content with literal ``\\n`` or ``\\t`` sequences is written in several
+        calls, so the append is not atomic.
+
         Args:
             content: Content to append.
         """
-        await self._cli._execute("daily:append", params={"content": content})
+        parts = self._split_content(content)
+        await self._cli._execute("daily:append", params={"content": parts[0]})
+        await self._write_parts("daily:append", parts[1:])
 
     async def prepend(self, content: str) -> None:
         """Prepend content to today's daily note.
 
+        Content with literal ``\\n`` or ``\\t`` sequences is written in several
+        calls, so the prepend is not atomic.
+
         Args:
             content: Content to prepend.
         """
-        await self._cli._execute("daily:prepend", params={"content": content})
+        parts = self._split_content(content)
+        await self._cli._execute("daily:prepend", params={"content": parts[-1]})
+        await self._write_parts("daily:prepend", parts[-2::-1])
