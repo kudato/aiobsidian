@@ -24,8 +24,9 @@ class CLIBookmarksResource(BaseCLIResource):
     ) -> None:
         """Add a bookmark.
 
-        At least one of ``file``, ``folder``, ``url``, or ``search``
-        must be provided.
+        With none of ``file``, ``folder``, ``url`` and ``search`` given,
+        the CLI bookmarks the file open in the Obsidian UI, and fails if
+        there is none.
 
         Args:
             file: Path to a file to bookmark.

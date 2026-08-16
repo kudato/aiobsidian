@@ -76,12 +76,14 @@ class CLIHistoryResource(BaseCLIResource):
             version: Version identifier. Defaults to the latest version.
 
         Returns:
-            File content at the specified version.
+            File content at that version, without the header line the CLI
+            prints before it.
         """
         params: dict[str, str] = {"path": path}
         if version is not None:
             params["version"] = version
-        return await self._cli._execute("history:read", params=params)
+        output = await self._cli._execute("history:read", params=params)
+        return self._strip_content_header(output)
 
     async def restore(self, path: str, *, version: str) -> None:
         """Restore a file from local history.

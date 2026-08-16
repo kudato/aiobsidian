@@ -38,7 +38,8 @@ class CLITagsResource(BaseCLIResource):
 
         Args:
             sort: Sort order (e.g. ``"count"`` to sort by frequency).
-            path: Restrict to tags found under this path.
+            path: Restrict to the tags of this one file. The CLI refuses
+                a folder: there is no way to scope the listing to one.
             counts: If ``True``, include usage counts per tag.
 
         Returns:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 CONSOLE_OUTPUT = "08:38:02 Received CLI command\n08:38:03 Plugin loaded\n"
 CONSOLE_MSGS = ["08:38:02 Received CLI command", "08:38:03 Plugin loaded"]
 
@@ -45,9 +47,9 @@ async def test_errors_none_captured(cli):
 
 
 async def test_screenshot(cli):
-    cli._execute.return_value = "base64data\n"
+    cli._execute.return_value = ""
     result = await cli.dev.screenshot("/tmp/shot.png")
-    assert result == "base64data"
+    assert result is None
     cli._execute.assert_awaited_once_with(
         "dev:screenshot", params={"path": "/tmp/shot.png"}
     )
@@ -62,17 +64,37 @@ async def test_dom(cli):
     )
 
 
-async def test_dom_all_flags(cli):
-    cli._execute.return_value = "text content"
-    result = await cli.dev.dom(
-        "#app", match_all=True, text=True, attr="data-id", css="color"
-    )
-    assert result == "text content"
+async def test_dom_text(cli):
+    cli._execute.return_value = "hello\n"
+    result = await cli.dev.dom("#app", match_all=True, text=True)
+    assert result == "hello"
     cli._execute.assert_awaited_once_with(
-        "dev:dom",
-        params={"selector": "#app", "attr": "data-id", "css": "color"},
-        flags=["all", "text"],
+        "dev:dom", params={"selector": "#app"}, flags=["all", "text"]
     )
+
+
+async def test_dom_attr(cli):
+    cli._execute.return_value = "workspace-leaf\n"
+    result = await cli.dev.dom("#app", attr="class")
+    assert result == "workspace-leaf"
+    cli._execute.assert_awaited_once_with(
+        "dev:dom", params={"selector": "#app", "attr": "class"}, flags=None
+    )
+
+
+async def test_dom_css(cli):
+    cli._execute.return_value = "display: flex\n"
+    result = await cli.dev.dom("#app", css="display")
+    assert result == "display: flex"
+    cli._execute.assert_awaited_once_with(
+        "dev:dom", params={"selector": "#app", "css": "display"}, flags=None
+    )
+
+
+async def test_dom_rejects_several_answers(cli):
+    with pytest.raises(TypeError, match="text, attr, css"):
+        await cli.dev.dom("#app", text=True, attr="class", css="display")
+    cli._execute.assert_not_awaited()
 
 
 async def test_css(cli):

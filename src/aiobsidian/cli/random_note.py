@@ -18,6 +18,8 @@ class CLIRandomResource(BaseCLIResource):
         """Read the content of a random note.
 
         Returns:
-            Content of a randomly selected note.
+            Content of a randomly selected note, without the path line
+            the CLI prints before it.
         """
-        return await self._cli._execute("random:read")
+        output = await self._cli._execute("random:read")
+        return self._strip_path_header(output)

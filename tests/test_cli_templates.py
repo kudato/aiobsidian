@@ -16,10 +16,10 @@ async def test_list(cli):
     cli._execute.assert_awaited_once_with("templates")
 
 
-async def test_read(cli):
-    cli._execute.return_value = "# Template content\n"
+async def test_read_keeps_whitespace(cli):
+    cli._execute.return_value = "# Template content\n\n- [ ] \n"
     result = await cli.templates.read("Daily Note")
-    assert result == "# Template content"
+    assert result == "# Template content\n\n- [ ] \n"
     cli._execute.assert_awaited_once_with(
         "template:read", params={"name": "Daily Note"}, flags=None
     )

@@ -64,19 +64,25 @@ async def test_list(cli):
     cli._execute.assert_awaited_once_with("history:list")
 
 
-async def test_read(cli):
-    cli._execute.return_value = "# Old content"
-    result = await cli.history.read("notes/todo.md", version="v1")
-    assert result == "# Old content"
+async def test_read_drops_the_version_header(cli):
+    cli._execute.return_value = (
+        "notes/todo.md (version 1, 2026-08-16 02:38)\n"
+        "---\n"
+        "---\ntitle: Todo\n---\n\n# Old content\n"
+    )
+    result = await cli.history.read("notes/todo.md", version="1")
+    assert result == "---\ntitle: Todo\n---\n\n# Old content\n"
     cli._execute.assert_awaited_once_with(
-        "history:read", params={"path": "notes/todo.md", "version": "v1"}
+        "history:read", params={"path": "notes/todo.md", "version": "1"}
     )
 
 
 async def test_read_latest(cli):
-    cli._execute.return_value = "# Latest content"
+    cli._execute.return_value = (
+        "notes/todo.md (version 1, 2026-08-16 02:38)\n---\n# Latest content\n"
+    )
     result = await cli.history.read("notes/todo.md")
-    assert result == "# Latest content"
+    assert result == "# Latest content\n"
     cli._execute.assert_awaited_once_with(
         "history:read", params={"path": "notes/todo.md"}
     )
