@@ -1,3 +1,3 @@
 # CLI Bases Resource
 
-::: aiobsidian.cli.bases.CLIBasesResource
+::: aiobsidian.cli.CLIBasesResource

@@ -1,3 +1,3 @@
 # CLI Dev Resource
 
-::: aiobsidian.cli.dev.CLIDevResource
+::: aiobsidian.cli.CLIDevResource

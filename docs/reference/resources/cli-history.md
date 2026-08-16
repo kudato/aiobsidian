@@ -1,3 +1,3 @@
 # CLI History Resource
 
-::: aiobsidian.cli.history.CLIHistoryResource
+::: aiobsidian.cli.CLIHistoryResource

@@ -1,3 +1,3 @@
 # CLI Tags Resource
 
-::: aiobsidian.cli.tags.CLITagsResource
+::: aiobsidian.cli.CLITagsResource

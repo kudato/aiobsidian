@@ -1,3 +1,3 @@
 # CLI Workspaces Resource
 
-::: aiobsidian.cli.workspaces.CLIWorkspacesResource
+::: aiobsidian.cli.CLIWorkspacesResource

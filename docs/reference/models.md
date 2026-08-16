@@ -2,28 +2,28 @@
 
 ## Vault Models
 
-::: aiobsidian.models.vault.FileStat
+::: aiobsidian.models.FileStat
 
-::: aiobsidian.models.vault.NoteJson
+::: aiobsidian.models.NoteJson
 
-::: aiobsidian.models.vault.DocumentMap
+::: aiobsidian.models.DocumentMap
 
-::: aiobsidian.models.vault.VaultDirectory
+::: aiobsidian.models.VaultDirectory
 
 ## Search Models
 
-::: aiobsidian.models.search.MatchSpan
+::: aiobsidian.models.MatchSpan
 
-::: aiobsidian.models.search.SearchMatch
+::: aiobsidian.models.SearchMatch
 
-::: aiobsidian.models.search.SearchResult
+::: aiobsidian.models.SearchResult
 
 ## System Models
 
-::: aiobsidian.models.system.Versions
+::: aiobsidian.models.Versions
 
-::: aiobsidian.models.system.ServerStatus
+::: aiobsidian.models.ServerStatus
 
 ## Command Models
 
-::: aiobsidian.models.commands.Command
+::: aiobsidian.models.Command

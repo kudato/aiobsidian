@@ -1,3 +1,3 @@
 # CLI Tasks Resource
 
-::: aiobsidian.cli.tasks.CLITasksResource
+::: aiobsidian.cli.CLITasksResource

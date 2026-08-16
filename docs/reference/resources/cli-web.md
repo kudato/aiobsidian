@@ -1,3 +1,3 @@
 # CLI Web Resource
 
-::: aiobsidian.cli.web.CLIWebResource
+::: aiobsidian.cli.CLIWebResource

@@ -1,3 +1,3 @@
 # Active File Resource
 
-::: aiobsidian.rest.active.ActiveFileResource
+::: aiobsidian.rest.ActiveFileResource

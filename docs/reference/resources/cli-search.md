@@ -1,3 +1,3 @@
 # CLI Search Resource
 
-::: aiobsidian.cli.search.CLISearchResource
+::: aiobsidian.cli.CLISearchResource

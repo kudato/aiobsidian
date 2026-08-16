@@ -1,3 +1,3 @@
 # CLI Hotkeys Resource
 
-::: aiobsidian.cli.hotkeys.CLIHotkeysResource
+::: aiobsidian.cli.CLIHotkeysResource

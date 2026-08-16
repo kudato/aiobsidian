@@ -1,3 +1,3 @@
 # CLI Outline Resource
 
-::: aiobsidian.cli.outline.CLIOutlineResource
+::: aiobsidian.cli.CLIOutlineResource

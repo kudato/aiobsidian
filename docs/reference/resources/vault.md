@@ -1,3 +1,3 @@
 # Vault Resource
 
-::: aiobsidian.rest.vault.VaultResource
+::: aiobsidian.rest.VaultResource

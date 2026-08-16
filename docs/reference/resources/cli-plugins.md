@@ -1,3 +1,3 @@
 # CLI Plugins Resource
 
-::: aiobsidian.cli.plugins.CLIPluginsResource
+::: aiobsidian.cli.CLIPluginsResource

@@ -23,10 +23,18 @@ from ._types import (
     PropertyValue,
     TargetType,
 )
-from .models.commands import Command
-from .models.search import MatchSpan, SearchMatch, SearchResult
-from .models.system import ServerStatus, Versions
-from .models.vault import DocumentMap, FileStat, NoteJson, VaultDirectory
+from .models import (
+    Command,
+    DocumentMap,
+    FileStat,
+    MatchSpan,
+    NoteJson,
+    SearchMatch,
+    SearchResult,
+    ServerStatus,
+    VaultDirectory,
+    Versions,
+)
 
 __all__ = [
     "APIError",

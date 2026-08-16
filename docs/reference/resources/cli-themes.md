@@ -1,3 +1,3 @@
 # CLI Themes Resource
 
-::: aiobsidian.cli.themes.CLIThemesResource
+::: aiobsidian.cli.CLIThemesResource
