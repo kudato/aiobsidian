@@ -45,6 +45,15 @@ class PeriodicNotesResource(ContentResource):
         content_type: Literal[ContentType.DOCUMENT_MAP],
     ) -> DocumentMap: ...
 
+    @overload
+    async def get(
+        self,
+        period: Period,
+        *,
+        date: datetime.date | None = ...,
+        content_type: ContentType,
+    ) -> str | NoteJson | DocumentMap: ...
+
     async def get(
         self,
         period: Period,

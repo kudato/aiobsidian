@@ -29,7 +29,7 @@ jobs:
         run: uv run ruff format --check src/ tests/
 
       - name: Type check
-        run: uv run mypy src/
+        run: uv run mypy src/ tests/typing_examples.py
 
       - name: Tests
         run: uv run pytest --cov=aiobsidian --cov-report=term-missing --cov-report=xml
