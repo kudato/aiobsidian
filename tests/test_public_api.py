@@ -19,20 +19,32 @@ from aiobsidian.cli._base import BaseCLIResource
 from aiobsidian.rest._base import BaseResource
 
 
+def _raise(name):
+    """Re-raise an import error `walk_packages` would otherwise swallow.
+
+    Without it a subpackage whose import fails is skipped silently, and
+    the tests below quietly stop covering whatever it holds.
+
+    Args:
+        name: Module that could not be imported.
+    """
+    raise
+
+
 def _defined_names(package, base):
     """Collect the public classes a package defines across its modules.
 
     Args:
-        package: Package to walk, subpackages included. Modules whose
-            name starts with an underscore are private and are skipped.
+        package: Package to walk, subpackages included. Anything with
+            an underscore-prefixed component is private and is skipped.
         base: Base class the collected classes inherit from.
 
     Returns:
         Set of class names.
     """
     names = set()
-    for info in pkgutil.walk_packages(package.__path__, f"{package.__name__}."):
-        if info.name.rpartition(".")[2].startswith("_"):
+    for info in pkgutil.walk_packages(package.__path__, f"{package.__name__}.", _raise):
+        if any(part.startswith("_") for part in info.name.split(".")):
             continue
         module = importlib.import_module(info.name)
         names |= {
