@@ -63,6 +63,12 @@ class ObsidianClient:
         verify_ssl: bool = False,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
+        if not 0 <= port <= 65535:
+            # Out of range, the OS rejects the connect() with an
+            # OverflowError that anyio wraps in an ExceptionGroup, so
+            # nothing the caller could reasonably catch ever sees it.
+            raise ValueError(f"port must be between 0 and 65535, got {port}")
+
         self._host = host
         self._port = port
         self._scheme = scheme

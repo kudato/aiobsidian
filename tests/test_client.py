@@ -269,30 +269,51 @@ class TestUnsendableRequests:
         assert isinstance(exc_info.value.__cause__, httpx.InvalidURL)
 
     async def test_a_scheme_that_is_not_http(self):
-        client = ObsidianClient("key", scheme="ftp")
-
-        with pytest.raises(ValueError) as exc_info:
-            await client.request("GET", "/vault/note.md")
+        # `async with`, not a trailing aclose(): a failing assertion
+        # would skip the close and leak the transport.
+        async with ObsidianClient("key", scheme="ftp") as client:
+            with pytest.raises(ValueError) as exc_info:
+                await client.request("GET", "/vault/note.md")
 
         assert not isinstance(exc_info.value, ObsidianError)
         assert isinstance(exc_info.value.__cause__, httpx.UnsupportedProtocol)
-        await client.aclose()
 
     async def test_an_illegal_header(self):
         # A real socket, deliberately: httpx builds the request happily
         # and h11 rejects the header only once a connection exists, so
         # neither a mock transport nor a dead port reaches this path.
-        server = await asyncio.start_server(lambda reader, writer: None, "127.0.0.1", 0)
-        port = server.sockets[0].getsockname()[1]
+        accepted: list[asyncio.StreamWriter] = []
 
-        async with server:
-            client = ObsidianClient("key", host="127.0.0.1", port=port, scheme="http")
-            with pytest.raises(ValueError) as exc_info:
-                await client.request("GET", "/x", headers={"X-Bad": "a\nb"})
-            await client.aclose()
+        async def accept(reader, writer):
+            # Held open, not closed here: closing under httpx mid-connect
+            # would surface as a connection failure instead of the header
+            # rejection this test is after.
+            accepted.append(writer)
+
+        server = await asyncio.start_server(accept, "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+        try:
+            async with ObsidianClient(
+                "key", host="127.0.0.1", port=port, scheme="http"
+            ) as client:
+                with pytest.raises(ValueError) as exc_info:
+                    await client.request("GET", "/x", headers={"X-Bad": "a\nb"})
+        finally:
+            for writer in accepted:
+                writer.close()
+            server.close()
+            await server.wait_closed()
 
         assert not isinstance(exc_info.value, ObsidianError)
         assert isinstance(exc_info.value.__cause__, httpx.LocalProtocolError)
+
+    @pytest.mark.parametrize("port", [-1, 65536, 70000])
+    async def test_a_port_outside_the_valid_range(self, port):
+        # Left to httpx this surfaces from connect() as an OverflowError
+        # inside an anyio ExceptionGroup, which is neither an
+        # ObsidianError nor anything a caller would think to catch.
+        with pytest.raises(ValueError, match="port must be between"):
+            ObsidianClient("key", port=port)
 
     async def test_a_host_that_makes_no_url(self):
         # httpx parses the base URL as the client is built, so this one
