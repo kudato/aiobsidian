@@ -5,6 +5,15 @@ class ObsidianError(Exception):
     """Base exception for all aiobsidian errors."""
 
 
+class NotFoundError(ObsidianError):
+    """The requested resource does not exist.
+
+    Transport-neutral base class: `APINotFoundError` (REST) and
+    `CLINotFoundError` (CLI) both inherit from it, so a missing note can be
+    handled the same way regardless of the transport in use.
+    """
+
+
 class APIError(ObsidianError):
     """Error returned by the Obsidian REST API.
 
@@ -33,7 +42,7 @@ class AuthenticationError(APIError):
     """HTTP 401 Unauthorized — invalid or missing API key."""
 
 
-class NotFoundError(APIError):
+class APINotFoundError(APIError, NotFoundError):
     """HTTP 404 Not Found — the requested resource does not exist."""
 
 
@@ -42,7 +51,7 @@ class CLIError(ObsidianError):
 
 
 class BinaryNotFoundError(CLIError):
-    """The Obsidian CLI binary could not be found.
+    """The Obsidian CLI binary could not be found or executed.
 
     Attributes:
         message: Description of the error.
@@ -54,21 +63,43 @@ class BinaryNotFoundError(CLIError):
 
 
 class CommandError(CLIError):
-    """A CLI command exited with a non-zero status.
+    """A CLI command failed.
+
+    The Obsidian CLI reports failures by printing `Error: ...` to standard
+    output while still exiting with status `0`, so `exit_code` is usually
+    `0` and the failure text is carried by `stdout`.
 
     Attributes:
         command: The CLI command that failed.
-        exit_code: Process exit code.
+        exit_code: Process exit code (`0` for failures reported on stdout).
         stderr: Standard error output.
+        stdout: Standard output, which carries the CLI error message.
     """
 
-    def __init__(self, command: str, exit_code: int, stderr: str) -> None:
+    def __init__(
+        self,
+        command: str,
+        exit_code: int,
+        stderr: str,
+        stdout: str = "",
+    ) -> None:
         self.command = command
         self.exit_code = exit_code
         self.stderr = stderr
+        self.stdout = stdout
+        detail = stderr.strip() or stdout.strip() or "no output"
         super().__init__(
-            f"Command {command!r} failed (exit_code={exit_code}): {stderr}"
+            f"Command {command!r} failed (exit_code={exit_code}): {detail}"
         )
+
+
+class CLINotFoundError(CommandError, NotFoundError):
+    """A CLI command failed because the requested resource does not exist.
+
+    Raised when the CLI reports a missing file, folder, tag, property or any
+    other vault resource. A command that the CLI itself does not know is
+    reported as a plain `CommandError`.
+    """
 
 
 class CLITimeoutError(CLIError):
