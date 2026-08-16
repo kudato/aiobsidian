@@ -5,3 +5,5 @@
 ::: aiobsidian.TargetType
 
 ::: aiobsidian.ContentType
+
+::: aiobsidian.PropertyType

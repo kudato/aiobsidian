@@ -15,7 +15,14 @@ from ._exceptions import (
     NotFoundError,
     ObsidianError,
 )
-from ._types import ContentType, JsonValue, PatchOperation, TargetType
+from ._types import (
+    ContentType,
+    JsonValue,
+    PatchOperation,
+    PropertyType,
+    PropertyValue,
+    TargetType,
+)
 from .models.commands import Command
 from .models.search import MatchSpan, SearchMatch, SearchResult
 from .models.system import ServerStatus, Versions
@@ -43,6 +50,8 @@ __all__ = [
     "ObsidianClient",
     "ObsidianError",
     "PatchOperation",
+    "PropertyType",
+    "PropertyValue",
     "SearchMatch",
     "SearchResult",
     "ServerStatus",

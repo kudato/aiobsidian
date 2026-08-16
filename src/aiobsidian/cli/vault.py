@@ -109,13 +109,14 @@ class CLIVaultResource(BaseCLIResource):
         await self._cli._execute("move", params={"path": path, "to": to})
 
     async def rename(self, path: str, new_name: str) -> None:
-        """Rename a vault file.
+        """Rename a vault file, leaving it in its folder.
 
         Args:
             path: Current path relative to the vault root.
-            new_name: New file name (without directory prefix).
+            new_name: New file name, without a directory prefix. The
+                extension is kept when it is omitted.
         """
-        await self._cli._execute("rename", params={"path": path, "new-name": new_name})
+        await self._cli._execute("rename", params={"path": path, "name": new_name})
 
     async def delete(self, path: str, *, permanent: bool = False) -> None:
         """Delete a vault file.
