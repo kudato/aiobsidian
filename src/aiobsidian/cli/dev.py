@@ -135,19 +135,28 @@ class CLIDevResource(BaseCLIResource):
     async def set_mobile(self, value: bool) -> None:
         """Turn mobile emulation on or off.
 
+        Obsidian reloads its window right after answering, so give it a
+        moment before the next command.
+
         Args:
             value: ``True`` enables emulation, ``False`` disables it.
         """
         flags = ["on"] if value else ["off"]
         await self._cli._execute("dev:mobile", flags=flags)
 
-    async def set_capture(self, value: bool) -> None:
-        """Start or stop capturing the console.
+    async def set_debugger(self, value: bool) -> None:
+        """Attach or detach the Chrome DevTools Protocol debugger.
 
-        What is captured is what `console()` and `errors()` read.
+        `console()` needs it attached and fails otherwise. Detaching
+        also discards everything it captured, so read the messages
+        before turning it off.
+
+        `errors()` does not depend on it: JavaScript errors are
+        collected from the moment Obsidian starts, attached or not.
 
         Args:
-            value: ``True`` starts capturing, ``False`` stops it.
+            value: ``True`` attaches the debugger, ``False`` detaches
+                it and clears the captured console messages.
         """
         flags = ["on"] if value else ["off"]
         await self._cli._execute("dev:debug", flags=flags)

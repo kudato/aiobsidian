@@ -22,6 +22,8 @@ class CLISyncResource(BaseCLIResource):
         Args:
             value: ``True`` pauses sync, ``False`` resumes it.
         """
+        # Inverted on purpose: the CLI names the flags after the state
+        # it puts sync into, so `on` resumes and `off` pauses.
         await self._cli._execute("sync", flags=["off" if value else "on"])
 
     async def open(self) -> None:

@@ -125,15 +125,15 @@ async def test_set_mobile_false(cli):
     cli._execute.assert_awaited_once_with("dev:mobile", flags=["off"])
 
 
-async def test_set_capture_true(cli):
+async def test_set_debugger_true(cli):
     cli._execute.return_value = ""
-    await cli.dev.set_capture(True)
+    await cli.dev.set_debugger(True)
     cli._execute.assert_awaited_once_with("dev:debug", flags=["on"])
 
 
-async def test_set_capture_false(cli):
+async def test_set_debugger_false(cli):
     cli._execute.return_value = ""
-    await cli.dev.set_capture(False)
+    await cli.dev.set_debugger(False)
     cli._execute.assert_awaited_once_with("dev:debug", flags=["off"])
 
 

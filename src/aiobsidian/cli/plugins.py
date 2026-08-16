@@ -30,9 +30,13 @@ class CLIPluginsResource(BaseCLIResource):
     async def set_restricted(self, value: bool) -> None:
         """Turn restricted mode on or off.
 
+        Obsidian reloads its window right after answering, so give it a
+        moment before the next command.
+
         Args:
-            value: ``True`` enables restricted mode, which disables every
-                community plugin; ``False`` leaves it.
+            value: ``True`` enables restricted mode, which turns every
+                community plugin off; ``False`` disables restricted mode
+                and lets them run again.
         """
         flags = ["on"] if value else ["off"]
         await self._cli._execute("plugins:restrict", flags=flags)
