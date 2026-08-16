@@ -6,6 +6,8 @@ from ._base import BaseResource
 class OpenResource(BaseResource):
     """Open files in the Obsidian UI."""
 
+    __slots__ = ()
+
     _BASE_URL = "/open"
 
     async def open(

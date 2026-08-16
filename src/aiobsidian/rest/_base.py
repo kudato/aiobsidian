@@ -45,6 +45,8 @@ class ContentResource(BaseResource):
     patching that are used by the vault and active file resources.
     """
 
+    __slots__ = ()
+
     @overload
     async def _get_content(
         self, url: str, content_type: Literal[ContentType.MARKDOWN]

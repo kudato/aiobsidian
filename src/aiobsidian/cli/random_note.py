@@ -10,6 +10,8 @@ class CLIRandomResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def open(self) -> None:
         """Open a random note in the Obsidian UI."""
         await self._cli._execute("random")

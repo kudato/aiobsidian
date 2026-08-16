@@ -14,6 +14,8 @@ class CLISyncResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def toggle(self, *, on: bool) -> None:
         """Pause or resume Obsidian Sync.
 

@@ -24,7 +24,8 @@ uv run mkdocs build                    # build static docs
 - **Always** `from __future__ import annotations` (except `_types.py`, which needs `StrEnum` at runtime, and `__init__.py`)
 - Use `X | Y` unions, never `Union[X, Y]` or `Optional[X]`
 - Break circular imports with `TYPE_CHECKING` guards, and import resource classes lazily inside the `@cached_property` getter
-- Resources use `__slots__`; every `__init__` parameter after the first positional one is keyword-only
+- Every resource declares its own `__slots__`, `__slots__ = ()` included; the clients are not slotted, `@cached_property` needs `__dict__`
+- Every `__init__` parameter after the first positional one is keyword-only
 - Deserialize with `Model.model_validate(data)`, never `Model(**data)`; map API camelCase with `Field(alias=...)`
 - Google-style docstrings with `Args:`, `Returns:` and `Raises:` sections
 - Failure detection for CLI commands belongs to `_execute()`: the CLI exits `0` on failure, so resource methods parse successful output only

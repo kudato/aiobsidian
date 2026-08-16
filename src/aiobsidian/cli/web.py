@@ -10,6 +10,8 @@ class CLIWebResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def open(self, url: str) -> None:
         """Open a URL in the Obsidian web viewer.
 

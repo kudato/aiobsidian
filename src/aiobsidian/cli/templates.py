@@ -10,6 +10,8 @@ class CLITemplatesResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def read(
         self,
         name: str,

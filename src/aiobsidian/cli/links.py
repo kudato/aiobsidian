@@ -12,6 +12,8 @@ class CLILinksResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def outgoing(self, path: str) -> list[str]:
         """Get outgoing links from a note.
 

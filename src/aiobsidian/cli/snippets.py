@@ -10,6 +10,8 @@ class CLISnippetsResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def enabled(self) -> list[str]:
         """List enabled CSS snippets.
 

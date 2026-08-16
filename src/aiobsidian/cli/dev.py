@@ -10,6 +10,8 @@ class CLIDevResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def devtools(self) -> None:
         """Toggle Electron DevTools."""
         await self._cli._execute("devtools")

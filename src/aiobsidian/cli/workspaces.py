@@ -10,6 +10,8 @@ class CLIWorkspacesResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def current(self) -> str:
         """Get the current workspace layout tree.
 

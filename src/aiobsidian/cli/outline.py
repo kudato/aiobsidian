@@ -12,6 +12,8 @@ class CLIOutlineResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def get(self, path: str) -> list[dict[str, Any]]:
         """Get the heading outline of a file.
 

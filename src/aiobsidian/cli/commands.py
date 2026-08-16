@@ -10,6 +10,8 @@ class CLICommandsResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def execute(self, command_id: str) -> None:
         """Execute an Obsidian command by its ID.
 

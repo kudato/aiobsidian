@@ -7,6 +7,8 @@ from ._base import BaseResource
 class SystemResource(BaseResource):
     """Access server status and the OpenAPI specification."""
 
+    __slots__ = ()
+
     async def status(self) -> ServerStatus:
         """Get the current server status.
 

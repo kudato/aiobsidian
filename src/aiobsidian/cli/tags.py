@@ -15,6 +15,8 @@ class CLITagsResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def get(self, name: str) -> list[str]:
         """Get notes that contain a specific tag.
 

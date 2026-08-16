@@ -10,6 +10,8 @@ from ._base import ContentResource
 class ActiveFileResource(ContentResource):
     """Operations on the currently active (open) file in Obsidian."""
 
+    __slots__ = ()
+
     _BASE_URL = "/active/"
 
     @overload
