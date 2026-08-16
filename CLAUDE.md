@@ -1,5 +1,13 @@
 # CLAUDE.md
 
+## Git
+
+- Open every pull request against `main`, never against another branch; keep dependent work local until what it needs is merged
+- Write commits and pull request titles as Conventional Commits, `!` included; the title becomes the squash commit subject on `main`
+- Update a branch from `main` by merging, never by rebasing
+- Never rewrite pushed history — no force push, rebase, amend or hard reset on a published branch
+- Squash-merge every pull request; `main` stays linear
+
 ## Commands
 
 ```bash
@@ -28,11 +36,3 @@ uv run mkdocs build                    # build static docs
 - `asyncio_mode = "auto"` — no async markers needed
 - REST: `respx.mock` with the `client` fixture; CLI: the `cli` fixture with `AsyncMock` on `_execute`
 - CLI test data must reproduce real `obsidian` output, not what the code happens to send
-
-## Git
-
-- Open every pull request against `main`, never against another branch; keep dependent work local until what it needs is merged
-- Write commits and pull request titles as Conventional Commits, `!` included; the title becomes the squash commit subject on `main`
-- Update a branch from `main` by merging, never by rebasing
-- Never rewrite pushed history — no force push, rebase, amend or hard reset on a published branch
-- Squash-merge every pull request; `main` stays linear
