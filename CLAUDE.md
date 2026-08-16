@@ -79,13 +79,9 @@ Each resource is a `@cached_property` on `ObsidianCLI` or `ObsidianClient`. The 
 
 All exceptions carry `status_code`, `message`, and optional `error_code` from JSON body. Non-JSON error bodies fall back to `response.text`.
 
-`ObsidianCLI._execute()` cannot rely on the exit code — the Obsidian CLI exits `0` for
-failures and prints `Error: ...` to stdout. Output with that prefix is dispatched by
-`_build_error()`:
-- `Error: ... not found ...` → `CLINotFoundError` (except `Error: Command "..." not found`, which means the CLI has no such command)
-- Anything else → `CommandError` with `exit_code=0` and the CLI message in `stdout`
+The Obsidian CLI exits `0` even when a command fails and prints `Error: ...` to stdout. Deciding what counts as a failure belongs to `_execute()`, not to resource methods, which can assume they receive successful output.
 
-`NotFoundError` is the transport-neutral base of `APINotFoundError` and `CLINotFoundError`. Failures to spawn the binary (`OSError`) become `BinaryNotFoundError`.
+`NotFoundError` is the transport-neutral base shared by `APINotFoundError` (REST) and `CLINotFoundError` (CLI).
 
 ### SSL
 
