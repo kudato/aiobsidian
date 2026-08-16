@@ -31,3 +31,20 @@ async def test_open_default_no_new_leaf_param(mock_api, client):
     route = mock_api.post("/open/note.md").respond(200)
     await client.open.open("note.md")
     assert "newLeaf" not in str(route.calls[0].request.url)
+
+
+async def test_open_path_with_question_mark(mock_api, client):
+    route = mock_api.post("/open/scratch/q%3Fmark.md").respond(200)
+
+    await client.open.open("scratch/q?mark.md")
+
+    assert route.called
+    assert route.calls[0].request.url.raw_path == b"/open/scratch/q%3Fmark.md"
+
+
+async def test_open_leading_slash(mock_api, client):
+    route = mock_api.post("/open/notes/hello.md").respond(200)
+
+    await client.open.open("/notes/hello.md")
+
+    assert route.called

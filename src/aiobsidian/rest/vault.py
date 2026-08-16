@@ -46,7 +46,7 @@ class VaultResource(ContentResource):
 
         Args:
             path: Path to the file relative to the vault root
-                (e.g. `"Notes/hello.md"`).
+                (e.g. `"Notes/hello.md"`). A leading slash is ignored.
             content_type: Desired response format. Use
                 `ContentType.MARKDOWN` for raw text,
                 `ContentType.NOTE_JSON` for structured JSON, or
@@ -59,18 +59,21 @@ class VaultResource(ContentResource):
         Raises:
             APINotFoundError: If the file does not exist.
         """
-        return await self._get_content(f"{self._BASE_URL}/{path}", content_type)
+        return await self._get_content(
+            f"{self._BASE_URL}/{self._encode_path(path)}", content_type
+        )
 
     async def update(self, path: str, content: str) -> None:
         """Create or replace a file in the vault.
 
         Args:
             path: Path for the file relative to the vault root.
+                A leading slash is ignored.
             content: Markdown content to write.
         """
         await self._client.request(
             "PUT",
-            f"{self._BASE_URL}/{path}",
+            f"{self._BASE_URL}/{self._encode_path(path)}",
             content=content,
             headers={"Content-Type": ContentType.MARKDOWN},
         )
@@ -80,12 +83,15 @@ class VaultResource(ContentResource):
 
         Args:
             path: Path to the file relative to the vault root.
+                A leading slash is ignored.
             content: Markdown content to append.
 
         Raises:
             APINotFoundError: If the file does not exist.
         """
-        await self._append_content(f"{self._BASE_URL}/{path}", content)
+        await self._append_content(
+            f"{self._BASE_URL}/{self._encode_path(path)}", content
+        )
 
     async def patch(
         self,
@@ -101,6 +107,7 @@ class VaultResource(ContentResource):
 
         Args:
             path: Path to the file relative to the vault root.
+                A leading slash is ignored.
             content: Content to insert or replace.
             operation: How to apply the content (`append`, `prepend`,
                 or `replace`).
@@ -114,7 +121,7 @@ class VaultResource(ContentResource):
             APINotFoundError: If the file does not exist.
         """
         await self._patch_content(
-            f"{self._BASE_URL}/{path}",
+            f"{self._BASE_URL}/{self._encode_path(path)}",
             content,
             operation=operation,
             target_type=target_type,
@@ -127,11 +134,14 @@ class VaultResource(ContentResource):
 
         Args:
             path: Path to the file relative to the vault root.
+                A leading slash is ignored.
 
         Raises:
             APINotFoundError: If the file does not exist.
         """
-        await self._client.request("DELETE", f"{self._BASE_URL}/{path}")
+        await self._client.request(
+            "DELETE", f"{self._BASE_URL}/{self._encode_path(path)}"
+        )
 
     async def list(self, path: str = "") -> VaultDirectory:
         """List files in a vault directory.
@@ -143,7 +153,7 @@ class VaultResource(ContentResource):
         Returns:
             A `VaultDirectory` containing the list of file paths.
         """
-        path = path.strip("/")
-        trailing = f"{path}/" if path else ""
+        encoded = self._encode_path(path)
+        trailing = f"{encoded}/" if encoded else ""
         response = await self._client.request("GET", f"{self._BASE_URL}/{trailing}")
         return VaultDirectory.model_validate(response.json())
