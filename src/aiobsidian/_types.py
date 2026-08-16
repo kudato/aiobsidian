@@ -8,25 +8,6 @@ Used for frontmatter values, which are not restricted to strings.
 """
 
 
-class Period(StrEnum):
-    """Time period for periodic notes.
-
-    Used with `client.periodic` to access daily, weekly, monthly,
-    quarterly, or yearly notes.
-    """
-
-    DAILY = "daily"
-    """Daily note."""
-    WEEKLY = "weekly"
-    """Weekly note."""
-    MONTHLY = "monthly"
-    """Monthly note."""
-    QUARTERLY = "quarterly"
-    """Quarterly note."""
-    YEARLY = "yearly"
-    """Yearly note."""
-
-
 class PatchOperation(StrEnum):
     """Operation type for PATCH requests.
 
@@ -67,7 +48,5 @@ class ContentType(StrEnum):
     """Structured JSON with content, frontmatter, tags, and stats."""
     DOCUMENT_MAP = "application/vnd.olrapi.document-map+json"
     """JSON listing headings, blocks, and frontmatter fields."""
-    DATAVIEW_DQL = "application/vnd.olrapi.dataview.dql+txt"
-    """Dataview Query Language query string."""
     JSONLOGIC = "application/vnd.olrapi.jsonlogic+json"
     """JsonLogic query object."""

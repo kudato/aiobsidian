@@ -8,7 +8,7 @@ from ._base import BaseResource
 
 
 class SearchResource(BaseResource):
-    """Search vault content using different query methods."""
+    """Search vault content with a text query or a JsonLogic expression."""
 
     _BASE_URL = "/search"
 
@@ -33,25 +33,6 @@ class SearchResource(BaseResource):
             "POST",
             f"{self._BASE_URL}/simple/",
             params={"query": query, "contextLength": context_length},
-        )
-        return [SearchResult.model_validate(r) for r in response.json()]
-
-    async def dataview(self, dql: str) -> list[SearchResult]:
-        """Search using a Dataview Query Language (DQL) expression.
-
-        Requires the Dataview plugin to be installed in Obsidian.
-
-        Args:
-            dql: A DQL query string (e.g. `"TABLE file.name FROM #tag"`).
-
-        Returns:
-            A list of `SearchResult` objects.
-        """
-        response = await self._client.request(
-            "POST",
-            f"{self._BASE_URL}/",
-            content=dql,
-            headers={"Content-Type": ContentType.DATAVIEW_DQL},
         )
         return [SearchResult.model_validate(r) for r in response.json()]
 

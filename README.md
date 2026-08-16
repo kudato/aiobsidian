@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/github/license/kudato/aiobsidian)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-mkdocs-blue)](https://kudato.github.io/aiobsidian)
 
-Async Python client for [Obsidian](https://obsidian.md). CLI-first: works out of the box with the [Obsidian CLI](https://obsidian.md/cli) (v1.12+). Optional REST support via the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin.
+Async Python client for [Obsidian](https://obsidian.md). CLI-first: works out of the box with the [Obsidian CLI](https://obsidian.md/cli) (v1.12+). Optional REST support via the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin (v5.0+).
 
 ---
 
@@ -104,9 +104,8 @@ asyncio.run(main())
 |----------|--------|-------------|
 | **vault** | `client.vault` | CRUD operations on any file |
 | **active** | `client.active` | Operations on the currently open file |
-| **periodic** | `client.periodic` | Daily, weekly, monthly, quarterly, yearly notes |
 | **commands** | `client.commands` | List and execute Obsidian commands |
-| **search** | `client.search` | Simple text search, Dataview DQL, JsonLogic |
+| **search** | `client.search` | Simple text search, JsonLogic |
 | **open** | `client.open` | Open files in Obsidian UI |
 | **system** | `client.system` | Server status, OpenAPI spec |
 

@@ -41,9 +41,8 @@ class BaseResource:
 class ContentResource(BaseResource):
     """Base class for resources that operate on file content.
 
-    Provides shared helpers for content retrieval, appending,
-    and patching that are used by vault, active file, and
-    periodic notes resources.
+    Provides shared helpers for content retrieval, appending, and
+    patching that are used by the vault and active file resources.
     """
 
     @overload

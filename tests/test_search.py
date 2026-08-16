@@ -16,7 +16,7 @@ SIMPLE_RESULTS = [
     }
 ]
 
-DATAVIEW_RESULTS = [{"filename": "games/elden-ring.md", "result": {"rating": 10}}]
+JSONLOGIC_RESULTS = [{"filename": "games/elden-ring.md", "result": {"rating": 10}}]
 
 JSONLOGIC_BOOL_RESULTS = [
     {"filename": "scratch/lib.md", "result": True},
@@ -44,24 +44,14 @@ async def test_simple_search_params(mock_api, client):
     assert "contextLength=200" in str(request.url)
 
 
-async def test_dataview_search(mock_api, client):
-    route = mock_api.post("/search/").respond(200, json=DATAVIEW_RESULTS)
-
-    results = await client.search.dataview("TABLE rating FROM #game")
-
-    assert len(results) == 1
-    assert results[0].result == {"rating": 10}
-    request: httpx.Request = route.calls[0].request
-    assert request.headers["content-type"] == "application/vnd.olrapi.dataview.dql+txt"
-
-
 async def test_jsonlogic_search(mock_api, client):
-    route = mock_api.post("/search/").respond(200, json=DATAVIEW_RESULTS)
+    route = mock_api.post("/search/").respond(200, json=JSONLOGIC_RESULTS)
     query = {"===": [{"var": "frontmatter.url"}, "https://example.com"]}
 
     results = await client.search.jsonlogic(query)
 
     assert len(results) == 1
+    assert results[0].result == {"rating": 10}
     request: httpx.Request = route.calls[0].request
     assert request.headers["content-type"] == "application/vnd.olrapi.jsonlogic+json"
 
@@ -127,12 +117,6 @@ async def test_simple_search_server_error(mock_api, client):
         await client.search.simple("query")
 
     assert exc_info.value.status_code == 500
-
-
-async def test_dataview_sends_dql_body(mock_api, client):
-    route = mock_api.post("/search/").respond(200, json=[])
-    await client.search.dataview("TABLE file.name FROM #tag")
-    assert route.calls[0].request.content == b"TABLE file.name FROM #tag"
 
 
 async def test_jsonlogic_sends_json_body(mock_api, client):

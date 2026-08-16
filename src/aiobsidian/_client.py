@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from .rest.active import ActiveFileResource
     from .rest.commands import CommandsResource
     from .rest.open import OpenResource
-    from .rest.periodic import PeriodicNotesResource
     from .rest.search import SearchResource
     from .rest.system import SystemResource
     from .rest.vault import VaultResource
@@ -21,8 +20,9 @@ if TYPE_CHECKING:
 class ObsidianClient:
     """Async client for the Obsidian Local REST API.
 
-    Provides access to vault files, the active file, periodic notes,
-    commands, search, and system information through resource properties.
+    Provides access to vault files, the active file, commands, search,
+    and system information through resource properties. Requires the
+    Local REST API plugin 5.0 or newer.
 
     Can be used as an async context manager:
 
@@ -176,13 +176,6 @@ class ObsidianClient:
         return ActiveFileResource(self)
 
     @cached_property
-    def periodic(self) -> PeriodicNotesResource:
-        """Access periodic notes (daily, weekly, monthly, quarterly, yearly)."""
-        from .rest.periodic import PeriodicNotesResource
-
-        return PeriodicNotesResource(self)
-
-    @cached_property
     def commands(self) -> CommandsResource:
         """List and execute Obsidian commands."""
         from .rest.commands import CommandsResource
@@ -191,7 +184,7 @@ class ObsidianClient:
 
     @cached_property
     def search(self) -> SearchResource:
-        """Search vault content (simple text, Dataview DQL, JsonLogic)."""
+        """Search vault content (simple text, JsonLogic)."""
         from .rest.search import SearchResource
 
         return SearchResource(self)

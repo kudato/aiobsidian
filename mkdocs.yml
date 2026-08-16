@@ -61,7 +61,6 @@ nav:
   - User Guide:
       - Vault Operations: guide/vault.md
       - Active File: guide/active-file.md
-      - Periodic Notes: guide/periodic-notes.md
       - Commands: guide/commands.md
       - Search: guide/search.md
       - Open Files: guide/open.md
@@ -99,7 +98,6 @@ nav:
       - REST Resources:
           - Vault: reference/resources/vault.md
           - Active File: reference/resources/active.md
-          - Periodic Notes: reference/resources/periodic.md
           - Commands: reference/resources/commands.md
           - Search: reference/resources/search.md
           - Open: reference/resources/open.md

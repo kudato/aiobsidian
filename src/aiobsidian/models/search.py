@@ -38,8 +38,8 @@ class SearchResult(BaseModel):
         matches: List of match locations with context
             (present for simple search).
         result: What the query evaluated to for this file (present for
-            Dataview/JsonLogic queries). Any JSON type: a predicate
-            yields `True`, a field lookup yields that field's value.
+            JsonLogic queries). Any JSON type: a predicate yields
+            `True`, a field lookup yields that field's value.
     """
 
     filename: str

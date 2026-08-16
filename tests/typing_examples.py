@@ -7,10 +7,9 @@ methods resolve as documented. The module is deliberately not named
 
 from __future__ import annotations
 
-import datetime
 from typing import assert_type
 
-from aiobsidian import ContentType, DocumentMap, NoteJson, ObsidianClient, Period
+from aiobsidian import ContentType, DocumentMap, NoteJson, ObsidianClient
 
 
 async def literal_content_types(client: ObsidianClient) -> None:
@@ -29,13 +28,8 @@ async def literal_content_types(client: ObsidianClient) -> None:
         await client.active.get(content_type=ContentType.NOTE_JSON),
         NoteJson,
     )
-    assert_type(await client.periodic.get(Period.DAILY), str)
     assert_type(
-        await client.periodic.get(
-            Period.DAILY,
-            date=datetime.date(2026, 8, 16),
-            content_type=ContentType.DOCUMENT_MAP,
-        ),
+        await client.active.get(content_type=ContentType.DOCUMENT_MAP),
         DocumentMap,
     )
 
@@ -48,9 +42,5 @@ async def runtime_content_type(client: ObsidianClient, chosen: ContentType) -> N
     )
     assert_type(
         await client.active.get(content_type=chosen),
-        str | NoteJson | DocumentMap,
-    )
-    assert_type(
-        await client.periodic.get(Period.DAILY, content_type=chosen),
         str | NoteJson | DocumentMap,
     )
