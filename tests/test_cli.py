@@ -75,6 +75,7 @@ class TestExecute:
             "read",
             "vault=TestVault",
             "path=note.md",
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -91,6 +92,7 @@ class TestExecute:
             "tags",
             "vault=TestVault",
             "format=json",
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -115,6 +117,7 @@ class TestExecute:
 
         mock_process = AsyncMock()
         mock_process.communicate.side_effect = TimeoutError
+        mock_process.returncode = None
         mock_process.kill = MagicMock()
         mock_process.wait = AsyncMock()
 
@@ -164,6 +167,7 @@ class TestExecute:
             "vault=TestVault",
             "path=note.md",
             "overwrite",
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -173,6 +177,7 @@ class TestExecute:
 
         mock_process = AsyncMock()
         mock_process.communicate.side_effect = TimeoutError
+        mock_process.returncode = None
         mock_process.kill = MagicMock()
         mock_process.wait = AsyncMock()
 
@@ -275,6 +280,64 @@ class TestErrorDetection:
                 await cli._execute("read", params={"path": "missing.md"})
 
         assert exc_info.value.exit_code == 1
+
+
+class TestProcessLifecycle:
+    async def test_cancellation_kills_the_child(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+
+        async def hang():
+            await asyncio.Event().wait()
+
+        process = AsyncMock()
+        process.communicate = hang
+        process.returncode = None
+        process.kill = MagicMock()
+        process.wait = AsyncMock()
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            task = asyncio.create_task(
+                cli._execute("create", params={"path": "big.md"})
+            )
+            await asyncio.sleep(0)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+        process.kill.assert_called_once()
+        process.wait.assert_awaited_once()
+
+    async def test_finished_child_is_not_killed(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+
+        process = _mock_process(b"", returncode=0)
+        process.communicate.side_effect = TimeoutError
+        process.kill = MagicMock()
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CLITimeoutError):
+                await cli._execute("read", params={"path": "slow.md"})
+
+        process.kill.assert_not_called()
+
+    async def test_non_utf8_output_is_not_fatal(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(b"caf\xe9 latte")
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            result = await cli._execute("read", params={"path": "note.md"})
+
+        assert result.startswith("caf")
+        assert result.endswith(" latte")
+
+    async def test_stdin_is_closed(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(b"")
+
+        with patch("asyncio.create_subprocess_exec", return_value=process) as mock_exec:
+            await cli._execute("read")
+
+        assert mock_exec.await_args.kwargs["stdin"] == asyncio.subprocess.DEVNULL
 
 
 class TestBinaryExecution:

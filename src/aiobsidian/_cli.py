@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import re
 import shutil
@@ -128,6 +129,10 @@ class ObsidianCLI:
         consequence, reading a note whose first line starts with `Error: ` also
         raises instead of returning the text.
 
+        Cancelling the call kills the child process before the cancellation
+        propagates, so no orphan keeps writing to the vault. The command gets
+        no stdin, so one waiting for input fails instead of hanging.
+
         Args:
             command: CLI command name (e.g. `"read"`, `"daily:path"`).
             params: Key-value parameters passed as `key=value` arguments.
@@ -159,6 +164,7 @@ class ObsidianCLI:
         try:
             process = await asyncio.create_subprocess_exec(
                 *args,
+                stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -173,12 +179,14 @@ class ObsidianCLI:
                 process.communicate(), timeout=effective_timeout
             )
         except TimeoutError:
-            process.kill()
-            await process.wait()
-            raise CLITimeoutError(command, effective_timeout)
+            await self._kill(process)
+            raise CLITimeoutError(command, effective_timeout) from None
+        except asyncio.CancelledError:
+            await self._kill(process)
+            raise
 
-        stdout = stdout_bytes.decode()
-        stderr = stderr_bytes.decode()
+        stdout = stdout_bytes.decode(errors="replace")
+        stderr = stderr_bytes.decode(errors="replace")
 
         if process.returncode != 0:
             raise self._build_error(command, process.returncode or 1, stdout, stderr)
@@ -190,6 +198,20 @@ class ObsidianCLI:
             raise self._build_error(command, 0, stdout, stderr)
 
         return stdout
+
+    @staticmethod
+    async def _kill(process: asyncio.subprocess.Process) -> None:
+        """Kill a running command and wait for the child to exit.
+
+        Args:
+            process: The child process to stop.
+        """
+        if process.returncode is not None:
+            return
+        with contextlib.suppress(ProcessLookupError):
+            process.kill()
+        with contextlib.suppress(ProcessLookupError, asyncio.CancelledError):
+            await asyncio.shield(process.wait())
 
     @staticmethod
     def _build_error(

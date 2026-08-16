@@ -37,6 +37,9 @@ class APIError(ObsidianError):
             msg += f" (error_code={error_code})"
         super().__init__(msg)
 
+    def __reduce__(self) -> tuple[type[APIError], tuple[int, str, int | None]]:
+        return type(self), (self.status_code, self.message, self.error_code)
+
 
 class AuthenticationError(APIError):
     """HTTP 401 Unauthorized — invalid or missing API key."""
@@ -92,6 +95,9 @@ class CommandError(CLIError):
             f"Command {command!r} failed (exit_code={exit_code}): {detail}"
         )
 
+    def __reduce__(self) -> tuple[type[CommandError], tuple[str, int, str, str]]:
+        return type(self), (self.command, self.exit_code, self.stderr, self.stdout)
+
 
 class CLINotFoundError(CommandError, NotFoundError):
     """A CLI command failed because the requested resource does not exist.
@@ -116,6 +122,9 @@ class CLIParseError(CLIError):
         excerpt = output.strip()[:200]
         super().__init__(f"Could not parse the output of {command!r}: {excerpt!r}")
 
+    def __reduce__(self) -> tuple[type[CLIParseError], tuple[str, str]]:
+        return type(self), (self.command, self.output)
+
 
 class CLITimeoutError(CLIError):
     """A CLI command exceeded the timeout limit.
@@ -129,3 +138,6 @@ class CLITimeoutError(CLIError):
         self.command = command
         self.timeout = timeout
         super().__init__(f"Command {command!r} timed out after {timeout}s")
+
+    def __reduce__(self) -> tuple[type[CLITimeoutError], tuple[str, float]]:
+        return type(self), (self.command, self.timeout)
