@@ -14,8 +14,8 @@ NOTE_JSON = {
 }
 
 DOC_MAP_JSON = {
-    "headings": ["# Active"],
-    "blocks": ["^def456"],
+    "headings": ["Active"],
+    "blocks": ["def456"],
     "frontmatterFields": [],
 }
 
@@ -65,8 +65,37 @@ async def test_patch(mock_api, client):
     )
 
     request: httpx.Request = route.calls[0].request
-    assert request.headers["content-type"] == "application/json"
+    assert request.content == b"value"
+    assert request.headers["content-type"] == "text/markdown"
     assert request.headers["target-type"] == "frontmatter"
+
+
+async def test_patch_frontmatter_json_value(mock_api, client):
+    route = mock_api.patch("/active/").respond(200)
+
+    await client.active.patch(
+        ["a", "b"],
+        operation=PatchOperation.REPLACE,
+        target_type=TargetType.FRONTMATTER,
+        target="tags",
+    )
+
+    request: httpx.Request = route.calls[0].request
+    assert request.content == b'["a", "b"]'
+    assert request.headers["content-type"] == "application/json"
+
+
+async def test_patch_sends_patch_version(mock_api, client):
+    route = mock_api.patch("/active/").respond(200)
+
+    await client.active.patch(
+        "content",
+        operation=PatchOperation.APPEND,
+        target_type=TargetType.HEADING,
+        target="Section",
+    )
+
+    assert route.calls[0].request.headers["markdown-patch-version"] == "1"
 
 
 async def test_delete(mock_api, client):
@@ -78,12 +107,13 @@ async def test_delete(mock_api, client):
 
 
 async def test_get_document_map(mock_api, client):
-    mock_api.get("/active/").respond(200, json=DOC_MAP_JSON)
+    route = mock_api.get("/active/").respond(200, json=DOC_MAP_JSON)
 
     result = await client.active.get(content_type=ContentType.DOCUMENT_MAP)
 
     assert isinstance(result, DocumentMap)
-    assert result.headings == ["# Active"]
+    assert result.headings == ["Active"]
+    assert route.calls[0].request.headers["markdown-patch-version"] == "1"
 
 
 async def test_get_not_found(mock_api, client):

@@ -1,4 +1,11 @@
 from enum import StrEnum
+from typing import Any
+
+JsonValue = str | int | float | bool | None | list[Any] | dict[str, Any]
+"""Any value the Obsidian REST API can carry as JSON.
+
+Used for frontmatter values, which are not restricted to strings.
+"""
 
 
 class Period(StrEnum):
@@ -41,11 +48,11 @@ class TargetType(StrEnum):
     """
 
     HEADING = "heading"
-    """Target a heading section (e.g. `## My Heading`)."""
+    """Target a heading section, by its text (e.g. `"My Heading"`)."""
     BLOCK = "block"
-    """Target a block reference (e.g. `^block-id`)."""
+    """Target a block reference, by its bare id (e.g. `"block-id"`)."""
     FRONTMATTER = "frontmatter"
-    """Target a frontmatter field."""
+    """Target a frontmatter field, by its key."""
 
 
 class ContentType(StrEnum):

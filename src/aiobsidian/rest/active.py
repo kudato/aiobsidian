@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal, overload
 
-from .._types import ContentType, PatchOperation, TargetType
+from .._types import ContentType, JsonValue, PatchOperation, TargetType
 from ..models.vault import DocumentMap, NoteJson
 from ._base import ContentResource
 
@@ -82,7 +82,7 @@ class ActiveFileResource(ContentResource):
 
     async def patch(
         self,
-        content: str,
+        content: JsonValue,
         *,
         operation: PatchOperation,
         target_type: TargetType,
@@ -92,13 +92,23 @@ class ActiveFileResource(ContentResource):
         """Patch a specific section of the active file.
 
         Args:
-            content: Content to insert or replace.
+            content: Markdown text for a `heading` or `block` target.
+                For a `frontmatter` target this is the field's value:
+                a `str` is stored verbatim, any other JSON type
+                (list, dict, number, bool, `None`) is serialized and
+                stored as that type.
             operation: How to apply the content (`append`, `prepend`,
                 or `replace`).
             target_type: What to target (`heading`, `block`, or
                 `frontmatter`).
-            target: The target identifier.
-            target_delimiter: Delimiter for nested targets.
+            target: The target identifier — heading text, the bare block
+                id (no `^`), or the frontmatter key.
+            target_delimiter: Delimiter joining the parts of a nested
+                heading target.
+
+        Raises:
+            TypeError: If `content` is not a `str` while targeting a
+                heading or a block.
         """
         await self._patch_content(
             self._BASE_URL,
