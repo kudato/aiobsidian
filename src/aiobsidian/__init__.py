@@ -3,8 +3,11 @@
 from ._cli import ObsidianCLI
 from ._client import ObsidianClient
 from ._exceptions import (
+    APIConnectionError,
     APIError,
     APINotFoundError,
+    APIStatusError,
+    APITimeoutError,
     AuthenticationError,
     BinaryNotFoundError,
     CLIError,
@@ -37,8 +40,11 @@ from .models import (
 )
 
 __all__ = [
+    "APIConnectionError",
     "APIError",
     "APINotFoundError",
+    "APIStatusError",
+    "APITimeoutError",
     "AuthenticationError",
     "BinaryNotFoundError",
     "CLIError",

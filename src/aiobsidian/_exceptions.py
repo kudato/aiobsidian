@@ -15,7 +15,15 @@ class NotFoundError(ObsidianError):
 
 
 class APIError(ObsidianError):
-    """Error returned by the Obsidian REST API.
+    """Base exception for Obsidian REST API errors.
+
+    The counterpart of `CLIError`: catching it covers a request the
+    server refused as well as one that never reached it.
+    """
+
+
+class APIStatusError(APIError):
+    """The REST API answered with an error status.
 
     Attributes:
         status_code: HTTP status code of the response.
@@ -37,16 +45,57 @@ class APIError(ObsidianError):
             msg += f" (error_code={error_code})"
         super().__init__(msg)
 
-    def __reduce__(self) -> tuple[type[APIError], tuple[int, str, int | None]]:
+    def __reduce__(self) -> tuple[type[APIStatusError], tuple[int, str, int | None]]:
         return type(self), (self.status_code, self.message, self.error_code)
 
 
-class AuthenticationError(APIError):
+class AuthenticationError(APIStatusError):
     """HTTP 401 Unauthorized — invalid or missing API key."""
 
 
-class APINotFoundError(APIError, NotFoundError):
+class APINotFoundError(APIStatusError, NotFoundError):
     """HTTP 404 Not Found — the requested resource does not exist."""
+
+
+class APIConnectionError(APIError):
+    """The REST API server could not be reached.
+
+    Attributes:
+        method: HTTP method of the request that failed.
+        url: URL the request was sent to.
+        detail: What the HTTP transport reported.
+    """
+
+    def __init__(self, method: str, url: str, detail: str) -> None:
+        self.method = method
+        self.url = url
+        self.detail = detail
+        super().__init__(
+            f"{method} {url} could not be reached: {detail}. Is Obsidian "
+            f"running with the Local REST API plugin enabled?"
+        )
+
+    def __reduce__(self) -> tuple[type[APIConnectionError], tuple[str, str, str]]:
+        return type(self), (self.method, self.url, self.detail)
+
+
+class APITimeoutError(APIError):
+    """A request to the REST API exceeded its timeout.
+
+    Attributes:
+        method: HTTP method of the request that timed out.
+        url: URL the request was sent to.
+        detail: What the HTTP transport reported.
+    """
+
+    def __init__(self, method: str, url: str, detail: str) -> None:
+        self.method = method
+        self.url = url
+        self.detail = detail
+        super().__init__(f"{method} {url} timed out: {detail}")
+
+    def __reduce__(self) -> tuple[type[APITimeoutError], tuple[str, str, str]]:
+        return type(self), (self.method, self.url, self.detail)
 
 
 class CLIError(ObsidianError):

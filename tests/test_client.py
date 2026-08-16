@@ -4,10 +4,14 @@ import respx
 
 from aiobsidian._client import ObsidianClient
 from aiobsidian._exceptions import (
+    APIConnectionError,
     APIError,
     APINotFoundError,
+    APIStatusError,
+    APITimeoutError,
     AuthenticationError,
     NotFoundError,
+    ObsidianError,
 )
 
 
@@ -147,15 +151,75 @@ async def test_raise_for_status_json_array_body(mock_api, client):
 
 
 async def test_api_error_str_with_error_code():
-    err = APIError(404, "Not found", 40401)
+    err = APIStatusError(404, "Not found", 40401)
     assert str(err) == "[404] Not found (error_code=40401)"
     assert err.error_code == 40401
 
 
 async def test_api_error_str_without_error_code():
-    err = APIError(500, "Internal error")
+    err = APIStatusError(500, "Internal error")
     assert str(err) == "[500] Internal error"
     assert err.error_code is None
+
+
+class TestTransportErrors:
+    """httpx failures must not reach the caller as httpx exceptions.
+
+    httpx is an optional dependency, so catching one of its exceptions
+    means importing a package the caller may not have installed, and it
+    sits outside the ObsidianError hierarchy the docs promise.
+    """
+
+    async def test_unreachable_server_raises_api_connection_error(
+        self, mock_api, client
+    ):
+        mock_api.get("/vault/note.md").mock(
+            side_effect=httpx.ConnectError("[Errno 61] Connection refused")
+        )
+
+        with pytest.raises(APIConnectionError) as exc_info:
+            await client.request("GET", "/vault/note.md")
+
+        error = exc_info.value
+        assert error.method == "GET"
+        assert error.url == "https://127.0.0.1:27124/vault/note.md"
+        assert error.detail == "[Errno 61] Connection refused"
+        assert "Is Obsidian running" in str(error)
+
+    async def test_slow_server_raises_api_timeout_error(self, mock_api, client):
+        mock_api.get("/vault/note.md").mock(side_effect=httpx.ReadTimeout("timed out"))
+
+        with pytest.raises(APITimeoutError) as exc_info:
+            await client.request("GET", "/vault/note.md")
+
+        assert exc_info.value.method == "GET"
+        assert exc_info.value.detail == "timed out"
+
+    async def test_a_timeout_is_not_reported_as_a_connection_failure(
+        self, mock_api, client
+    ):
+        # httpx.TimeoutException derives from RequestError, so the order
+        # of the two except clauses is what keeps these apart.
+        mock_api.get("/x").mock(side_effect=httpx.ConnectTimeout("timed out"))
+
+        with pytest.raises(APITimeoutError):
+            await client.request("GET", "/x")
+
+    async def test_transport_errors_are_obsidian_errors(self, mock_api, client):
+        mock_api.get("/x").mock(side_effect=httpx.ConnectError("refused"))
+
+        with pytest.raises(ObsidianError):
+            await client.request("GET", "/x")
+
+    async def test_an_error_without_a_message_still_names_itself(
+        self, mock_api, client
+    ):
+        mock_api.get("/x").mock(side_effect=httpx.ReadError(""))
+
+        with pytest.raises(APIConnectionError) as exc_info:
+            await client.request("GET", "/x")
+
+        assert exc_info.value.detail == "ReadError"
 
 
 async def test_repr_does_not_contain_api_key():

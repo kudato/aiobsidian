@@ -4,7 +4,13 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from ._constants import DEFAULT_HOST, DEFAULT_PORT, DEFAULT_SCHEME, DEFAULT_TIMEOUT
-from ._exceptions import APIError, APINotFoundError, AuthenticationError
+from ._exceptions import (
+    APIConnectionError,
+    APINotFoundError,
+    APIStatusError,
+    APITimeoutError,
+    AuthenticationError,
+)
 
 if TYPE_CHECKING:
     import httpx
@@ -15,6 +21,18 @@ if TYPE_CHECKING:
     from .rest.search import SearchResource
     from .rest.system import SystemResource
     from .rest.vault import VaultResource
+
+
+def _detail(exc: Exception) -> str:
+    """Describe an httpx failure, which sometimes carries no message.
+
+    Args:
+        exc: The exception raised by the HTTP transport.
+
+    Returns:
+        Its message, or its class name when it has none.
+    """
+    return str(exc) or type(exc).__name__
 
 
 class ObsidianClient:
@@ -64,6 +82,7 @@ class ObsidianClient:
         self._timeout = timeout
         self._verify_ssl = verify_ssl
         self._external_client = http_client is not None
+        self._httpx = self._import_httpx()
         self._http = http_client or self._build_http_client()
         self._url_prefix = "" if str(self._http.base_url) else self._base_url
 
@@ -121,25 +140,55 @@ class ObsidianClient:
             The `httpx.Response` object.
 
         Raises:
+            APIConnectionError: If the server cannot be reached.
+            APITimeoutError: If the request exceeds the timeout.
             AuthenticationError: If the API key is invalid (HTTP 401).
             APINotFoundError: If the resource is not found (HTTP 404).
-            APIError: For any other HTTP error (status >= 400).
+            APIStatusError: For any other HTTP error (status >= 400).
         """
         request_headers: dict[str, Any] = {"Authorization": f"Bearer {self._api_key}"}
         if headers:
             request_headers.update(headers)
 
-        response = await self._http.request(
-            method,
-            f"{self._url_prefix}{path}",
-            content=content,
-            json=json,
-            headers=request_headers,
-            params=params,
-        )
+        url = f"{self._url_prefix}{path}"
+        try:
+            response = await self._http.request(
+                method,
+                url,
+                content=content,
+                json=json,
+                headers=request_headers,
+                params=params,
+            )
+        except self._httpx.TimeoutException as exc:
+            raise APITimeoutError(
+                method, self._failed_url(exc, url), _detail(exc)
+            ) from exc
+        except self._httpx.RequestError as exc:
+            raise APIConnectionError(
+                method, self._failed_url(exc, url), _detail(exc)
+            ) from exc
+
         if response.status_code >= 400:
             self._raise_for_status(response)
         return response
+
+    @staticmethod
+    def _failed_url(exc: Any, fallback: str) -> str:
+        """Recover the absolute URL a failed request was sent to.
+
+        Args:
+            exc: The `httpx.RequestError` that was raised.
+            fallback: URL to report when httpx did not attach a request,
+                which is what the caller passed and may be relative.
+
+        Returns:
+            The URL to name in the error message.
+        """
+        try:
+            return str(exc.request.url)
+        except RuntimeError:
+            return fallback
 
     @staticmethod
     def _raise_for_status(response: httpx.Response) -> None:
@@ -157,7 +206,7 @@ class ObsidianClient:
             raise AuthenticationError(status, message, error_code)
         if status == 404:
             raise APINotFoundError(status, message, error_code)
-        raise APIError(status, message, error_code)
+        raise APIStatusError(status, message, error_code)
 
     # -- resources ---------------------------------------------------------
 

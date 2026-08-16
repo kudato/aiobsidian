@@ -5,8 +5,10 @@ import pickle
 import pytest
 
 from aiobsidian._exceptions import (
-    APIError,
+    APIConnectionError,
     APINotFoundError,
+    APIStatusError,
+    APITimeoutError,
     AuthenticationError,
     BinaryNotFoundError,
     CLINotFoundError,
@@ -16,8 +18,10 @@ from aiobsidian._exceptions import (
 )
 
 CASES = [
-    APIError(500, "Internal error"),
-    APIError(400, "Bad request", 40001),
+    APIStatusError(500, "Internal error"),
+    APIStatusError(400, "Bad request", 40001),
+    APIConnectionError("GET", "https://127.0.0.1:27124/", "Connection refused"),
+    APITimeoutError("GET", "https://127.0.0.1:27124/", "timed out"),
     AuthenticationError(401, "Unauthorized"),
     APINotFoundError(404, "Not found", 40401),
     BinaryNotFoundError("binary not found"),

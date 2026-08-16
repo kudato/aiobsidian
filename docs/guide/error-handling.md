@@ -13,10 +13,17 @@ ObsidianError                   # Base exception for all aiobsidian errors
 │   │   └── CLINotFoundError    # ... because the resource does not exist
 │   ├── CLIParseError           # Command output could not be parsed
 │   └── CLITimeoutError         # Command exceeded timeout
-└── APIError                    # HTTP error from the REST API
-    ├── AuthenticationError     # 401 Unauthorized
-    └── APINotFoundError        # 404 Not Found
+└── APIError                    # Base exception for REST errors
+    ├── APIStatusError          # The server answered with status >= 400
+    │   ├── AuthenticationError # 401 Unauthorized
+    │   └── APINotFoundError    # 404 Not Found
+    ├── APIConnectionError      # The server could not be reached
+    └── APITimeoutError         # The request took too long
 ```
+
+`CLIError` and `APIError` are the two transport roots: catching either one
+covers every way that transport can fail, whether or not a request or command
+ever reached Obsidian.
 
 `CLINotFoundError` and `APINotFoundError` also inherit from `NotFoundError`, so a
 missing note can be handled the same way on both transports:
@@ -90,31 +97,45 @@ letting a `json.JSONDecodeError` escape the `ObsidianError` hierarchy.
 ```python
 from aiobsidian import (
     ObsidianClient,
-    APIError,
+    APIConnectionError,
     APINotFoundError,
+    APIStatusError,
+    APITimeoutError,
     AuthenticationError,
 )
 
 async with ObsidianClient(api_key="your-api-key") as client:
     try:
         content = await client.vault.get("nonexistent.md")
+    except APIConnectionError:
+        print("Obsidian is not reachable — is it running with the plugin enabled?")
+    except APITimeoutError:
+        print("The server did not answer in time")
     except APINotFoundError:
         print("File not found")
     except AuthenticationError:
         print("Invalid API key")
-    except APIError as e:
+    except APIStatusError as e:
         print(f"API error [{e.status_code}]: {e.message}")
 ```
 
-### APIError attributes
+### The request never reached the server
 
-All API exceptions (`APIError`, `AuthenticationError`, `APINotFoundError`) have these attributes:
+`APIConnectionError` and `APITimeoutError` cover the failures where no response
+came back at all: Obsidian is closed, the plugin is disabled, the port is wrong,
+the host is unreachable. The underlying `httpx` exception is the `__cause__` and
+never escapes on its own — `httpx` is an optional dependency, so catching it
+would mean importing a package the caller may not have installed.
 
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `status_code` | `int` | HTTP status code (e.g. 401, 404, 500) |
-| `message` | `str` | Error message from the API response |
-| `error_code` | `int \| None` | Optional numeric error code from the API |
+### Attributes
+
+| Exception | Attributes |
+|-----------|-----------|
+| `APIStatusError` | `status_code`, `message`, `error_code` |
+| `AuthenticationError` | `status_code`, `message`, `error_code` |
+| `APINotFoundError` | `status_code`, `message`, `error_code` |
+| `APIConnectionError` | `method`, `url`, `detail` |
+| `APITimeoutError` | `method`, `url`, `detail` |
 
 ## Catching all aiobsidian errors
 

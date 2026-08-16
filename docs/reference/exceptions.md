@@ -24,6 +24,12 @@
 
 ::: aiobsidian.APIError
 
+::: aiobsidian.APIStatusError
+
 ::: aiobsidian.AuthenticationError
 
 ::: aiobsidian.APINotFoundError
+
+::: aiobsidian.APIConnectionError
+
+::: aiobsidian.APITimeoutError
