@@ -5,8 +5,11 @@ import json
 RESULTS = ["welcome.md", "notes/linked.md"]
 
 CONTEXT_RESULTS = [
-    {"file": "welcome.md", "matches": [{"line": 13, "text": "Text with a match."}]},
-    {"file": "notes/linked.md", "matches": []},
+    {"file": "welcome.md", "matches": [{"line": 2, "text": "title: Welcome"}]},
+    {
+        "file": "notes/linked.md",
+        "matches": [{"line": 7, "text": "Back to [[welcome]]."}],
+    },
 ]
 
 
@@ -16,7 +19,7 @@ async def test_open(cli):
     cli._execute.assert_awaited_once_with("search:open", params={"query": "test query"})
 
 
-async def test_query(cli):
+async def test_query_returns_paths(cli):
     cli._execute.return_value = json.dumps(RESULTS)
     result = await cli.search.query("test query")
     assert result == RESULTS
@@ -64,25 +67,14 @@ async def test_query_case_sensitive(cli):
     )
 
 
-async def test_query_with_matches(cli):
-    cli._execute.return_value = json.dumps(RESULTS)
-    result = await cli.search.query("test", matches=True)
-    assert result == RESULTS
-    cli._execute.assert_awaited_once_with(
-        "search", params={"query": "test"}, flags=["matches"], output_format="json"
-    )
-
-
 async def test_query_all_params(cli):
     cli._execute.return_value = json.dumps(RESULTS)
-    result = await cli.search.query(
-        "test", path="notes", limit=10, case=True, matches=True
-    )
+    result = await cli.search.query("test", path="notes", limit=10, case=True)
     assert result == RESULTS
     cli._execute.assert_awaited_once_with(
         "search",
         params={"query": "test", "path": "notes", "limit": "10"},
-        flags=["case", "matches"],
+        flags=["case"],
         output_format="json",
     )
 
@@ -103,18 +95,6 @@ async def test_context_no_matches(cli):
     cli._execute.return_value = "No matches found.\n"
     result = await cli.search.context("nothing")
     assert result == []
-
-
-async def test_context_with_lines(cli):
-    cli._execute.return_value = json.dumps(CONTEXT_RESULTS)
-    result = await cli.search.context("test query", lines=3)
-    assert result == CONTEXT_RESULTS
-    cli._execute.assert_awaited_once_with(
-        "search:context",
-        params={"query": "test query", "lines": "3"},
-        flags=None,
-        output_format="json",
-    )
 
 
 async def test_context_with_path(cli):
@@ -155,13 +135,11 @@ async def test_context_case_sensitive(cli):
 
 async def test_context_all_params(cli):
     cli._execute.return_value = json.dumps(CONTEXT_RESULTS)
-    result = await cli.search.context(
-        "test", lines=2, path="notes", limit=10, case=True
-    )
+    result = await cli.search.context("test", path="notes", limit=10, case=True)
     assert result == CONTEXT_RESULTS
     cli._execute.assert_awaited_once_with(
         "search:context",
-        params={"query": "test", "lines": "2", "path": "notes", "limit": "10"},
+        params={"query": "test", "path": "notes", "limit": "10"},
         flags=["case"],
         output_format="json",
     )

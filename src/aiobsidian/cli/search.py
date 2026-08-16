@@ -27,8 +27,7 @@ class CLISearchResource(BaseCLIResource):
         path: str | None = None,
         limit: int | None = None,
         case: bool = False,
-        matches: bool = False,
-    ) -> list[dict[str, Any]]:
+    ) -> list[str]:
         """Search the vault.
 
         Args:
@@ -36,51 +35,45 @@ class CLISearchResource(BaseCLIResource):
             path: Restrict search to files under this path.
             limit: Maximum number of results to return.
             case: If ``True``, perform case-sensitive search.
-            matches: If ``True``, include match details in results.
 
         Returns:
-            List of search result dictionaries.
+            Paths of the matching files. Use `context()` to see where in
+            each file the query matched.
         """
         params: dict[str, str] = {"query": query}
         if path is not None:
             params["path"] = path
         if limit is not None:
             params["limit"] = str(limit)
-        flags: list[str] = []
-        if case:
-            flags.append("case")
-        if matches:
-            flags.append("matches")
+        flags = ["case"] if case else None
         output = await self._cli._execute(
-            "search", params=params, flags=flags or None, output_format="json"
+            "search", params=params, flags=flags, output_format="json"
         )
-        result: list[dict[str, Any]] = self._parse_json("search", output)
+        result: list[str] = self._parse_json("search", output)
         return result
 
     async def context(
         self,
         query: str,
         *,
-        lines: int | None = None,
         path: str | None = None,
         limit: int | None = None,
         case: bool = False,
     ) -> list[dict[str, Any]]:
-        """Search the vault with surrounding context lines.
+        """Search the vault, with the matching line of every hit.
 
         Args:
             query: Search query string.
-            lines: Number of context lines to include around matches.
             path: Restrict search to files under this path.
             limit: Maximum number of results to return.
             case: If ``True``, perform case-sensitive search.
 
         Returns:
-            List of search result dictionaries with context.
+            One entry per matching file, each with its ``file`` and a
+            ``matches`` list of ``line`` and ``text`` pairs. The CLI
+            reports the matching line itself, never the lines around it.
         """
         params: dict[str, str] = {"query": query}
-        if lines is not None:
-            params["lines"] = str(lines)
         if path is not None:
             params["path"] = path
         if limit is not None:
