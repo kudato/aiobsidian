@@ -7,6 +7,14 @@ JsonValue = str | int | float | bool | None | list[Any] | dict[str, Any]
 Used for frontmatter values, which are not restricted to strings.
 """
 
+PropertyValue = str | list[str] | None
+"""A frontmatter value as the Obsidian CLI prints it.
+
+The CLI renders every value as text, so the declared type is lost: a
+property holding several values arrives as a list of strings, an empty
+one as `None`, and everything else as a single string.
+"""
+
 
 class PatchOperation(StrEnum):
     """Operation type for PATCH requests.
@@ -34,6 +42,27 @@ class TargetType(StrEnum):
     """Target a block reference, by its bare id (e.g. `"block-id"`)."""
     FRONTMATTER = "frontmatter"
     """Target a frontmatter field, by its key."""
+
+
+class PropertyType(StrEnum):
+    """Type of a frontmatter property, as the Obsidian CLI names it.
+
+    Passed to `property:set` to decide how the value text is turned into
+    a frontmatter value.
+    """
+
+    TEXT = "text"
+    """A string."""
+    LIST = "list"
+    """A list of strings, written as a comma-separated value."""
+    NUMBER = "number"
+    """A number."""
+    CHECKBOX = "checkbox"
+    """A boolean, written as `"true"` or `"false"`."""
+    DATE = "date"
+    """A date, written as `YYYY-MM-DD`."""
+    DATETIME = "datetime"
+    """A date and time, written as `YYYY-MM-DDTHH:mm` or with seconds."""
 
 
 class ContentType(StrEnum):

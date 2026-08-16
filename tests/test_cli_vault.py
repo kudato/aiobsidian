@@ -177,10 +177,10 @@ async def test_move(cli):
 
 
 async def test_rename(cli):
-    cli._execute.return_value = ""
+    cli._execute.return_value = "Renamed to renamed.md\n"
     await cli.vault.rename("note.md", "renamed.md")
     cli._execute.assert_awaited_once_with(
-        "rename", params={"path": "note.md", "new-name": "renamed.md"}
+        "rename", params={"path": "note.md", "name": "renamed.md"}
     )
 
 
