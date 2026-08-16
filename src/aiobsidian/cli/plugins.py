@@ -27,14 +27,14 @@ class CLIPluginsResource(BaseCLIResource):
         output = await self._cli._execute("plugin", params={"id": plugin_id})
         return self._parse_fields("plugin", output)
 
-    async def restrict(self, *, on: bool) -> None:
-        """Toggle restricted mode for plugins.
+    async def set_restricted(self, value: bool) -> None:
+        """Turn restricted mode on or off.
 
         Args:
-            on: If ``True``, enable restricted mode;
-                if ``False``, disable it.
+            value: ``True`` enables restricted mode, which disables every
+                community plugin; ``False`` leaves it.
         """
-        flags = ["on"] if on else ["off"]
+        flags = ["on"] if value else ["off"]
         await self._cli._execute("plugins:restrict", flags=flags)
 
     async def enabled(self) -> list[dict[str, Any]]:

@@ -24,16 +24,16 @@ VERSION = (
 )
 
 
-async def test_toggle_on(cli):
-    cli._execute.return_value = "Sync resumed.\n"
-    await cli.sync.toggle(on=True)
-    cli._execute.assert_awaited_once_with("sync", flags=["on"])
-
-
-async def test_toggle_off(cli):
+async def test_set_paused_true_pauses(cli):
     cli._execute.return_value = "Sync paused.\n"
-    await cli.sync.toggle(on=False)
+    await cli.sync.set_paused(True)
     cli._execute.assert_awaited_once_with("sync", flags=["off"])
+
+
+async def test_set_paused_false_resumes(cli):
+    cli._execute.return_value = "Sync resumed.\n"
+    await cli.sync.set_paused(False)
+    cli._execute.assert_awaited_once_with("sync", flags=["on"])
 
 
 async def test_open(cli):

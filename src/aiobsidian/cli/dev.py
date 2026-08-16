@@ -132,22 +132,24 @@ class CLIDevResource(BaseCLIResource):
         output = await self._cli._execute("dev:css", params=params)
         return output.strip()
 
-    async def mobile(self, *, on: bool) -> None:
-        """Toggle mobile emulation.
+    async def set_mobile(self, value: bool) -> None:
+        """Turn mobile emulation on or off.
 
         Args:
-            on: ``True`` to enable, ``False`` to disable.
+            value: ``True`` enables emulation, ``False`` disables it.
         """
-        flags = ["on"] if on else ["off"]
+        flags = ["on"] if value else ["off"]
         await self._cli._execute("dev:mobile", flags=flags)
 
-    async def debug(self, *, on: bool) -> None:
-        """Start or stop console capture.
+    async def set_capture(self, value: bool) -> None:
+        """Start or stop capturing the console.
+
+        What is captured is what `console()` and `errors()` read.
 
         Args:
-            on: ``True`` to start, ``False`` to stop capture.
+            value: ``True`` starts capturing, ``False`` stops it.
         """
-        flags = ["on"] if on else ["off"]
+        flags = ["on"] if value else ["off"]
         await self._cli._execute("dev:debug", flags=flags)
 
     async def cdp(self, method: str, params: str) -> str:

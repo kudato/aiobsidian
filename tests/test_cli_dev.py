@@ -113,27 +113,27 @@ async def test_css_with_prop(cli):
     )
 
 
-async def test_mobile_on(cli):
+async def test_set_mobile_true(cli):
     cli._execute.return_value = ""
-    await cli.dev.mobile(on=True)
+    await cli.dev.set_mobile(True)
     cli._execute.assert_awaited_once_with("dev:mobile", flags=["on"])
 
 
-async def test_mobile_off(cli):
+async def test_set_mobile_false(cli):
     cli._execute.return_value = ""
-    await cli.dev.mobile(on=False)
+    await cli.dev.set_mobile(False)
     cli._execute.assert_awaited_once_with("dev:mobile", flags=["off"])
 
 
-async def test_debug_on(cli):
+async def test_set_capture_true(cli):
     cli._execute.return_value = ""
-    await cli.dev.debug(on=True)
+    await cli.dev.set_capture(True)
     cli._execute.assert_awaited_once_with("dev:debug", flags=["on"])
 
 
-async def test_debug_off(cli):
+async def test_set_capture_false(cli):
     cli._execute.return_value = ""
-    await cli.dev.debug(on=False)
+    await cli.dev.set_capture(False)
     cli._execute.assert_awaited_once_with("dev:debug", flags=["off"])
 
 
