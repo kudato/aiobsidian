@@ -11,6 +11,8 @@ class CLIHistoryResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def versions(self, path: str) -> list[dict[str, str]]:
         """List versions of a specific file in local history.
 

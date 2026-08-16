@@ -10,6 +10,8 @@ class CLITabsResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def open(self, *, file: str | None = None, view: str | None = None) -> None:
         """Open a file or view in a new tab.
 

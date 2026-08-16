@@ -10,6 +10,8 @@ class CLISystemResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def version(self) -> str:
         """Get the Obsidian version.
 

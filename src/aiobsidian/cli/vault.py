@@ -11,6 +11,8 @@ class CLIVaultResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def open(self, path: str) -> None:
         """Open a file in the Obsidian UI.
 

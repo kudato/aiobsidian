@@ -15,6 +15,8 @@ class CLIPublishResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def open(self, path: str | None = None) -> str:
         """Open a file on the published site in a browser.
 

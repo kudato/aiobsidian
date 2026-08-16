@@ -10,6 +10,8 @@ class CLIDailyResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def read(self) -> str:
         """Read the content of today's daily note.
 

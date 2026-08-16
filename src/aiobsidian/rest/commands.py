@@ -7,6 +7,8 @@ from ._base import BaseResource
 class CommandsResource(BaseResource):
     """List and execute Obsidian commands."""
 
+    __slots__ = ()
+
     _BASE_URL = "/commands"
 
     async def list(self) -> list[Command]:

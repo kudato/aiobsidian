@@ -16,6 +16,8 @@ class CLITasksResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def list(
         self,
         *,

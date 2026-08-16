@@ -10,6 +10,8 @@ class CLIThemesResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def current(self) -> str:
         """Get the active theme.
 

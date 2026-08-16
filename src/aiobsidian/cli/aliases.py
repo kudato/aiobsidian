@@ -10,6 +10,8 @@ class CLIAliasesResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def get(self, path: str) -> list[str]:
         """Get the aliases for a file.
 

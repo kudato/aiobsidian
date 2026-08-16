@@ -12,6 +12,8 @@ class CLIPluginsResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def info(self, plugin_id: str) -> dict[str, str]:
         """Get details about a plugin.
 

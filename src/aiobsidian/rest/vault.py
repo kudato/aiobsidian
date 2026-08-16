@@ -10,6 +10,8 @@ from ._base import ContentResource
 class VaultResource(ContentResource):
     """Operations on files and directories in the vault."""
 
+    __slots__ = ()
+
     _BASE_URL = "/vault"
 
     @overload

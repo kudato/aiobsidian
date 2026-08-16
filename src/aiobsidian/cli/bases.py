@@ -12,6 +12,8 @@ class CLIBasesResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def views(self) -> list[dict[str, str]]:
         """List the views of the base file open in the Obsidian UI.
 

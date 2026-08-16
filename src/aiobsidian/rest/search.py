@@ -10,6 +10,8 @@ from ._base import BaseResource
 class SearchResource(BaseResource):
     """Search vault content with a text query or a JsonLogic expression."""
 
+    __slots__ = ()
+
     _BASE_URL = "/search"
 
     async def simple(

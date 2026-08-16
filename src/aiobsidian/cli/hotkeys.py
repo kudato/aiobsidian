@@ -12,6 +12,8 @@ class CLIHotkeysResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
+    __slots__ = ()
+
     async def get(self, command_id: str, *, verbose: bool = False) -> str:
         """Get the hotkey binding for a command.
 
