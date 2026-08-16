@@ -33,6 +33,35 @@ cli = ObsidianCLI("MyVault", binary="/opt/obsidian/bin/obsidian")
 cli = ObsidianCLI("MyVault", timeout=60.0)
 ```
 
+A single slow command can override it without changing the client:
+
+```python
+await cli.run("dev:screenshot", params={"path": "shot.png"}, timeout=120.0)
+```
+
+Wrapping a call in `asyncio.timeout` works too — cancelling a command
+kills it and everything it started, so nothing is left running against
+the vault.
+
+### Running commands the library does not wrap
+
+`run()` sends a command as given and returns its output as printed,
+without parsing:
+
+```python
+raw = await cli.run("wordcount", params={"path": "note.md"})
+# 'words: 3\ncharacters: 24\n'
+
+raw = await cli.run("tags", flags=["counts"], output_format="json")
+```
+
+Prefer the resource methods where they exist — they know the shape of
+each command's output. `run()` is for the commands they do not cover
+yet, and it is the CLI counterpart of `ObsidianClient.request()`.
+
+Failures are detected the same way as everywhere else, so a command that
+fails raises instead of returning its error text.
+
 ---
 
 ## ObsidianClient (REST)

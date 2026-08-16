@@ -146,6 +146,71 @@ class TestClose:
         assert cli._running == set()
 
 
+class TestRun:
+    async def test_passes_everything_through(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(b"[]")
+
+        with patch("asyncio.create_subprocess_exec", return_value=process) as mock_exec:
+            await cli.run(
+                "tags",
+                params={"path": "note.md"},
+                flags=["counts"],
+                output_format="json",
+            )
+
+        mock_exec.assert_awaited_once_with(
+            "/usr/bin/obsidian",
+            "tags",
+            "vault=TestVault",
+            "format=json",
+            "path=note.md",
+            "counts",
+            **SPAWN_KWARGS,
+        )
+
+    async def test_returns_output_unparsed(self):
+        # The point of the escape hatch: no stripping, no parsing, no
+        # guessing at a shape.
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(b"words: 3\ncharacters: 24\n")
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            output = await cli.run("wordcount", params={"path": "note.md"})
+
+        assert output == "words: 3\ncharacters: 24\n"
+
+    async def test_timeout_override(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian", timeout=30.0)
+        process = _mock_process(b"")
+        process.communicate.side_effect = TimeoutError
+        process.returncode = None
+        process.kill = MagicMock()
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CLITimeoutError) as exc_info:
+                await cli.run("dev:screenshot", timeout=0.5)
+
+        assert exc_info.value.timeout == 0.5
+
+    async def test_a_failing_command_raises(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(b'Error: Command "nope" not found\n')
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CommandError) as exc_info:
+                await cli.run("nope")
+
+        assert exc_info.value.command == "nope"
+
+    async def test_after_aclose_raises(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        await cli.aclose()
+
+        with pytest.raises(RuntimeError, match="has been closed"):
+            await cli.run("version")
+
+
 class TestExecute:
     async def test_success(self):
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
