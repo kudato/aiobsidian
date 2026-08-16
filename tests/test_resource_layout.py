@@ -16,19 +16,31 @@ from aiobsidian.cli._base import BaseCLIResource
 from aiobsidian.rest._base import BaseResource
 
 
+def _raise(name):
+    """Re-raise an import error `walk_packages` would otherwise swallow.
+
+    Without it a subpackage whose import fails is skipped silently, and
+    the tests below quietly stop covering whatever it holds.
+
+    Args:
+        name: Module that could not be imported.
+    """
+    raise
+
+
 def _resource_classes(package, base):
     """Collect the resource classes a package defines itself.
 
     Args:
-        package: Package to walk.
+        package: Package to walk, subpackages included.
         base: Base class every resource inherits from.
 
     Returns:
         Resource classes, excluding those merely imported into a module.
     """
     found = []
-    for info in pkgutil.iter_modules(package.__path__):
-        module = importlib.import_module(f"{package.__name__}.{info.name}")
+    for info in pkgutil.walk_packages(package.__path__, f"{package.__name__}.", _raise):
+        module = importlib.import_module(info.name)
         found.extend(
             obj
             for obj in vars(module).values()

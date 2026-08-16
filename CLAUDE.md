@@ -11,7 +11,7 @@
 ## Commands
 
 ```bash
-uv sync                                # install all deps (dev + docs)
+uv sync --all-groups                   # install all deps (dev + docs); plain `uv sync` drops docs
 uv run ruff check src/ tests/          # lint
 uv run ruff format src/ tests/         # auto-format
 uv run mypy src/ tests/typing_examples.py   # type check

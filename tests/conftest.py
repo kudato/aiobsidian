@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
@@ -6,6 +6,25 @@ import respx
 
 from aiobsidian._cli import ObsidianCLI
 from aiobsidian._client import ObsidianClient
+
+
+@pytest.fixture(autouse=True)
+def guard_killpg(request):
+    """Keep os.killpg away from process groups the tests do not own.
+
+    A mocked process answers `.pid` with a MagicMock, and MagicMock
+    coerces to 1 through `__index__`, so an unguarded `_kill` would ask
+    the OS to SIGKILL process group 1. A desktop refuses that; a
+    container running as root would not.
+
+    Autouse across the whole suite, not one file: any test that patches
+    `asyncio.create_subprocess_exec` can reach `_kill`.
+    """
+    if "real_processes" in request.keywords:
+        yield None
+        return
+    with patch("aiobsidian._cli.os.killpg") as killpg:
+        yield killpg
 
 
 @pytest.fixture()
