@@ -30,8 +30,9 @@ class CLIPluginsResource(BaseCLIResource):
     async def set_restricted(self, value: bool) -> None:
         """Turn restricted mode on or off.
 
-        Obsidian reloads its window right after answering, so give it a
-        moment before the next command.
+        Obsidian reloads its window right after answering, unless the
+        setting was already in the state asked for; give it a moment
+        before the next command.
 
         Args:
             value: ``True`` enables restricted mode, which turns every
