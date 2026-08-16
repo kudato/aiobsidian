@@ -113,19 +113,25 @@ Both `ObsidianCLI` and `ObsidianClient` support async context managers:
 ```python
 async with ObsidianCLI("MyVault") as cli:
     files = await cli.vault.list()
-# CLI instance is cleaned up here
+# any command still running is killed here
 
 async with ObsidianClient(api_key="your-api-key") as client:
     status = await client.system.status()
 # HTTP client is automatically closed here
 ```
 
-### Manual close (REST only)
+### Manual close
+
+Both clients close through `aclose()`, so code holding one does not need
+to know which transport it got:
 
 ```python
-client = ObsidianClient(api_key="your-api-key")
+client: ObsidianCLI | ObsidianClient = ObsidianCLI("MyVault")
 try:
-    status = await client.system.status()
+    ...
 finally:
     await client.aclose()
 ```
+
+Closing an `ObsidianCLI` is final: it kills every command still running,
+and any command issued afterwards raises `RuntimeError`.
