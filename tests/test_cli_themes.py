@@ -1,33 +1,30 @@
 from __future__ import annotations
 
-import json
-
-THEMES = [
-    {"name": "Default", "active": True},
-    {"name": "Minimal", "active": False},
-]
-
-CURRENT_THEME = {"name": "Default", "mode": "dark"}
-
 
 async def test_list(cli):
-    cli._execute.return_value = json.dumps(THEMES)
+    cli._execute.return_value = "Minimal\nThings\n"
     result = await cli.themes.list()
-    assert result == THEMES
+    assert result == ["Minimal", "Things"]
     cli._execute.assert_awaited_once_with("themes", flags=None)
 
 
 async def test_list_with_versions(cli):
-    cli._execute.return_value = json.dumps(THEMES)
+    cli._execute.return_value = "Minimal\t7.7.0\n"
     result = await cli.themes.list(versions=True)
-    assert result == THEMES
+    assert result == ["Minimal\t7.7.0"]
     cli._execute.assert_awaited_once_with("themes", flags=["versions"])
 
 
+async def test_list_only_default_installed(cli):
+    cli._execute.return_value = ""
+    result = await cli.themes.list()
+    assert result == []
+
+
 async def test_current(cli):
-    cli._execute.return_value = json.dumps(CURRENT_THEME)
+    cli._execute.return_value = "(default)\n"
     result = await cli.themes.current()
-    assert result == CURRENT_THEME
+    assert result == "(default)"
     cli._execute.assert_awaited_once_with("theme")
 
 

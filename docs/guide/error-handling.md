@@ -11,6 +11,7 @@ ObsidianError                   # Base exception for all aiobsidian errors
 │   ├── BinaryNotFoundError     # CLI binary not found or not executable
 │   ├── CommandError            # Command failed
 │   │   └── CLINotFoundError    # ... because the resource does not exist
+│   ├── CLIParseError           # Command output could not be parsed
 │   └── CLITimeoutError         # Command exceeded timeout
 └── APIError                    # HTTP error from the REST API
     ├── AuthenticationError     # 401 Unauthorized
@@ -70,6 +71,10 @@ starts with `Error: ` raises instead of returning the text. The prefix only matt
 the very beginning of the output, so `Error: ` further down a note is returned as
 normal content.
 
+A command may also succeed and still print something the library cannot interpret. In
+that case parsing raises `CLIParseError`, which carries the raw `output`, instead of
+letting a `json.JSONDecodeError` escape the `ObsidianError` hierarchy.
+
 ### CLIError attributes
 
 | Exception | Attributes |
@@ -77,6 +82,7 @@ normal content.
 | `BinaryNotFoundError` | `message` |
 | `CommandError` | `command`, `exit_code`, `stderr`, `stdout` |
 | `CLINotFoundError` | `command`, `exit_code`, `stderr`, `stdout` |
+| `CLIParseError` | `command`, `output` |
 | `CLITimeoutError` | `command`, `timeout` |
 
 ## REST API errors

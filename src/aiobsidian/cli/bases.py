@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from ._base import BaseCLIResource
@@ -13,18 +12,17 @@ class CLIBasesResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
-    async def views(self, path: str) -> list[dict[str, Any]]:
+    async def views(self, path: str) -> list[str]:
         """List views of a database file.
 
         Args:
             path: Path to the database file.
 
         Returns:
-            List of view objects.
+            List of view names.
         """
         output = await self._cli._execute("base:views", params={"file": path})
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)
 
     async def create(self, path: str, **fields: str) -> None:
         """Create a record in a database.
@@ -52,16 +50,17 @@ class CLIBasesResource(BaseCLIResource):
         params: dict[str, str] = {"file": path}
         if view is not None:
             params["view"] = view
-        output = await self._cli._execute("base:query", params=params)
-        result: list[dict[str, Any]] = json.loads(output)
+        output = await self._cli._execute(
+            "base:query", params=params, output_format="json"
+        )
+        result: list[dict[str, Any]] = self._parse_json("base:query", output)
         return result
 
-    async def list(self) -> list[dict[str, Any]]:
+    async def list(self) -> list[str]:
         """List all database files in the vault.
 
         Returns:
-            List of database file objects.
+            List of paths to `.base` files.
         """
         output = await self._cli._execute("bases")
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)

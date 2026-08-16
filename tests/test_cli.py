@@ -74,8 +74,23 @@ class TestExecute:
             "/usr/bin/obsidian",
             "read",
             "vault=TestVault",
-            "format=json",
             "path=note.md",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+    async def test_output_format(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(b"[]")
+
+        with patch("asyncio.create_subprocess_exec", return_value=process) as mock_exec:
+            await cli._execute("tags", output_format="json")
+
+        mock_exec.assert_awaited_once_with(
+            "/usr/bin/obsidian",
+            "tags",
+            "vault=TestVault",
+            "format=json",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -147,7 +162,6 @@ class TestExecute:
             "/usr/bin/obsidian",
             "create",
             "vault=TestVault",
-            "format=json",
             "path=note.md",
             "overwrite",
             stdout=asyncio.subprocess.PIPE,

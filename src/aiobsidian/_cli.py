@@ -117,6 +117,7 @@ class ObsidianCLI:
         *,
         params: dict[str, str] | None = None,
         flags: list[str] | None = None,
+        output_format: str | None = None,
         timeout: float | None = None,
     ) -> str:
         """Execute an Obsidian CLI command.
@@ -131,6 +132,9 @@ class ObsidianCLI:
             command: CLI command name (e.g. `"read"`, `"daily:path"`).
             params: Key-value parameters passed as `key=value` arguments.
             flags: Extra CLI flags (e.g. `["overwrite"]`).
+            output_format: Value for the `format=` parameter. Only commands
+                that document it accept one; the rest ignore it and print
+                plain text.
             timeout: Override the default timeout for this command.
 
         Returns:
@@ -144,12 +148,9 @@ class ObsidianCLI:
         """
         effective_timeout = timeout if timeout is not None else self._timeout
 
-        args: list[str] = [
-            self._binary,
-            command,
-            f"vault={self._vault}",
-            "format=json",
-        ]
+        args: list[str] = [self._binary, command, f"vault={self._vault}"]
+        if output_format is not None:
+            args.append(f"format={output_format}")
         if params:
             args.extend(f"{k}={v}" for k, v in params.items())
         if flags:

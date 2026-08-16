@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 
 TASKS = [
-    {"id": "1", "content": "Buy milk", "completed": False},
-    {"id": "2", "content": "Write docs", "completed": True},
+    {"status": " ", "text": "- [ ] Buy milk", "file": "todo.md", "line": "3"},
+    {"status": "x", "text": "- [x] Write docs", "file": "todo.md", "line": "4"},
 ]
 
 
@@ -12,28 +12,42 @@ async def test_list(cli):
     cli._execute.return_value = json.dumps(TASKS)
     result = await cli.tasks.list()
     assert result == TASKS
-    cli._execute.assert_awaited_once_with("tasks", params=None, flags=None)
+    cli._execute.assert_awaited_once_with(
+        "tasks", params=None, flags=None, output_format="json"
+    )
+
+
+async def test_list_no_tasks(cli):
+    cli._execute.return_value = "No tasks found.\n"
+    result = await cli.tasks.list(path="notes/empty.md")
+    assert result == []
 
 
 async def test_list_with_path(cli):
     cli._execute.return_value = json.dumps(TASKS)
     result = await cli.tasks.list(path="notes")
     assert result == TASKS
-    cli._execute.assert_awaited_once_with("tasks", params={"path": "notes"}, flags=None)
+    cli._execute.assert_awaited_once_with(
+        "tasks", params={"path": "notes"}, flags=None, output_format="json"
+    )
 
 
 async def test_list_daily(cli):
     cli._execute.return_value = json.dumps(TASKS)
     result = await cli.tasks.list(daily=True)
     assert result == TASKS
-    cli._execute.assert_awaited_once_with("tasks", params=None, flags=["daily"])
+    cli._execute.assert_awaited_once_with(
+        "tasks", params=None, flags=["daily"], output_format="json"
+    )
 
 
 async def test_list_done(cli):
     cli._execute.return_value = json.dumps(TASKS)
     result = await cli.tasks.list(done=True)
     assert result == TASKS
-    cli._execute.assert_awaited_once_with("tasks", params=None, flags=["done"])
+    cli._execute.assert_awaited_once_with(
+        "tasks", params=None, flags=["done"], output_format="json"
+    )
 
 
 async def test_list_all_flags(cli):
@@ -41,7 +55,10 @@ async def test_list_all_flags(cli):
     result = await cli.tasks.list(path="notes", daily=True, done=True)
     assert result == TASKS
     cli._execute.assert_awaited_once_with(
-        "tasks", params={"path": "notes"}, flags=["daily", "done"]
+        "tasks",
+        params={"path": "notes"},
+        flags=["daily", "done"],
+        output_format="json",
     )
 
 

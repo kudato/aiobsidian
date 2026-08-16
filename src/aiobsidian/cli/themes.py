@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from typing import Any
-
 from ._base import BaseCLIResource
 
 
@@ -13,15 +10,14 @@ class CLIThemesResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
-    async def current(self) -> dict[str, Any]:
-        """Get the current theme information.
+    async def current(self) -> str:
+        """Get the active theme.
 
         Returns:
-            Current theme details.
+            Theme name, or ``"(default)"`` when no community theme is active.
         """
         output = await self._cli._execute("theme")
-        result: dict[str, Any] = json.loads(output)
-        return result
+        return output.strip()
 
     async def set(self, name: str) -> None:
         """Change the active theme.
@@ -49,16 +45,15 @@ class CLIThemesResource(BaseCLIResource):
         """
         await self._cli._execute("theme:uninstall", params={"name": name})
 
-    async def list(self, *, versions: bool = False) -> list[dict[str, Any]]:
+    async def list(self, *, versions: bool = False) -> list[str]:
         """List all installed themes.
 
         Args:
             versions: If ``True``, include version information.
 
         Returns:
-            List of theme objects.
+            List of theme names, empty if only the default theme is installed.
         """
         flags = ["versions"] if versions else None
         output = await self._cli._execute("themes", flags=flags)
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)

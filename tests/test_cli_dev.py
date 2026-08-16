@@ -1,15 +1,7 @@
 from __future__ import annotations
 
-import json
-
-CONSOLE_MSGS = [
-    {"level": "log", "message": "hello"},
-    {"level": "warn", "message": "deprecation"},
-]
-
-ERRORS = [
-    {"message": "TypeError: undefined is not a function", "stack": "at foo:1"},
-]
+CONSOLE_OUTPUT = "08:38:02 Received CLI command\n08:38:03 Plugin loaded\n"
+CONSOLE_MSGS = ["08:38:02 Received CLI command", "08:38:03 Plugin loaded"]
 
 
 async def test_devtools(cli):
@@ -26,24 +18,30 @@ async def test_eval(cli):
 
 
 async def test_console(cli):
-    cli._execute.return_value = json.dumps(CONSOLE_MSGS)
+    cli._execute.return_value = CONSOLE_OUTPUT
     result = await cli.dev.console()
     assert result == CONSOLE_MSGS
     cli._execute.assert_awaited_once_with("dev:console", params=None)
 
 
 async def test_console_with_limit(cli):
-    cli._execute.return_value = json.dumps(CONSOLE_MSGS[:1])
+    cli._execute.return_value = "08:38:02 Received CLI command\n"
     result = await cli.dev.console(limit=1)
     assert result == CONSOLE_MSGS[:1]
     cli._execute.assert_awaited_once_with("dev:console", params={"limit": "1"})
 
 
 async def test_errors(cli):
-    cli._execute.return_value = json.dumps(ERRORS)
+    cli._execute.return_value = "TypeError: undefined is not a function\n"
     result = await cli.dev.errors()
-    assert result == ERRORS
+    assert result == ["TypeError: undefined is not a function"]
     cli._execute.assert_awaited_once_with("dev:errors")
+
+
+async def test_errors_none_captured(cli):
+    cli._execute.return_value = "No errors captured.\n"
+    result = await cli.dev.errors()
+    assert result == []
 
 
 async def test_screenshot(cli):
