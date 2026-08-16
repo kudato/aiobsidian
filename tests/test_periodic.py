@@ -110,12 +110,29 @@ async def test_patch_frontmatter(mock_api, client):
     route = mock_api.patch("/periodic/daily/").respond(200)
     await client.periodic.patch(
         Period.DAILY,
-        '"good"',
+        "good",
         operation=PatchOperation.REPLACE,
         target_type=TargetType.FRONTMATTER,
         target="mood",
     )
-    assert route.calls[0].request.headers["content-type"] == "application/json"
+    request = route.calls[0].request
+    assert request.content == b"good"
+    assert request.headers["content-type"] == "text/markdown"
+    assert request.headers["markdown-patch-version"] == "1"
+
+
+async def test_patch_frontmatter_json_value(mock_api, client):
+    route = mock_api.patch("/periodic/daily/").respond(200)
+    await client.periodic.patch(
+        Period.DAILY,
+        7,
+        operation=PatchOperation.REPLACE,
+        target_type=TargetType.FRONTMATTER,
+        target="hours",
+    )
+    request = route.calls[0].request
+    assert request.content == b"7"
+    assert request.headers["content-type"] == "application/json"
 
 
 async def test_append_sends_content_and_header(mock_api, client):

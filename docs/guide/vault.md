@@ -34,12 +34,12 @@ Discover the structure of a note — headings, blocks, and frontmatter fields:
 from aiobsidian import ContentType
 
 doc_map = await client.vault.get("Notes/hello.md", content_type=ContentType.DOCUMENT_MAP)
-print(doc_map.headings)           # ["Introduction", "Details"]
+print(doc_map.headings)           # ["Introduction", "Introduction::Details"]
 print(doc_map.blocks)             # ["block-id-1", "block-id-2"]
 print(doc_map.frontmatter_fields) # ["title", "tags"]
 ```
 
-This is useful for finding valid targets before using `patch()`.
+Every entry is spelled exactly as `patch()` wants it: a nested heading is joined with the `::` delimiter, and block ids come without their leading `^`.
 
 ## Creating files
 
@@ -89,19 +89,49 @@ await client.vault.patch(
 )
 ```
 
-### Patch frontmatter
+The target is the bare block id — `"block-id-1"`, not `"^block-id-1"`.
+
+### Patch a nested heading
+
+Join the heading path with `target_delimiter` (`::` by default):
 
 ```python
-import json
-
 await client.vault.patch(
     "Notes/hello.md",
-    json.dumps({"status": "published"}),
+    "Content for the subsection",
+    operation=PatchOperation.APPEND,
+    target_type=TargetType.HEADING,
+    target="Introduction::Details",
+)
+```
+
+### Patch frontmatter
+
+For a frontmatter target, `content` is the field's **value**. A `str` is stored as-is; any other JSON type is stored as that type:
+
+```python
+await client.vault.patch(
+    "Notes/hello.md",
+    "published",             # status: published
     operation=PatchOperation.REPLACE,
     target_type=TargetType.FRONTMATTER,
     target="status",
 )
+
+await client.vault.patch(
+    "Notes/hello.md",
+    ["draft", "python"],     # tags: [draft, python]
+    operation=PatchOperation.REPLACE,
+    target_type=TargetType.FRONTMATTER,
+    target="tags",
+)
 ```
+
+!!! note
+    Do not pre-serialize the value with `json.dumps()` — that stores the JSON
+    text as a string. Pass the Python value directly.
+
+The field must already exist; `REPLACE` on a missing key fails with `APIError [400]`.
 
 ### Patch operations
 
@@ -113,11 +143,11 @@ await client.vault.patch(
 
 ### Target types
 
-| Target type | Description |
-|-------------|-------------|
-| `TargetType.HEADING` | A heading section (e.g. `## My Heading`) |
-| `TargetType.BLOCK` | A block reference (e.g. `^block-id`) |
-| `TargetType.FRONTMATTER` | A YAML frontmatter field |
+| Target type | `target` spelling | Example |
+|-------------|-------------------|---------|
+| `TargetType.HEADING` | The heading text, without `#`; nested paths joined by `target_delimiter` | `"Introduction::Details"` |
+| `TargetType.BLOCK` | The bare block id, without `^` | `"block-id-1"` |
+| `TargetType.FRONTMATTER` | The field key | `"status"` |
 
 ## Deleting files
 
