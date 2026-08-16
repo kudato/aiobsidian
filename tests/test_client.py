@@ -7,6 +7,7 @@ from aiobsidian._exceptions import (
     APIConnectionError,
     APIError,
     APINotFoundError,
+    APIProtocolError,
     APIStatusError,
     APITimeoutError,
     AuthenticationError,
@@ -60,7 +61,7 @@ async def test_client_raises_not_found_error(mock_api, client):
 
 async def test_client_raises_api_error(mock_api, client):
     mock_api.post("/commands/bad/").respond(500, json={"message": "Internal error"})
-    with pytest.raises(APIError):
+    with pytest.raises(APIStatusError):
         await client.request("POST", "/commands/bad/")
 
 
@@ -117,7 +118,7 @@ async def test_client_request_headers_override_authorization(mock_api, client):
 
 async def test_client_raises_api_error_non_json_response(mock_api, client):
     mock_api.get("/bad").respond(500, text="Internal Server Error")
-    with pytest.raises(APIError) as exc_info:
+    with pytest.raises(APIStatusError) as exc_info:
         await client.request("GET", "/bad")
     assert exc_info.value.status_code == 500
     assert exc_info.value.message == "Internal Server Error"
@@ -137,15 +138,15 @@ async def test_build_http_client_timeout():
 
 async def test_raise_for_status_json_without_message_key(mock_api, client):
     mock_api.get("/x").respond(400, json={"detail": "something"})
-    with pytest.raises(APIError) as exc_info:
+    with pytest.raises(APIStatusError) as exc_info:
         await client.request("GET", "/x")
     assert "detail" in exc_info.value.message
 
 
 async def test_raise_for_status_json_array_body(mock_api, client):
-    """A JSON array body must not leak AttributeError; APIError is raised instead."""
+    """A JSON array body must not leak AttributeError; a status error is raised."""
     mock_api.get("/x").respond(500, json=[{"error": "boom"}])
-    with pytest.raises(APIError) as exc_info:
+    with pytest.raises(APIStatusError) as exc_info:
         await client.request("GET", "/x")
     assert exc_info.value.status_code == 500
 
@@ -220,6 +221,62 @@ class TestTransportErrors:
             await client.request("GET", "/x")
 
         assert exc_info.value.detail == "ReadError"
+
+    @pytest.mark.parametrize(
+        "raised",
+        [
+            httpx.RemoteProtocolError("illegal status line"),
+            httpx.LocalProtocolError("illegal header"),
+            httpx.DecodingError("incorrect header check"),
+            httpx.TooManyRedirects("Exceeded maximum allowed redirects."),
+        ],
+        ids=lambda exc: type(exc).__name__,
+    )
+    async def test_a_broken_exchange_is_not_a_connection_failure(
+        self, mock_api, client, raised
+    ):
+        # The server answered — telling the caller to check whether
+        # Obsidian is running would send them to debug the wrong thing.
+        mock_api.get("/x").mock(side_effect=raised)
+
+        with pytest.raises(APIProtocolError) as exc_info:
+            await client.request("GET", "/x")
+
+        assert not isinstance(exc_info.value, APIConnectionError)
+        assert "Obsidian running" not in str(exc_info.value)
+
+    async def test_an_unreachable_proxy_is_a_connection_failure(self, mock_api, client):
+        mock_api.get("/x").mock(side_effect=httpx.ProxyError("proxy refused"))
+
+        with pytest.raises(APIConnectionError):
+            await client.request("GET", "/x")
+
+    async def test_an_invalid_url_is_a_value_error(self, client):
+        # Not an httpx.RequestError at all: it is raised while building
+        # the request, before any transport is touched.
+        with pytest.raises(ValueError) as exc_info:
+            await client.request("GET", "http://℀.com/x")
+
+        assert not isinstance(exc_info.value, ObsidianError)
+        assert isinstance(exc_info.value.__cause__, httpx.InvalidURL)
+
+    async def test_an_error_without_a_request_falls_back_to_the_given_path(
+        self, mock_api, client
+    ):
+        # httpx attaches the request to every error it raises from
+        # request(); the fallback is there for the day it does not.
+        mock_api.get("/x").mock(side_effect=httpx.ConnectError("refused"))
+
+        with pytest.raises(APIConnectionError) as exc_info:
+            await client.request("GET", "/x")
+
+        assert exc_info.value.url == "https://127.0.0.1:27124/x"
+
+    def test_failure_falls_back_when_httpx_attached_no_request(self):
+        method, url, detail = ObsidianClient._failure(
+            "GET", "/vault/note.md", httpx.ConnectError("refused")
+        )
+        assert (method, url, detail) == ("GET", "/vault/note.md", "refused")
 
 
 async def test_repr_does_not_contain_api_key():

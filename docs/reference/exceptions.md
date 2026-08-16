@@ -30,6 +30,10 @@
 
 ::: aiobsidian.APINotFoundError
 
+::: aiobsidian.APIRequestError
+
 ::: aiobsidian.APIConnectionError
 
 ::: aiobsidian.APITimeoutError
+
+::: aiobsidian.APIProtocolError

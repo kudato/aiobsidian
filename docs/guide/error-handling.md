@@ -17,13 +17,19 @@ ObsidianError                   # Base exception for all aiobsidian errors
     ├── APIStatusError          # The server answered with status >= 400
     │   ├── AuthenticationError # 401 Unauthorized
     │   └── APINotFoundError    # 404 Not Found
-    ├── APIConnectionError      # The server could not be reached
-    └── APITimeoutError         # The request took too long
+    └── APIRequestError         # No usable response came back
+        ├── APIConnectionError  # The server could not be reached
+        ├── APITimeoutError     # The request took too long
+        └── APIProtocolError    # The exchange broke down
 ```
 
 `CLIError` and `APIError` are the two transport roots: catching either one
-covers every way that transport can fail, whether or not a request or command
-ever reached Obsidian.
+covers every failure of an operation on that transport, whether or not the
+request or command reached Obsidian.
+
+Misusing the library is not one of those failures and stays a plain builtin, as
+elsewhere in Python: a bad argument raises `TypeError` or `ValueError`, and
+using a client after `aclose()` raises `RuntimeError`.
 
 `CLINotFoundError` and `APINotFoundError` also inherit from `NotFoundError`, so a
 missing note can be handled the same way on both transports:
@@ -119,13 +125,24 @@ async with ObsidianClient(api_key="your-api-key") as client:
         print(f"API error [{e.status_code}]: {e.message}")
 ```
 
-### The request never reached the server
+### When no usable response comes back
 
-`APIConnectionError` and `APITimeoutError` cover the failures where no response
-came back at all: Obsidian is closed, the plugin is disabled, the port is wrong,
-the host is unreachable. The underlying `httpx` exception is the `__cause__` and
-never escapes on its own — `httpx` is an optional dependency, so catching it
-would mean importing a package the caller may not have installed.
+`APIRequestError` and its three subclasses cover the failures that produce no
+response to inspect, and they are kept apart because they point at different
+things to fix:
+
+| Exception | Meaning | Typical cause |
+|-----------|---------|---------------|
+| `APIConnectionError` | The server was never reached | Obsidian closed, plugin disabled, wrong port, unreachable host |
+| `APITimeoutError` | It did not answer in time | A slow or wedged request |
+| `APIProtocolError` | It answered, and the exchange broke | Malformed HTTP, a body that belied its headers, a redirect loop |
+
+Only `APIConnectionError` suggests checking whether Obsidian is running. The
+other two happen while it plainly is.
+
+The underlying `httpx` exception is available as `__cause__` and never escapes
+on its own — `httpx` is an optional dependency, so catching it would mean
+importing a package the caller may not have installed.
 
 ### Attributes
 
@@ -134,8 +151,27 @@ would mean importing a package the caller may not have installed.
 | `APIStatusError` | `status_code`, `message`, `error_code` |
 | `AuthenticationError` | `status_code`, `message`, `error_code` |
 | `APINotFoundError` | `status_code`, `message`, `error_code` |
+| `APIRequestError` | `method`, `url`, `detail` |
 | `APIConnectionError` | `method`, `url`, `detail` |
 | `APITimeoutError` | `method`, `url`, `detail` |
+| `APIProtocolError` | `method`, `url`, `detail` |
+
+### Upgrading from 0.4.0
+
+`APIError` used to be the status-carrying class and is now the REST root. Code
+that reads a status code off it must catch `APIStatusError` instead:
+
+```python
+except APIError as e:        # still catches status errors, but also
+    print(e.status_code)     # connection ones, which have no status_code
+
+except APIStatusError as e:  # what that code meant
+    print(e.status_code)
+```
+
+`APIError(404, "Not found")` still constructs, because `Exception` accepts any
+arguments — it just produces a useless message and no attributes. Search for it
+rather than relying on a `TypeError`.
 
 ## Catching all aiobsidian errors
 

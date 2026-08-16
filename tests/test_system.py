@@ -1,6 +1,6 @@
 import pytest
 
-from aiobsidian._exceptions import APIError, AuthenticationError
+from aiobsidian._exceptions import APIStatusError, AuthenticationError
 from aiobsidian.models.system import ServerStatus
 
 STATUS_JSON = {
@@ -42,5 +42,5 @@ async def test_status_authentication_error(mock_api, client):
 
 async def test_openapi_server_error(mock_api, client):
     mock_api.get("/openapi.yaml").respond(500, json={"message": "Internal error"})
-    with pytest.raises(APIError):
+    with pytest.raises(APIStatusError):
         await client.system.openapi()

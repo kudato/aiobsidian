@@ -57,8 +57,11 @@ class APINotFoundError(APIStatusError, NotFoundError):
     """HTTP 404 Not Found — the requested resource does not exist."""
 
 
-class APIConnectionError(APIError):
-    """The REST API server could not be reached.
+class APIRequestError(APIError):
+    """A request that never produced a usable response.
+
+    The other half of `APIError`: `APIStatusError` means the server
+    answered and refused, this means it did not answer at all.
 
     Attributes:
         method: HTTP method of the request that failed.
@@ -66,36 +69,49 @@ class APIConnectionError(APIError):
         detail: What the HTTP transport reported.
     """
 
+    _problem = "failed"
+    _hint = ""
+
     def __init__(self, method: str, url: str, detail: str) -> None:
         self.method = method
         self.url = url
         self.detail = detail
-        super().__init__(
-            f"{method} {url} could not be reached: {detail}. Is Obsidian "
-            f"running with the Local REST API plugin enabled?"
-        )
+        message = f"{method} {url} {self._problem}: {detail}"
+        if self._hint:
+            message = f"{message}. {self._hint}"
+        super().__init__(message)
 
-    def __reduce__(self) -> tuple[type[APIConnectionError], tuple[str, str, str]]:
+    def __reduce__(self) -> tuple[type[APIRequestError], tuple[str, str, str]]:
         return type(self), (self.method, self.url, self.detail)
 
 
-class APITimeoutError(APIError):
-    """A request to the REST API exceeded its timeout.
+class APIConnectionError(APIRequestError):
+    """The REST API server could not be reached.
 
-    Attributes:
-        method: HTTP method of the request that timed out.
-        url: URL the request was sent to.
-        detail: What the HTTP transport reported.
+    A refused connection, a dropped one, an unreachable host or a proxy
+    that would not forward.
     """
 
-    def __init__(self, method: str, url: str, detail: str) -> None:
-        self.method = method
-        self.url = url
-        self.detail = detail
-        super().__init__(f"{method} {url} timed out: {detail}")
+    _problem = "could not be reached"
+    _hint = "Is Obsidian running with the Local REST API plugin enabled?"
 
-    def __reduce__(self) -> tuple[type[APITimeoutError], tuple[str, str, str]]:
-        return type(self), (self.method, self.url, self.detail)
+
+class APITimeoutError(APIRequestError):
+    """A request to the REST API exceeded its timeout."""
+
+    _problem = "timed out"
+
+
+class APIProtocolError(APIRequestError):
+    """The exchange with the REST API server broke down.
+
+    The connection was made and the server answered, but the answer
+    could not be used: malformed HTTP, a body that did not match its
+    declared encoding or length, or a redirect loop. It says nothing
+    about whether Obsidian is running — it plainly is.
+    """
+
+    _problem = "did not complete"
 
 
 class CLIError(ObsidianError):

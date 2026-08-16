@@ -7,6 +7,7 @@ from ._constants import DEFAULT_HOST, DEFAULT_PORT, DEFAULT_SCHEME, DEFAULT_TIME
 from ._exceptions import (
     APIConnectionError,
     APINotFoundError,
+    APIProtocolError,
     APIStatusError,
     APITimeoutError,
     AuthenticationError,
@@ -21,18 +22,6 @@ if TYPE_CHECKING:
     from .rest.search import SearchResource
     from .rest.system import SystemResource
     from .rest.vault import VaultResource
-
-
-def _detail(exc: Exception) -> str:
-    """Describe an httpx failure, which sometimes carries no message.
-
-    Args:
-        exc: The exception raised by the HTTP transport.
-
-    Returns:
-        Its message, or its class name when it has none.
-    """
-    return str(exc) or type(exc).__name__
 
 
 class ObsidianClient:
@@ -140,8 +129,10 @@ class ObsidianClient:
             The `httpx.Response` object.
 
         Raises:
+            ValueError: If `path` does not make a valid URL.
             APIConnectionError: If the server cannot be reached.
             APITimeoutError: If the request exceeds the timeout.
+            APIProtocolError: If the exchange with the server breaks down.
             AuthenticationError: If the API key is invalid (HTTP 401).
             APINotFoundError: If the resource is not found (HTTP 404).
             APIStatusError: For any other HTTP error (status >= 400).
@@ -151,6 +142,7 @@ class ObsidianClient:
             request_headers.update(headers)
 
         url = f"{self._url_prefix}{path}"
+        httpx = self._httpx
         try:
             response = await self._http.request(
                 method,
@@ -160,35 +152,44 @@ class ObsidianClient:
                 headers=request_headers,
                 params=params,
             )
-        except self._httpx.TimeoutException as exc:
-            raise APITimeoutError(
-                method, self._failed_url(exc, url), _detail(exc)
-            ) from exc
-        except self._httpx.RequestError as exc:
-            raise APIConnectionError(
-                method, self._failed_url(exc, url), _detail(exc)
-            ) from exc
+        except httpx.InvalidURL as exc:
+            raise ValueError(f"{method} {url} is not a valid URL: {exc}") from exc
+        except httpx.TimeoutException as exc:
+            raise APITimeoutError(*self._failure(method, url, exc)) from exc
+        except (httpx.NetworkError, httpx.ProxyError) as exc:
+            raise APIConnectionError(*self._failure(method, url, exc)) from exc
+        except httpx.RequestError as exc:
+            # What is left answered, or half-answered, and the exchange
+            # broke: bad framing, a body that belied its own headers, a
+            # redirect loop. Reporting those as unreachable would send
+            # the caller to restart an Obsidian that is plainly running.
+            raise APIProtocolError(*self._failure(method, url, exc)) from exc
 
         if response.status_code >= 400:
             self._raise_for_status(response)
         return response
 
     @staticmethod
-    def _failed_url(exc: Any, fallback: str) -> str:
-        """Recover the absolute URL a failed request was sent to.
+    def _failure(
+        method: str, fallback_url: str, exc: httpx.RequestError
+    ) -> tuple[str, str, str]:
+        """Describe a failed request for the exception that reports it.
 
         Args:
-            exc: The `httpx.RequestError` that was raised.
-            fallback: URL to report when httpx did not attach a request,
-                which is what the caller passed and may be relative.
+            method: HTTP method of the request.
+            fallback_url: URL to name when httpx attached no request to
+                the error. It is what the caller passed, so it may be
+                relative.
+            exc: The error the HTTP transport raised.
 
         Returns:
-            The URL to name in the error message.
+            The method, the URL and what the transport reported.
         """
         try:
-            return str(exc.request.url)
+            url = str(exc.request.url)
         except RuntimeError:
-            return fallback
+            url = fallback_url
+        return method, url, str(exc) or type(exc).__name__
 
     @staticmethod
     def _raise_for_status(response: httpx.Response) -> None:
