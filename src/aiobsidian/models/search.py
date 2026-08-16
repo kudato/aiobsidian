@@ -37,7 +37,7 @@ class SearchResult(BaseModel):
         score: Relevance score (present for simple search).
         matches: List of match locations with context
             (present for simple search).
-        result: Raw result data (present for Dataview/JsonLogic queries).
+        result: Raw result data (present for JsonLogic queries).
     """
 
     filename: str

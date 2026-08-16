@@ -57,11 +57,17 @@ asyncio.run(main())
 ## REST setup
 
 1. **Obsidian** — download from [obsidian.md](https://obsidian.md)
-2. **Local REST API plugin** — install from the Obsidian Community Plugins:
+2. **Local REST API plugin 5.0 or newer** — install from the Obsidian Community Plugins:
     - Open Obsidian Settings → Community Plugins → Browse
     - Search for "Local REST API"
     - Install and enable the plugin
     - Copy the API key from the plugin settings
+
+    !!! warning
+        aiobsidian targets plugin **5.x**. Plugin 5.0 reworked the API — it dropped the
+        `/periodic/` routes and Dataview DQL search, and changed the patch format — so
+        earlier releases are not supported. Check your version under
+        Settings → Community Plugins.
 
 3. **Install aiobsidian with REST support**:
 

@@ -153,7 +153,6 @@ asyncio.run(main())
 |----------|--------|-------------|
 | **vault** | `client.vault` | Read, create, update, and delete vault files |
 | **active** | `client.active` | Operate on the currently open file |
-| **periodic** | `client.periodic` | Access daily, weekly, monthly, quarterly, yearly notes |
 | **commands** | `client.commands` | List and execute Obsidian commands |
 | **search** | `client.search` | Search vault content |
 | **open** | `client.open` | Open files in the Obsidian UI |
