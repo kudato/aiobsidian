@@ -122,6 +122,7 @@ class BaseCLIResource:
         output: str,
         *,
         separator: str = "\t",
+        strict: bool = True,
     ) -> dict[str, str]:
         """Parse `key<separator>value` output into a dictionary.
 
@@ -129,20 +130,46 @@ class BaseCLIResource:
             command: CLI command name, used for error reporting.
             output: Raw output of the command.
             separator: Separator between key and value.
+            strict: If `False`, skip lines without the separator instead of
+                refusing to parse. Some commands mix a plain sentence into
+                the field list.
 
         Returns:
             Mapping of keys to values, in the order printed by the CLI.
 
         Raises:
-            CLIParseError: If a line does not contain the separator.
+            CLIParseError: If `strict` and a line does not contain the
+                separator.
         """
         fields: dict[str, str] = {}
         for line in cls._parse_lines(output):
             key, found, value = line.partition(separator)
             if not found:
-                raise CLIParseError(command, output)
+                if strict:
+                    raise CLIParseError(command, output)
+                continue
             fields[key.strip()] = value.strip()
         return fields
+
+    @staticmethod
+    def _strip_content_header(output: str) -> str:
+        """Drop the header the CLI prints before a stored file version.
+
+        `history:read` and `sync:read` announce the version they found on
+        one line, follow it with a `---` rule and only then print the
+        content. The content itself often starts with frontmatter, whose
+        own `---` must survive, so exactly the first two lines go.
+
+        Args:
+            output: Raw output of the command.
+
+        Returns:
+            The content, or the whole output when the header is missing.
+        """
+        header, rule, content = (output.split("\n", 2) + ["", ""])[:3]
+        if rule == "---" and header.endswith(")"):
+            return content
+        return output
 
     @classmethod
     def _parse_rows(cls, output: str, *, separator: str = "\t") -> list[list[str]]:

@@ -64,11 +64,3 @@ async def test_get(cli):
     result = await cli.tags.get("python")
     assert result == ["projects/cli.md", "notes/setup.md"]
     cli._execute.assert_awaited_once_with("tag", params={"name": "python"})
-
-
-async def test_rename(cli):
-    cli._execute.return_value = ""
-    await cli.tags.rename("old-tag", "new-tag")
-    cli._execute.assert_awaited_once_with(
-        "tags:rename", params={"old": "old-tag", "new": "new-tag"}
-    )

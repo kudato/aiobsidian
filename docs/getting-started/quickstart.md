@@ -28,9 +28,9 @@ asyncio.run(main())
 | **daily** | `cli.daily` | Daily note: read, create, append, prepend, path |
 | **search** | `cli.search` | Full-text search |
 | **properties** | `cli.properties` | YAML frontmatter properties: list, read, set, remove |
-| **tags** | `cli.tags` | Tags: list, get notes by tag, rename |
+| **tags** | `cli.tags` | Tags: list, get notes by tag |
 | **links** | `cli.links` | Outgoing links, backlinks, unresolved, orphans |
-| **tasks** | `cli.tasks` | Tasks: list, create, complete, toggle |
+| **tasks** | `cli.tasks` | Tasks: list, complete, reopen, toggle |
 | **commands** | `cli.commands` | List and execute Obsidian commands |
 | **templates** | `cli.templates` | List, read, insert templates |
 | **bookmarks** | `cli.bookmarks` | List and add bookmarks |
@@ -72,9 +72,6 @@ tags = await cli.tags.list(sort="count")
 
 # Get notes with a specific tag
 notes = await cli.tags.get("python")
-
-# Rename a tag across the vault
-await cli.tags.rename("old-tag", "new-tag")
 ```
 
 ### Working with links
@@ -99,11 +96,16 @@ orphans = await cli.links.orphans()
 # List all tasks
 tasks = await cli.tasks.list()
 
-# Create a task
-await cli.tasks.create("Buy milk", tags="shopping,errands")
+# List only the ones still open
+open_tasks = await cli.tasks.list(todo=True)
 
-# Complete a task
-await cli.tasks.complete("task-id")
+# A task is addressed by its file and line number
+await cli.tasks.complete("notes/todo.md", 3)
+await cli.tasks.reopen("notes/todo.md", 3)
+await cli.tasks.toggle("notes/todo.md", 3)
+
+# There is no command that creates a task; append one
+await cli.vault.append("notes/todo.md", "- [ ] Buy milk")
 ```
 
 ### Searching

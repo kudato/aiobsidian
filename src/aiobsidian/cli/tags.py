@@ -8,6 +8,9 @@ from ._base import BaseCLIResource
 class CLITagsResource(BaseCLIResource):
     """CLI resource for tag operations.
 
+    The CLI can read tags but not rewrite them: renaming a tag across the
+    vault is a UI-only operation.
+
     Attributes:
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
@@ -23,15 +26,6 @@ class CLITagsResource(BaseCLIResource):
         """
         output = await self._cli._execute("tag", params={"name": name})
         return self._parse_lines(output)
-
-    async def rename(self, old: str, new: str) -> None:
-        """Rename a tag across the entire vault.
-
-        Args:
-            old: Current tag name.
-            new: New tag name.
-        """
-        await self._cli._execute("tags:rename", params={"old": old, "new": new})
 
     async def list(
         self,

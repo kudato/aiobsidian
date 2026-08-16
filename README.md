@@ -75,9 +75,9 @@ asyncio.run(main())
 | **daily** | `cli.daily` | Daily note operations |
 | **search** | `cli.search` | Full-text search |
 | **properties** | `cli.properties` | YAML frontmatter properties |
-| **tags** | `cli.tags` | Tag listing, lookup, rename |
+| **tags** | `cli.tags` | Tag listing and lookup |
 | **links** | `cli.links` | Outgoing links, backlinks, unresolved, orphans |
-| **tasks** | `cli.tasks` | Task listing, creation, completion, toggle |
+| **tasks** | `cli.tasks` | Task listing, completion, reopening, toggle |
 | **commands** | `cli.commands` | List and execute Obsidian commands |
 | **templates** | `cli.templates` | List, read, insert templates |
 | **bookmarks** | `cli.bookmarks` | List and add bookmarks |
