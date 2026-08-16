@@ -34,6 +34,6 @@ async def test_get_verbose(cli):
 
 
 async def test_get_without_hotkey(cli):
-    cli._execute.return_value = "\n"
+    cli._execute.return_value = "(none)\n"
     result = await cli.hotkeys.get("app:delete-file")
-    assert result == ""
+    assert result == "(none)"

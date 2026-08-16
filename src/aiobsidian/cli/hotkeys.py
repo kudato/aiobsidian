@@ -21,7 +21,7 @@ class CLIHotkeysResource(BaseCLIResource):
 
         Returns:
             The hotkey as displayed by Obsidian (e.g. ``"⌘ ⇧ F"``, or
-            ``"⌘ ⇧ F (default)"`` with ``verbose``). Empty string if the
+            ``"⌘ ⇧ F (default)"`` with ``verbose``). ``"(none)"`` if the
             command has no hotkey assigned.
         """
         flags = ["verbose"] if verbose else None
