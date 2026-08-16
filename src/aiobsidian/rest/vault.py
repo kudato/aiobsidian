@@ -36,6 +36,14 @@ class VaultResource(ContentResource):
         content_type: Literal[ContentType.DOCUMENT_MAP],
     ) -> DocumentMap: ...
 
+    @overload
+    async def get(
+        self,
+        path: str,
+        *,
+        content_type: ContentType,
+    ) -> str | NoteJson | DocumentMap: ...
+
     async def get(
         self,
         path: str,
