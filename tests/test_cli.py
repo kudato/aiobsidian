@@ -55,6 +55,71 @@ class TestContextManager:
         async with cli as c:
             assert c is cli
 
+    async def test_leaving_the_block_closes_the_client(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        async with cli:
+            pass
+
+        with pytest.raises(RuntimeError, match="has been closed"):
+            await cli._execute("version")
+
+
+class TestClose:
+    async def test_command_after_aclose_raises(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        await cli.aclose()
+
+        with pytest.raises(RuntimeError, match="'version'"):
+            await cli._execute("version")
+
+    async def test_aclose_is_idempotent(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        await cli.aclose()
+        await cli.aclose()
+
+    async def test_a_finished_command_is_not_tracked(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(b"1.13.7\n")
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            await cli._execute("version")
+
+        assert cli._running == set()
+
+    async def test_a_timed_out_command_is_not_tracked(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(b"", returncode=None)
+        process.communicate.side_effect = TimeoutError
+        process.kill = MagicMock()
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CLITimeoutError):
+                await cli._execute("read", params={"path": "slow.md"})
+
+        assert cli._running == set()
+
+    async def test_aclose_kills_a_command_in_flight(self, tmp_path):
+        # A real child process: the guarantee under test is that no
+        # `obsidian` keeps running after the client is closed, and a
+        # mocked process cannot show that.
+        binary = tmp_path / "slow-obsidian"
+        binary.write_text("#!/bin/sh\nsleep 30\n")
+        binary.chmod(0o755)
+
+        cli = ObsidianCLI("TestVault", binary=str(binary))
+        task = asyncio.create_task(cli._execute("read", params={"path": "big.md"}))
+        while not cli._running:
+            await asyncio.sleep(0.01)
+        process = next(iter(cli._running))
+
+        await cli.aclose()
+
+        async with asyncio.timeout(5):
+            with pytest.raises(RuntimeError, match="closed while it ran"):
+                await task
+        assert process.returncode is not None
+        assert cli._running == set()
+
 
 class TestExecute:
     async def test_success(self):

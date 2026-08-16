@@ -25,9 +25,6 @@ async def client(mock_api):
 
 @pytest.fixture()
 def cli():
-    instance = ObsidianCLI.__new__(ObsidianCLI)
-    instance._vault = "TestVault"
-    instance._binary = "/usr/local/bin/obsidian"
-    instance._timeout = 30.0
+    instance = ObsidianCLI("TestVault", binary="/usr/local/bin/obsidian")
     instance._execute = AsyncMock()
     return instance

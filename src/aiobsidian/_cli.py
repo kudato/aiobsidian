@@ -60,7 +60,8 @@ class ObsidianCLI:
     random notes, aliases, bases, system, tabs, web, and dev
     through resource properties.
 
-    Can be used as an async context manager:
+    Can be used as an async context manager, which closes the client on
+    the way out:
 
     ```python
     async with ObsidianCLI("MyVault") as cli:
@@ -84,6 +85,8 @@ class ObsidianCLI:
         self._vault = vault
         self._timeout = timeout
         self._binary = self._resolve_binary(binary)
+        self._running: set[asyncio.subprocess.Process] = set()
+        self._closed = False
 
     def __repr__(self) -> str:
         return f"ObsidianCLI(vault={self._vault!r}, binary={self._binary!r})"
@@ -146,11 +149,17 @@ class ObsidianCLI:
             Standard output from the command as a string.
 
         Raises:
+            RuntimeError: If the client has been closed.
             BinaryNotFoundError: If the binary cannot be executed.
             CLINotFoundError: If the CLI reports a missing resource.
             CommandError: If the command fails for any other reason.
             CLITimeoutError: If the command exceeds the timeout.
         """
+        if self._closed:
+            raise RuntimeError(
+                f"Cannot run {command!r}: this ObsidianCLI has been closed."
+            )
+
         effective_timeout = timeout if timeout is not None else self._timeout
 
         args: list[str] = [self._binary, command, f"vault={self._vault}"]
@@ -174,6 +183,7 @@ class ObsidianCLI:
                 f"{exc}. Install Obsidian v1.12+ or pass binary= explicitly."
             ) from exc
 
+        self._running.add(process)
         try:
             stdout_bytes, stderr_bytes = await asyncio.wait_for(
                 process.communicate(), timeout=effective_timeout
@@ -184,6 +194,17 @@ class ObsidianCLI:
         except asyncio.CancelledError:
             await self._kill(process)
             raise
+        finally:
+            self._running.discard(process)
+
+        # A signal we did not send is somebody else's business, but a
+        # signal plus a closed client is aclose() killing this command,
+        # and "exit_code=-9, no output" would not say so.
+        if self._closed and (process.returncode or 0) < 0:
+            raise RuntimeError(
+                f"Command {command!r} was killed: this ObsidianCLI was closed "
+                f"while it ran."
+            )
 
         stdout = stdout_bytes.decode(errors="replace")
         stderr = stderr_bytes.decode(errors="replace")
@@ -433,4 +454,20 @@ class ObsidianCLI:
         return self
 
     async def __aexit__(self, *exc: object) -> None:
-        pass
+        await self.aclose()
+
+    async def aclose(self) -> None:
+        """Close the client and kill every command still running.
+
+        A command started from another task is killed rather than waited
+        for, so leaving an `async with` block guarantees that no
+        `obsidian` process is still writing to the vault. That task gets
+        a `RuntimeError` naming the close as the cause.
+
+        Closed is final: any further command raises `RuntimeError`.
+        Calling this more than once is harmless.
+        """
+        self._closed = True
+        for process in list(self._running):
+            await self._kill(process)
+        self._running.clear()
