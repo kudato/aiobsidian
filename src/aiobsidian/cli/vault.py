@@ -42,6 +42,9 @@ class CLIVaultResource(BaseCLIResource):
     ) -> None:
         """Create a new file in the vault.
 
+        Content with literal ``\\n`` or ``\\t`` sequences is written in several
+        calls, so the file is built up incrementally rather than atomically.
+
         Args:
             path: Path for the new file relative to the vault root.
             content: File content.
@@ -50,7 +53,8 @@ class CLIVaultResource(BaseCLIResource):
             overwrite: If ``True``, overwrite an existing file.
             silent: If ``True``, suppress output.
         """
-        params: dict[str, str] = {"path": path, "content": content}
+        parts = self._split_content(content)
+        params: dict[str, str] = {"path": path, "content": parts[0]}
         if name is not None:
             params["name"] = name
         if template is not None:
@@ -61,28 +65,39 @@ class CLIVaultResource(BaseCLIResource):
         if silent:
             flags.append("silent")
         await self._cli._execute("create", params=params, flags=flags or None)
+        await self._write_parts("append", parts[1:], params={"path": path})
 
     async def append(self, path: str, content: str, *, inline: bool = False) -> None:
         """Append content to a vault file.
+
+        Content with literal ``\\n`` or ``\\t`` sequences is written in several
+        calls, so the append is not atomic.
 
         Args:
             path: Path to the file relative to the vault root.
             content: Content to append.
             inline: If ``True``, append inline without a newline separator.
         """
+        parts = self._split_content(content)
         flags = ["inline"] if inline else None
         await self._cli._execute(
-            "append", params={"path": path, "content": content}, flags=flags
+            "append", params={"path": path, "content": parts[0]}, flags=flags
         )
+        await self._write_parts("append", parts[1:], params={"path": path})
 
     async def prepend(self, path: str, content: str) -> None:
         """Prepend content to a vault file.
+
+        Content with literal ``\\n`` or ``\\t`` sequences is written in several
+        calls, so the prepend is not atomic.
 
         Args:
             path: Path to the file relative to the vault root.
             content: Content to prepend.
         """
-        await self._cli._execute("prepend", params={"path": path, "content": content})
+        parts = self._split_content(content)
+        await self._cli._execute("prepend", params={"path": path, "content": parts[-1]})
+        await self._write_parts("prepend", parts[-2::-1], params={"path": path})
 
     async def move(self, path: str, to: str) -> None:
         """Move a vault file to a new location.

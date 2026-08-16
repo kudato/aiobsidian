@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import call
+
 import pytest
 
 from aiobsidian._exceptions import CLIParseError
@@ -110,6 +112,60 @@ async def test_prepend(cli):
     cli._execute.assert_awaited_once_with(
         "prepend", params={"path": "note.md", "content": "first"}
     )
+
+
+async def test_create_with_backslash_escapes(cli):
+    cli._execute.return_value = ""
+    await cli.vault.create("note.md", r"C:\notes\temp")
+    assert cli._execute.await_args_list == [
+        call("create", params={"path": "note.md", "content": "C:\\"}, flags=None),
+        call(
+            "append",
+            params={"path": "note.md", "content": "notes\\"},
+            flags=["inline"],
+        ),
+        call(
+            "append",
+            params={"path": "note.md", "content": "temp"},
+            flags=["inline"],
+        ),
+    ]
+
+
+async def test_append_with_backslash_escapes(cli):
+    cli._execute.return_value = ""
+    await cli.vault.append("note.md", r"a\tb")
+    assert cli._execute.await_args_list == [
+        call("append", params={"path": "note.md", "content": "a\\"}, flags=None),
+        call("append", params={"path": "note.md", "content": "tb"}, flags=["inline"]),
+    ]
+
+
+async def test_append_inline_with_backslash_escapes(cli):
+    cli._execute.return_value = ""
+    await cli.vault.append("note.md", r"a\tb", inline=True)
+    assert cli._execute.await_args_list == [
+        call("append", params={"path": "note.md", "content": "a\\"}, flags=["inline"]),
+        call("append", params={"path": "note.md", "content": "tb"}, flags=["inline"]),
+    ]
+
+
+async def test_prepend_with_backslash_escapes(cli):
+    cli._execute.return_value = ""
+    await cli.vault.prepend("note.md", r"C:\notes\temp")
+    assert cli._execute.await_args_list == [
+        call("prepend", params={"path": "note.md", "content": "temp"}),
+        call(
+            "prepend",
+            params={"path": "note.md", "content": "notes\\"},
+            flags=["inline"],
+        ),
+        call(
+            "prepend",
+            params={"path": "note.md", "content": "C:\\"},
+            flags=["inline"],
+        ),
+    ]
 
 
 async def test_move(cli):
