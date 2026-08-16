@@ -32,6 +32,17 @@ for result in results:
     print(result.filename)
 ```
 
+Only files the query evaluates truthy for come back, and `result` carries what the expression evaluated to for each of them — any JSON type:
+
+```python
+# A predicate: result is True for every file listed
+await client.search.jsonlogic({"==": [{"var": "frontmatter.title"}, "Welcome"]})
+
+# A field lookup: result is that field's value
+await client.search.jsonlogic({"var": "tags"})        # ["draft", "python"]
+await client.search.jsonlogic({"var": "stat.size"})   # 113
+```
+
 ## Search result structure
 
 Each search method returns a list of `SearchResult` objects:
@@ -41,7 +52,7 @@ Each search method returns a list of `SearchResult` objects:
 | `filename` | `str` | Path to the matching file |
 | `score` | `float \| None` | Relevance score (simple search only) |
 | `matches` | `list[SearchMatch] \| None` | Match locations with context (simple search only) |
-| `result` | `dict[str, Any] \| list[Any] \| None` | Raw result data (JsonLogic only) |
+| `result` | `str \| bool \| int \| float \| dict \| list \| None` | What the query evaluated to for this file (JsonLogic only) |
 
 Each `SearchMatch` contains:
 

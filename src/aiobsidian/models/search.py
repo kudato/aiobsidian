@@ -37,10 +37,12 @@ class SearchResult(BaseModel):
         score: Relevance score (present for simple search).
         matches: List of match locations with context
             (present for simple search).
-        result: Raw result data (present for JsonLogic queries).
+        result: What the query evaluated to for this file (present for
+            JsonLogic queries). Any JSON type: a predicate yields
+            `True`, a field lookup yields that field's value.
     """
 
     filename: str
     score: float | None = None
     matches: list[SearchMatch] | None = None
-    result: dict[str, Any] | list[Any] | None = None
+    result: str | bool | int | float | dict[str, Any] | list[Any] | None = None

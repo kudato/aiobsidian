@@ -14,8 +14,8 @@ NOTE_JSON = {
 }
 
 DOC_MAP_JSON = {
-    "headings": ["# Hello"],
-    "blocks": ["^abc123"],
+    "headings": ["Hello", "Hello::Details"],
+    "blocks": ["abc123"],
     "frontmatterFields": ["title"],
 }
 
@@ -39,13 +39,23 @@ async def test_get_note_json(mock_api, client):
 
 
 async def test_get_document_map(mock_api, client):
-    mock_api.get("/vault/hello.md").respond(200, json=DOC_MAP_JSON)
+    route = mock_api.get("/vault/hello.md").respond(200, json=DOC_MAP_JSON)
 
     result = await client.vault.get("hello.md", content_type=ContentType.DOCUMENT_MAP)
 
     assert isinstance(result, DocumentMap)
-    assert result.headings == ["# Hello"]
+    assert result.headings == ["Hello", "Hello::Details"]
+    assert result.blocks == ["abc123"]
     assert result.frontmatter_fields == ["title"]
+    assert route.calls[0].request.headers["markdown-patch-version"] == "1"
+
+
+async def test_get_markdown_omits_patch_version(mock_api, client):
+    route = mock_api.get("/vault/hello.md").respond(200, text="# Hello")
+
+    await client.vault.get("hello.md")
+
+    assert "markdown-patch-version" not in route.calls[0].request.headers
 
 
 def test_document_map_populate_by_name():
@@ -84,6 +94,7 @@ async def test_patch(mock_api, client):
     )
 
     request: httpx.Request = route.calls[0].request
+    assert request.headers["markdown-patch-version"] == "1"
     assert request.headers["operation"] == "replace"
     assert request.headers["target-type"] == "heading"
     assert request.headers["target"] == "Section%201"
@@ -142,13 +153,13 @@ async def test_patch_prepend_to_block(mock_api, client):
         "prepended text",
         operation=PatchOperation.PREPEND,
         target_type=TargetType.BLOCK,
-        target="^abc123",
+        target="abc123",
     )
 
     request: httpx.Request = route.calls[0].request
     assert request.headers["operation"] == "prepend"
     assert request.headers["target-type"] == "block"
-    assert request.headers["target"] == "%5Eabc123"
+    assert request.headers["target"] == "abc123"
 
 
 async def test_get_sends_accept_header(mock_api, client):
@@ -165,18 +176,79 @@ async def test_append_sends_content_and_header(mock_api, client):
     assert request.headers["content-type"] == "text/markdown"
 
 
-async def test_patch_frontmatter_content_type(mock_api, client):
+async def test_patch_frontmatter_string_value(mock_api, client):
     route = mock_api.patch("/vault/note.md").respond(200)
     await client.vault.patch(
         "note.md",
-        '{"title": "New"}',
+        "My Title",
         operation=PatchOperation.REPLACE,
         target_type=TargetType.FRONTMATTER,
         target="title",
     )
     request: httpx.Request = route.calls[0].request
-    assert request.headers["content-type"] == "application/json"
+    assert request.content == b"My Title"
+    assert request.headers["content-type"] == "text/markdown"
     assert request.headers["target-type"] == "frontmatter"
+
+
+async def test_patch_frontmatter_list_value(mock_api, client):
+    route = mock_api.patch("/vault/note.md").respond(200)
+    await client.vault.patch(
+        "note.md",
+        ["draft", "python"],
+        operation=PatchOperation.REPLACE,
+        target_type=TargetType.FRONTMATTER,
+        target="tags",
+    )
+    request: httpx.Request = route.calls[0].request
+    assert request.content == b'["draft", "python"]'
+    assert request.headers["content-type"] == "application/json"
+
+
+async def test_patch_frontmatter_dict_value(mock_api, client):
+    route = mock_api.patch("/vault/note.md").respond(200)
+    await client.vault.patch(
+        "note.md",
+        {"by": "kudato"},
+        operation=PatchOperation.REPLACE,
+        target_type=TargetType.FRONTMATTER,
+        target="meta",
+    )
+    assert route.calls[0].request.content == b'{"by": "kudato"}'
+
+
+async def test_patch_frontmatter_number_value(mock_api, client):
+    route = mock_api.patch("/vault/note.md").respond(200)
+    await client.vault.patch(
+        "note.md",
+        42,
+        operation=PatchOperation.REPLACE,
+        target_type=TargetType.FRONTMATTER,
+        target="rating",
+    )
+    assert route.calls[0].request.content == b"42"
+
+
+async def test_patch_heading_rejects_non_string(client):
+    with pytest.raises(TypeError, match="heading"):
+        await client.vault.patch(
+            "note.md",
+            ["a", "b"],
+            operation=PatchOperation.REPLACE,
+            target_type=TargetType.HEADING,
+            target="Section",
+        )
+
+
+async def test_patch_block_rejects_non_string(client):
+    with pytest.raises(TypeError, match="block"):
+        await client.vault.patch(
+            "note.md",
+            {"a": 1},
+            operation=PatchOperation.REPLACE,
+            target_type=TargetType.BLOCK,
+            target="abc123",
+        )
 
 
 async def test_patch_custom_delimiter(mock_api, client):
@@ -229,6 +301,105 @@ async def test_get_deep_nested_path(mock_api, client):
 
     assert result == "# Deep"
     assert route.called
+
+
+async def test_get_path_with_hash(mock_api, client):
+    route = mock_api.get("/vault/scratch/note%23hash.md").respond(200, text="# Hash")
+
+    result = await client.vault.get("scratch/note#hash.md")
+
+    assert result == "# Hash"
+    assert route.called
+
+
+async def test_get_path_with_percent(mock_api, client):
+    route = mock_api.get("/vault/scratch/note%2050%25.md").respond(200, text="# Half")
+
+    result = await client.vault.get("scratch/note 50%.md")
+
+    assert result == "# Half"
+    assert route.called
+
+
+async def test_get_path_with_question_mark(mock_api, client):
+    route = mock_api.get("/vault/scratch/q%3Fmark.md").respond(200, text="# Query")
+
+    result = await client.vault.get("scratch/q?mark.md")
+
+    assert result == "# Query"
+    assert route.called
+
+
+async def test_update_path_with_hash(mock_api, client):
+    route = mock_api.put("/vault/scratch/note%23hash.md").respond(204)
+
+    await client.vault.update("scratch/note#hash.md", "OVERWRITTEN")
+
+    assert route.called
+    assert route.calls[0].request.url.raw_path == b"/vault/scratch/note%23hash.md"
+
+
+async def test_delete_path_with_hash(mock_api, client):
+    route = mock_api.delete("/vault/scratch/note%23hash.md").respond(204)
+
+    await client.vault.delete("scratch/note#hash.md")
+
+    assert route.called
+
+
+async def test_get_leading_slash(mock_api, client):
+    route = mock_api.get("/vault/notes/a.md").respond(200, text="# A")
+
+    result = await client.vault.get("/notes/a.md")
+
+    assert result == "# A"
+    assert route.called
+
+
+async def test_update_leading_slash(mock_api, client):
+    route = mock_api.put("/vault/notes/a.md").respond(204)
+
+    await client.vault.update("/notes/a.md", "content")
+
+    assert route.called
+
+
+async def test_append_leading_slash(mock_api, client):
+    route = mock_api.post("/vault/notes/a.md").respond(204)
+
+    await client.vault.append("/notes/a.md", "content")
+
+    assert route.called
+
+
+async def test_patch_leading_slash(mock_api, client):
+    route = mock_api.patch("/vault/notes/a.md").respond(200)
+
+    await client.vault.patch(
+        "/notes/a.md",
+        "content",
+        operation=PatchOperation.APPEND,
+        target_type=TargetType.HEADING,
+        target="Section",
+    )
+
+    assert route.called
+
+
+async def test_delete_leading_slash(mock_api, client):
+    route = mock_api.delete("/vault/notes/a.md").respond(204)
+
+    await client.vault.delete("/notes/a.md")
+
+    assert route.called
+
+
+async def test_list_path_with_hash(mock_api, client):
+    mock_api.get("/vault/scratch/tag%23folder/").respond(200, json={"files": ["a.md"]})
+
+    result = await client.vault.list("scratch/tag#folder")
+
+    assert result.files == ["a.md"]
 
 
 async def test_patch_non_ascii_target(mock_api, client):

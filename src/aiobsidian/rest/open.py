@@ -20,8 +20,14 @@ class OpenResource(BaseResource):
         await client.open.open("Notes/hello.md")
         ```
 
+        Warning:
+            This is not a read-only operation. If the file does not
+            exist, Obsidian creates an empty note at `filename` and
+            opens that — the call succeeds instead of raising.
+
         Args:
-            filename: Path to the file to open, relative to the vault root.
+            filename: Path to the file to open, relative to the vault
+                root. A leading slash is ignored.
             new_leaf: If `True`, open the file in a new tab/pane.
         """
         params: dict[str, str] = {}
@@ -29,6 +35,6 @@ class OpenResource(BaseResource):
             params["newLeaf"] = "true"
         await self._client.request(
             "POST",
-            f"{self._BASE_URL}/{filename}",
+            f"{self._BASE_URL}/{self._encode_path(filename)}",
             params=params,
         )

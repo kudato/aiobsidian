@@ -14,7 +14,7 @@
 uv sync                                # install all deps (dev + docs)
 uv run ruff check src/ tests/          # lint
 uv run ruff format src/ tests/         # auto-format
-uv run mypy src/                       # type check
+uv run mypy src/ tests/typing_examples.py   # type check
 uv run pytest                          # run tests
 uv run mkdocs build                    # build static docs
 ```

@@ -69,6 +69,48 @@ async def test_client_bearer_token():
         await client.aclose()
 
 
+async def test_client_bearer_token_with_external_http_client(mock_api):
+    route = mock_api.get("/vault/").respond(200, json={"files": []})
+    http = httpx.AsyncClient(base_url="https://127.0.0.1:27124")
+
+    async with ObsidianClient("my-secret-key", http_client=http) as client:
+        await client.vault.list()
+
+    assert route.calls[0].request.headers["authorization"] == "Bearer my-secret-key"
+    await http.aclose()
+
+
+async def test_client_external_http_client_without_base_url(mock_api):
+    route = mock_api.get("/vault/").respond(200, json={"files": []})
+    http = httpx.AsyncClient()
+
+    async with ObsidianClient("key", http_client=http) as client:
+        await client.vault.list()
+
+    assert route.calls[0].request.url == "https://127.0.0.1:27124/vault/"
+    await http.aclose()
+
+
+async def test_client_external_http_client_keeps_its_base_url(mock_api):
+    with respx.mock(base_url="http://proxy.local:8080") as api:
+        route = api.get("/vault/").respond(200, json={"files": []})
+        http = httpx.AsyncClient(base_url="http://proxy.local:8080")
+
+        async with ObsidianClient("key", http_client=http) as client:
+            await client.vault.list()
+
+        assert route.called
+        await http.aclose()
+
+
+async def test_client_request_headers_override_authorization(mock_api, client):
+    route = mock_api.get("/").respond(200, json={"ok": "OK"})
+
+    await client.request("GET", "/", headers={"Authorization": "Bearer other"})
+
+    assert route.calls[0].request.headers["authorization"] == "Bearer other"
+
+
 async def test_client_raises_api_error_non_json_response(mock_api, client):
     mock_api.get("/bad").respond(500, text="Internal Server Error")
     with pytest.raises(APIError) as exc_info:
