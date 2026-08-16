@@ -117,6 +117,56 @@ class ObsidianCLI:
             )
         return resolved
 
+    async def run(
+        self,
+        command: str,
+        *,
+        params: dict[str, str] | None = None,
+        flags: list[str] | None = None,
+        output_format: str | None = None,
+        timeout: float | None = None,
+    ) -> str:
+        """Run a CLI command and return its output unparsed.
+
+        The escape hatch for commands this library does not wrap and for
+        the ones it wraps differently than a caller needs. Prefer the
+        resource methods (e.g. `cli.vault.read()`), which know the shape
+        of each command's output; this returns the raw text.
+
+        ```python
+        raw = await cli.run("wordcount", params={"path": "note.md"})
+        ```
+
+        Failure detection is the same as everywhere else, so a command
+        that fails raises rather than returning its error text.
+
+        Args:
+            command: CLI command name (e.g. `"read"`, `"daily:path"`).
+            params: Key-value parameters passed as `key=value` arguments.
+            flags: Extra CLI flags (e.g. `["overwrite"]`).
+            output_format: Value for the `format=` parameter. Only
+                commands that document it accept one; the rest ignore it
+                and print plain text.
+            timeout: Override the client's timeout for this command.
+
+        Returns:
+            Standard output of the command, exactly as printed.
+
+        Raises:
+            RuntimeError: If the client has been closed.
+            BinaryNotFoundError: If the binary cannot be executed.
+            CLINotFoundError: If the CLI reports a missing resource.
+            CommandError: If the command fails for any other reason.
+            CLITimeoutError: If the command exceeds the timeout.
+        """
+        return await self._execute(
+            command,
+            params=params,
+            flags=flags,
+            output_format=output_format,
+            timeout=timeout,
+        )
+
     async def _execute(
         self,
         command: str,
@@ -134,8 +184,9 @@ class ObsidianCLI:
         consequence, reading a note whose first line starts with `Error: ` also
         raises instead of returning the text.
 
-        Cancelling the call kills the child process before the cancellation
-        propagates, so no orphan keeps writing to the vault. The command gets
+        Cancelling the call kills the command and everything it started
+        before the cancellation propagates, so no orphan keeps writing to the
+        vault and `asyncio.timeout` around a call is safe. The command gets
         no stdin, so one waiting for input fails instead of hanging.
 
         Args:
