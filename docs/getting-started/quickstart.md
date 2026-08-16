@@ -109,9 +109,14 @@ await cli.tasks.complete("task-id")
 ### Searching
 
 ```python
-results = await cli.search.query("python asyncio")
-for result in results:
-    print(result)
+# Paths of the matching files
+for path in await cli.search.query("python asyncio"):
+    print(path)
+
+# The same search, with the line every hit matched on
+for hit in await cli.search.context("python asyncio"):
+    for match in hit["matches"]:
+        print(f"{hit['file']}:{match['line']}  {match['text']}")
 ```
 
 ### Daily notes
