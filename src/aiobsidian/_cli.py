@@ -48,6 +48,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_CAN_SIGNAL_GROUPS = hasattr(os, "killpg") and hasattr(signal, "SIGKILL")
+"""Whether a whole process group can be signalled. False on Windows,
+where `start_new_session` is accepted and ignored, so a command's own
+children are beyond reach and only the command itself can be stopped."""
+
 _ERROR_PREFIX = "Error: "
 _NOT_FOUND_PATTERN = re.compile(r"\bnot found\b", re.IGNORECASE)
 _UNKNOWN_COMMAND_PATTERN = re.compile(r'^Error: Command "[^"]*" not found')
@@ -88,6 +93,10 @@ class ObsidianCLI:
         self._timeout = timeout
         self._binary = self._resolve_binary(binary)
         self._running: set[asyncio.subprocess.Process] = set()
+        self._killed_by_close: set[asyncio.subprocess.Process] = set()
+        self._starting = 0
+        self._settled = asyncio.Event()
+        self._settled.set()
         self._closed = False
 
     def __repr__(self) -> str:
@@ -153,7 +162,8 @@ class ObsidianCLI:
             Standard output of the command, exactly as printed.
 
         Raises:
-            RuntimeError: If the client has been closed.
+            RuntimeError: If the client is closed, or is closed while the
+                command runs.
             BinaryNotFoundError: If the binary cannot be executed.
             CLINotFoundError: If the CLI reports a missing resource.
             CommandError: If the command fails for any other reason.
@@ -184,10 +194,12 @@ class ObsidianCLI:
         consequence, reading a note whose first line starts with `Error: ` also
         raises instead of returning the text.
 
-        Cancelling the call kills the command and everything it started
+        Cancelling a running command kills it and everything it started
         before the cancellation propagates, so no orphan keeps writing to the
-        vault and `asyncio.timeout` around a call is safe. The command gets
-        no stdin, so one waiting for input fails instead of hanging.
+        vault and `asyncio.timeout` around a call is safe. Cancellation during
+        the spawn itself is the exception: asyncio kills the command but
+        cannot reach a child it had already started. The command gets no
+        stdin, so one waiting for input fails instead of hanging.
 
         Args:
             command: CLI command name (e.g. `"read"`, `"daily:path"`).
@@ -202,7 +214,8 @@ class ObsidianCLI:
             Standard output from the command as a string.
 
         Raises:
-            RuntimeError: If the client has been closed.
+            RuntimeError: If the client is closed, or is closed while the
+                command runs.
             BinaryNotFoundError: If the binary cannot be executed.
             CLINotFoundError: If the CLI reports a missing resource.
             CommandError: If the command fails for any other reason.
@@ -223,23 +236,46 @@ class ObsidianCLI:
         if flags:
             args.extend(flags)
 
+        # Counted from here, before the spawn can be awaited, so that a
+        # concurrent aclose() knows a command exists that is not in
+        # _running yet and waits for it rather than returning early.
+        self._starting += 1
+        self._settled.clear()
         try:
-            process = await asyncio.create_subprocess_exec(
-                *args,
-                stdin=asyncio.subprocess.DEVNULL,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                # Its own process group, so that stopping the command
-                # stops whatever it started. See _kill.
-                start_new_session=True,
-            )
-        except OSError as exc:
-            raise BinaryNotFoundError(
-                f"Obsidian CLI binary {self._binary!r} could not be executed: "
-                f"{exc}. Install Obsidian v1.12+ or pass binary= explicitly."
-            ) from exc
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    *args,
+                    stdin=asyncio.subprocess.DEVNULL,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    # Its own process group, so that stopping the command
+                    # stops whatever it started. See _kill.
+                    start_new_session=True,
+                )
+            except OSError as exc:
+                raise BinaryNotFoundError(
+                    f"Obsidian CLI binary {self._binary!r} could not be executed: "
+                    f"{exc}. Install Obsidian v1.12+ or pass binary= explicitly."
+                ) from exc
+            self._running.add(process)
+        finally:
+            self._starting -= 1
+            if not self._starting:
+                self._settled.set()
 
-        self._running.add(process)
+        # Registering and re-checking without an await in between is what
+        # makes this safe: aclose() either set _closed before the check,
+        # and this kills its own child, or it has yet to take its
+        # snapshot of _running, which by then contains the child.
+        if self._closed:
+            self._running.discard(process)
+            self._killed_by_close.discard(process)
+            await self._kill(process)
+            raise RuntimeError(
+                f"Cannot run {command!r}: this ObsidianCLI was closed while "
+                f"the command was starting."
+            )
+
         try:
             stdout_bytes, stderr_bytes = await asyncio.wait_for(
                 process.communicate(), timeout=effective_timeout
@@ -252,11 +288,14 @@ class ObsidianCLI:
             raise
         finally:
             self._running.discard(process)
+            killed_by_close = process in self._killed_by_close
+            self._killed_by_close.discard(process)
 
-        # A signal we did not send is somebody else's business, but a
-        # signal plus a closed client is aclose() killing this command,
-        # and "exit_code=-9, no output" would not say so.
-        if self._closed and (process.returncode or 0) < 0:
+        if killed_by_close:
+            # Otherwise this surfaces as "exit_code=-9, no output", which
+            # names neither the cause nor the culprit. Membership, not a
+            # signal death plus a closed client: something else may have
+            # killed the command, and that is somebody else's business.
             raise RuntimeError(
                 f"Command {command!r} was killed: this ObsidianCLI was closed "
                 f"while it ran."
@@ -277,25 +316,54 @@ class ObsidianCLI:
         return stdout
 
     @staticmethod
-    async def _kill(process: asyncio.subprocess.Process) -> None:
-        """Kill a running command, its own children included, and reap it.
+    def _signal(process: asyncio.subprocess.Process) -> None:
+        """SIGKILL a command and everything it started.
 
         The whole process group goes, not just the command: a grandchild
         that outlived its parent would keep the vault open and keep the
         pipe open with it, leaving whoever awaits the output stuck in
-        `communicate()` for as long as the grandchild runs.
+        `communicate()` for as long as the grandchild runs. The group is
+        signalled even when the command itself has already exited,
+        because that is precisely when a grandchild is what is left.
+
+        Deliberately synchronous. It is what makes killing several
+        commands safe under cancellation: signal them all first, and no
+        later `await` can be interrupted while one is still alive.
 
         Args:
             process: The child process to stop.
         """
+        if _CAN_SIGNAL_GROUPS:
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.killpg(process.pid, signal.SIGKILL)
+        if process.returncode is None:
+            with contextlib.suppress(ProcessLookupError):
+                process.kill()
+
+    @staticmethod
+    async def _reap(process: asyncio.subprocess.Process) -> None:
+        """Wait for a signalled command to be collected.
+
+        Shielded, so the child is reaped even when the caller is
+        cancelled; the cancellation itself is not swallowed.
+
+        Args:
+            process: The child process to wait for.
+        """
         if process.returncode is not None:
             return
-        with contextlib.suppress(ProcessLookupError, PermissionError):
-            os.killpg(process.pid, signal.SIGKILL)
         with contextlib.suppress(ProcessLookupError):
-            process.kill()
-        with contextlib.suppress(ProcessLookupError, asyncio.CancelledError):
             await asyncio.shield(process.wait())
+
+    @classmethod
+    async def _kill(cls, process: asyncio.subprocess.Process) -> None:
+        """Stop a command and wait for it to be collected.
+
+        Args:
+            process: The child process to stop.
+        """
+        cls._signal(process)
+        await cls._reap(process)
 
     @staticmethod
     def _build_error(
@@ -514,6 +582,10 @@ class ObsidianCLI:
     # -- lifecycle ---------------------------------------------------------
 
     async def __aenter__(self) -> ObsidianCLI:
+        if self._closed:
+            raise RuntimeError(
+                "This ObsidianCLI has been closed and cannot be entered again."
+            )
         return self
 
     async def __aexit__(self, *exc: object) -> None:
@@ -527,10 +599,41 @@ class ObsidianCLI:
         `obsidian` process is still writing to the vault. That task gets
         a `RuntimeError` naming the close as the cause.
 
+        Cancelling the collecting is safe: every command is signalled
+        before anything is awaited, so a cancellation there can only
+        interrupt the collecting of processes that are already dead.
+
+        A command caught mid-spawn is what that cannot cover. It has no
+        pid yet, so there is nothing to signal on its behalf; this call
+        waits for it instead, and cancelling that wait hands the killing
+        back to the command's own task, which does it as soon as it
+        runs. If that task is cancelled in the same window, asyncio
+        kills the command but not a child the command had started.
+
         Closed is final: any further command raises `RuntimeError`.
         Calling this more than once is harmless.
         """
         self._closed = True
-        for process in list(self._running):
-            await self._kill(process)
-        self._running.clear()
+        while True:
+            # Signalling every one of them before anything is awaited
+            # buys two things. A cancellation arriving during the reaping
+            # below cannot leave a command alive, and no command can
+            # finish and be reaped between being listed and being
+            # signalled, which would aim SIGKILL at a pid the OS is free
+            # to have handed to somebody else.
+            signalled = list(self._running)
+            for process in signalled:
+                self._running.discard(process)
+                self._killed_by_close.add(process)
+                self._signal(process)
+
+            for process in signalled:
+                await self._reap(process)
+
+            # A command counted but not yet registered was spawned as
+            # this call started. Waiting for it is what makes the
+            # guarantee above true at the moment aclose() returns,
+            # rather than whenever its owner task next runs.
+            if not self._starting:
+                return
+            await self._settled.wait()
