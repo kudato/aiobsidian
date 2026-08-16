@@ -5,6 +5,15 @@ class ObsidianError(Exception):
     """Base exception for all aiobsidian errors."""
 
 
+class NotFoundError(ObsidianError):
+    """The requested resource does not exist.
+
+    Transport-neutral base class: `APINotFoundError` (REST) and
+    `CLINotFoundError` (CLI) both inherit from it, so a missing note can be
+    handled the same way regardless of the transport in use.
+    """
+
+
 class APIError(ObsidianError):
     """Error returned by the Obsidian REST API.
 
@@ -28,12 +37,15 @@ class APIError(ObsidianError):
             msg += f" (error_code={error_code})"
         super().__init__(msg)
 
+    def __reduce__(self) -> tuple[type[APIError], tuple[int, str, int | None]]:
+        return type(self), (self.status_code, self.message, self.error_code)
+
 
 class AuthenticationError(APIError):
     """HTTP 401 Unauthorized — invalid or missing API key."""
 
 
-class NotFoundError(APIError):
+class APINotFoundError(APIError, NotFoundError):
     """HTTP 404 Not Found — the requested resource does not exist."""
 
 
@@ -42,7 +54,7 @@ class CLIError(ObsidianError):
 
 
 class BinaryNotFoundError(CLIError):
-    """The Obsidian CLI binary could not be found.
+    """The Obsidian CLI binary could not be found or executed.
 
     Attributes:
         message: Description of the error.
@@ -54,21 +66,64 @@ class BinaryNotFoundError(CLIError):
 
 
 class CommandError(CLIError):
-    """A CLI command exited with a non-zero status.
+    """A CLI command failed.
+
+    The Obsidian CLI reports failures by printing `Error: ...` to standard
+    output while still exiting with status `0`, so `exit_code` is usually
+    `0` and the failure text is carried by `stdout`.
 
     Attributes:
         command: The CLI command that failed.
-        exit_code: Process exit code.
+        exit_code: Process exit code (`0` for failures reported on stdout).
         stderr: Standard error output.
+        stdout: Standard output, which carries the CLI error message.
     """
 
-    def __init__(self, command: str, exit_code: int, stderr: str) -> None:
+    def __init__(
+        self,
+        command: str,
+        exit_code: int,
+        stderr: str,
+        stdout: str = "",
+    ) -> None:
         self.command = command
         self.exit_code = exit_code
         self.stderr = stderr
+        self.stdout = stdout
+        detail = stderr.strip() or stdout.strip() or "no output"
         super().__init__(
-            f"Command {command!r} failed (exit_code={exit_code}): {stderr}"
+            f"Command {command!r} failed (exit_code={exit_code}): {detail}"
         )
+
+    def __reduce__(self) -> tuple[type[CommandError], tuple[str, int, str, str]]:
+        return type(self), (self.command, self.exit_code, self.stderr, self.stdout)
+
+
+class CLINotFoundError(CommandError, NotFoundError):
+    """A CLI command failed because the requested resource does not exist.
+
+    Raised when the CLI reports a missing file, folder, tag, property or any
+    other vault resource. A command that the CLI itself does not know is
+    reported as a plain `CommandError`.
+    """
+
+
+class CLIParseError(CLIError):
+    """The output of a CLI command could not be parsed.
+
+    Attributes:
+        command: The CLI command whose output could not be parsed.
+        output: Raw output of the command.
+    """
+
+    def __init__(self, command: str, output: str) -> None:
+        self.command = command
+        self.output = output
+        excerpt = output.strip()[:200]
+        super().__init__(f"Could not parse the output of {command!r}: {excerpt!r}")
+
+    def __reduce__(self) -> tuple[type[CLIParseError], tuple[str, str]]:
+        return type(self), (self.command, self.output)
 
 
 class CLITimeoutError(CLIError):
@@ -83,3 +138,6 @@ class CLITimeoutError(CLIError):
         self.command = command
         self.timeout = timeout
         super().__init__(f"Command {command!r} timed out after {timeout}s")
+
+    def __reduce__(self) -> tuple[type[CLITimeoutError], tuple[str, float]]:
+        return type(self), (self.command, self.timeout)

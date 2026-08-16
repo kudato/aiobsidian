@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from typing import Any
-
 from ._base import BaseCLIResource
 
 
@@ -29,31 +26,29 @@ class CLIDevResource(BaseCLIResource):
         output = await self._cli._execute("eval", params={"code": code})
         return output.strip()
 
-    async def console(self, *, limit: int | None = None) -> list[dict[str, Any]]:
+    async def console(self, *, limit: int | None = None) -> list[str]:
         """Show console messages.
 
         Args:
             limit: Maximum number of messages to return.
 
         Returns:
-            List of console message objects.
+            List of captured messages, each prefixed with its timestamp.
         """
         params: dict[str, str] = {}
         if limit is not None:
             params["limit"] = str(limit)
         output = await self._cli._execute("dev:console", params=params or None)
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)
 
-    async def errors(self) -> list[dict[str, Any]]:
+    async def errors(self) -> list[str]:
         """Show JavaScript errors.
 
         Returns:
-            List of error objects.
+            List of captured errors, empty if none were captured.
         """
         output = await self._cli._execute("dev:errors")
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)
 
     async def screenshot(self, path: str) -> str:
         """Capture a screenshot (base64 PNG).

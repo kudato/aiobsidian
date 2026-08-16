@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from typing import Any
-
 from ._base import BaseCLIResource
 
 
@@ -22,15 +19,15 @@ class CLISystemResource(BaseCLIResource):
         output = await self._cli._execute("version")
         return output.strip()
 
-    async def help(self) -> list[dict[str, Any]]:
-        """List all available CLI commands.
+    async def help(self) -> str:
+        """Get the CLI help text listing all available commands.
 
         Returns:
-            List of command descriptions.
+            Help text as printed by the CLI, including usage notes and the
+            parameters of every command.
         """
         output = await self._cli._execute("help")
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return output.strip()
 
     async def reload(self) -> None:
         """Reload the Obsidian window."""
@@ -40,12 +37,11 @@ class CLISystemResource(BaseCLIResource):
         """Restart the Obsidian application."""
         await self._cli._execute("restart")
 
-    async def vaults(self) -> list[dict[str, Any]]:
+    async def vaults(self) -> list[str]:
         """List all known vaults (desktop only).
 
         Returns:
-            List of vault objects.
+            List of vault names.
         """
         output = await self._cli._execute("vaults")
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)

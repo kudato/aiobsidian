@@ -3,20 +3,19 @@ from __future__ import annotations
 import json
 
 PLUGINS = [
-    {"id": "dataview", "name": "Dataview", "enabled": True},
-    {"id": "templater", "name": "Templater", "enabled": False},
+    {"id": "dataview"},
+    {"id": "templater"},
 ]
 
 ENABLED_PLUGINS = [
-    {"id": "dataview", "name": "Dataview"},
+    {"id": "dataview"},
 ]
 
 
 async def test_info(cli):
-    plugin_info = {"id": "dataview", "name": "Dataview", "version": "0.5.66"}
-    cli._execute.return_value = json.dumps(plugin_info)
+    cli._execute.return_value = "type\tcommunity\nname\tDataview\nenabled\ttrue\n"
     result = await cli.plugins.info("dataview")
-    assert result == plugin_info
+    assert result == {"type": "community", "name": "Dataview", "enabled": "true"}
     cli._execute.assert_awaited_once_with("plugin", params={"id": "dataview"})
 
 
@@ -36,21 +35,23 @@ async def test_list(cli):
     cli._execute.return_value = json.dumps(PLUGINS)
     result = await cli.plugins.list()
     assert result == PLUGINS
-    cli._execute.assert_awaited_once_with("plugins", flags=None)
+    cli._execute.assert_awaited_once_with("plugins", flags=None, output_format="json")
 
 
 async def test_list_with_versions(cli):
     cli._execute.return_value = json.dumps(PLUGINS)
     result = await cli.plugins.list(versions=True)
     assert result == PLUGINS
-    cli._execute.assert_awaited_once_with("plugins", flags=["versions"])
+    cli._execute.assert_awaited_once_with(
+        "plugins", flags=["versions"], output_format="json"
+    )
 
 
 async def test_enabled(cli):
     cli._execute.return_value = json.dumps(ENABLED_PLUGINS)
     result = await cli.plugins.enabled()
     assert result == ENABLED_PLUGINS
-    cli._execute.assert_awaited_once_with("plugins:enabled")
+    cli._execute.assert_awaited_once_with("plugins:enabled", output_format="json")
 
 
 async def test_enable(cli):

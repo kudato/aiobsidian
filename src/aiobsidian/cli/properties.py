@@ -22,8 +22,10 @@ class CLIPropertiesResource(BaseCLIResource):
         Returns:
             Dictionary of property names to their values.
         """
-        output = await self._cli._execute("properties", params={"path": path})
-        result: dict[str, Any] = json.loads(output)
+        output = await self._cli._execute(
+            "properties", params={"path": path}, output_format="json"
+        )
+        result: dict[str, Any] = self._parse_json("properties", output, empty={})
         return result
 
     async def read(self, path: str, property_name: str) -> Any:

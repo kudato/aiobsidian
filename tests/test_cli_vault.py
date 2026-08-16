@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-import json
+from unittest.mock import call
+
+import pytest
+
+from aiobsidian._exceptions import CLIParseError
 
 
 async def test_open(cli):
@@ -110,6 +114,60 @@ async def test_prepend(cli):
     )
 
 
+async def test_create_with_backslash_escapes(cli):
+    cli._execute.return_value = ""
+    await cli.vault.create("note.md", r"C:\notes\temp")
+    assert cli._execute.await_args_list == [
+        call("create", params={"path": "note.md", "content": "C:\\"}, flags=None),
+        call(
+            "append",
+            params={"path": "note.md", "content": "notes\\"},
+            flags=["inline"],
+        ),
+        call(
+            "append",
+            params={"path": "note.md", "content": "temp"},
+            flags=["inline"],
+        ),
+    ]
+
+
+async def test_append_with_backslash_escapes(cli):
+    cli._execute.return_value = ""
+    await cli.vault.append("note.md", r"a\tb")
+    assert cli._execute.await_args_list == [
+        call("append", params={"path": "note.md", "content": "a\\"}, flags=None),
+        call("append", params={"path": "note.md", "content": "tb"}, flags=["inline"]),
+    ]
+
+
+async def test_append_inline_with_backslash_escapes(cli):
+    cli._execute.return_value = ""
+    await cli.vault.append("note.md", r"a\tb", inline=True)
+    assert cli._execute.await_args_list == [
+        call("append", params={"path": "note.md", "content": "a\\"}, flags=["inline"]),
+        call("append", params={"path": "note.md", "content": "tb"}, flags=["inline"]),
+    ]
+
+
+async def test_prepend_with_backslash_escapes(cli):
+    cli._execute.return_value = ""
+    await cli.vault.prepend("note.md", r"C:\notes\temp")
+    assert cli._execute.await_args_list == [
+        call("prepend", params={"path": "note.md", "content": "temp"}),
+        call(
+            "prepend",
+            params={"path": "note.md", "content": "notes\\"},
+            flags=["inline"],
+        ),
+        call(
+            "prepend",
+            params={"path": "note.md", "content": "C:\\"},
+            flags=["inline"],
+        ),
+    ]
+
+
 async def test_move(cli):
     cli._execute.return_value = ""
     await cli.vault.move("old.md", "new.md")
@@ -143,83 +201,115 @@ async def test_delete_permanent(cli):
 
 
 async def test_list(cli):
-    cli._execute.return_value = json.dumps(["a.md", "b.md"])
+    cli._execute.return_value = "a.md\nb.md\n"
     result = await cli.vault.list()
     assert result == ["a.md", "b.md"]
     cli._execute.assert_awaited_once_with("files", params=None)
 
 
-async def test_list_with_path(cli):
-    cli._execute.return_value = json.dumps(["folder/a.md"])
+async def test_list_with_folder_positional(cli):
+    cli._execute.return_value = "folder/a.md\n"
     result = await cli.vault.list("folder")
     assert result == ["folder/a.md"]
-    cli._execute.assert_awaited_once_with("files", params={"path": "folder"})
+    cli._execute.assert_awaited_once_with("files", params={"folder": "folder"})
 
 
 async def test_list_with_ext(cli):
-    cli._execute.return_value = json.dumps(["a.md", "b.md"])
+    cli._execute.return_value = "a.md\nb.md\n"
     result = await cli.vault.list(ext="md")
     assert result == ["a.md", "b.md"]
     cli._execute.assert_awaited_once_with("files", params={"ext": "md"})
 
 
-async def test_list_with_folder(cli):
-    cli._execute.return_value = json.dumps(["notes/a.md"])
+async def test_list_with_folder_keyword(cli):
+    cli._execute.return_value = "notes/a.md\n"
     result = await cli.vault.list(folder="notes")
     assert result == ["notes/a.md"]
     cli._execute.assert_awaited_once_with("files", params={"folder": "notes"})
 
 
-async def test_list_with_all_params(cli):
-    cli._execute.return_value = json.dumps(["notes/a.md"])
-    result = await cli.vault.list("notes", ext="md", folder="notes")
+async def test_list_with_folder_and_ext(cli):
+    cli._execute.return_value = "notes/a.md\n"
+    result = await cli.vault.list("notes", ext="md")
     assert result == ["notes/a.md"]
     cli._execute.assert_awaited_once_with(
-        "files", params={"path": "notes", "ext": "md", "folder": "notes"}
+        "files", params={"folder": "notes", "ext": "md"}
     )
 
 
+async def test_list_empty_vault(cli):
+    cli._execute.return_value = ""
+    result = await cli.vault.list()
+    assert result == []
+
+
 async def test_info(cli):
-    vault_info = {"name": "TestVault", "path": "/vaults/TestVault"}
-    cli._execute.return_value = json.dumps(vault_info)
+    cli._execute.return_value = (
+        "name\tTestVault\npath\t/vaults/TestVault\nfiles\t47\nfolders\t14\nsize\t2825\n"
+    )
     result = await cli.vault.info()
-    assert result == vault_info
+    assert result == {
+        "name": "TestVault",
+        "path": "/vaults/TestVault",
+        "files": "47",
+        "folders": "14",
+        "size": "2825",
+    }
     cli._execute.assert_awaited_once_with("vault")
 
 
+async def test_info_unexpected_output(cli):
+    cli._execute.return_value = "not a field list\n"
+    with pytest.raises(CLIParseError):
+        await cli.vault.info()
+
+
 async def test_file_info(cli):
-    file_meta = {"path": "note.md", "size": 1024, "ctime": 1710000000}
-    cli._execute.return_value = json.dumps(file_meta)
+    cli._execute.return_value = (
+        "path\tnote.md\nname\tnote\nextension\tmd\nsize\t137\n"
+        "created\t1786836399339\nmodified\t1786836399341\n"
+    )
     result = await cli.vault.file_info("note.md")
-    assert result == file_meta
+    assert result == {
+        "path": "note.md",
+        "name": "note",
+        "extension": "md",
+        "size": "137",
+        "created": "1786836399339",
+        "modified": "1786836399341",
+    }
     cli._execute.assert_awaited_once_with("file", params={"path": "note.md"})
 
 
 async def test_folder_info(cli):
-    folder_meta = {"path": "notes", "children": 5}
-    cli._execute.return_value = json.dumps(folder_meta)
+    cli._execute.return_value = "path\tnotes\nfiles\t3\nfolders\t0\nsize\t305\n"
     result = await cli.vault.folder_info("notes")
-    assert result == folder_meta
+    assert result == {"path": "notes", "files": "3", "folders": "0", "size": "305"}
     cli._execute.assert_awaited_once_with("folder", params={"path": "notes"})
 
 
 async def test_folders(cli):
-    cli._execute.return_value = json.dumps(["notes", "archive", "templates"])
+    cli._execute.return_value = "notes\narchive\ntemplates\n"
     result = await cli.vault.folders()
     assert result == ["notes", "archive", "templates"]
     cli._execute.assert_awaited_once_with("folders", params=None)
 
 
-async def test_folders_with_path(cli):
-    cli._execute.return_value = json.dumps(["notes/sub1", "notes/sub2"])
+async def test_folders_with_parent(cli):
+    cli._execute.return_value = "notes/sub1\nnotes/sub2\n"
     result = await cli.vault.folders("notes")
     assert result == ["notes/sub1", "notes/sub2"]
-    cli._execute.assert_awaited_once_with("folders", params={"path": "notes"})
+    cli._execute.assert_awaited_once_with("folders", params={"folder": "notes"})
 
 
 async def test_wordcount(cli):
-    counts = {"words": 500, "characters": 2800}
-    cli._execute.return_value = json.dumps(counts)
+    cli._execute.return_value = "words: 500\ncharacters: 2800\n"
     result = await cli.vault.wordcount("note.md")
-    assert result == counts
+    assert result == {"words": 500, "characters": 2800}
     cli._execute.assert_awaited_once_with("wordcount", params={"file": "note.md"})
+
+
+async def test_wordcount_non_numeric(cli):
+    cli._execute.return_value = "words: many\n"
+    with pytest.raises(CLIParseError):
+        await cli.vault.wordcount("note.md")

@@ -1,22 +1,28 @@
 from __future__ import annotations
 
-import json
+import pytest
 
-HISTORY_FILES = [
-    {"path": "notes/todo.md", "versions": 3},
-    {"path": "notes/ideas.md", "versions": 1},
-]
+from aiobsidian._exceptions import CLIParseError
+
+VERSIONS_OUTPUT = (
+    "notes/todo.md\n1\t2026-08-16 02:38\t431 B\n2\t2026-08-15 21:04\t402 B\n"
+)
 
 
 async def test_versions(cli):
-    versions = [
-        {"version": "v1", "date": "2026-03-16T09:00:00Z"},
-        {"version": "v2", "date": "2026-03-16T10:00:00Z"},
-    ]
-    cli._execute.return_value = json.dumps(versions)
+    cli._execute.return_value = VERSIONS_OUTPUT
     result = await cli.history.versions("notes/todo.md")
-    assert result == versions
+    assert result == [
+        {"version": "1", "modified": "2026-08-16 02:38", "size": "431 B"},
+        {"version": "2", "modified": "2026-08-15 21:04", "size": "402 B"},
+    ]
     cli._execute.assert_awaited_once_with("history", params={"path": "notes/todo.md"})
+
+
+async def test_versions_unexpected_row(cli):
+    cli._execute.return_value = "notes/todo.md\n1\t2026-08-16 02:38\n"
+    with pytest.raises(CLIParseError):
+        await cli.history.versions("notes/todo.md")
 
 
 async def test_open(cli):
@@ -52,9 +58,9 @@ async def test_diff_all_params(cli):
 
 
 async def test_list(cli):
-    cli._execute.return_value = json.dumps(HISTORY_FILES)
+    cli._execute.return_value = "notes/todo.md\nnotes/ideas.md\n"
     result = await cli.history.list()
-    assert result == HISTORY_FILES
+    assert result == ["notes/todo.md", "notes/ideas.md"]
     cli._execute.assert_awaited_once_with("history:list")
 
 

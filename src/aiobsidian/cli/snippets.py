@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from typing import Any
-
 from ._base import BaseCLIResource
 
 
@@ -13,15 +10,14 @@ class CLISnippetsResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
-    async def enabled(self) -> list[dict[str, Any]]:
+    async def enabled(self) -> list[str]:
         """List enabled CSS snippets.
 
         Returns:
-            List of enabled snippet objects.
+            List of enabled snippet names.
         """
         output = await self._cli._execute("snippets:enabled")
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)
 
     async def enable(self, name: str) -> None:
         """Enable a CSS snippet.
@@ -39,12 +35,11 @@ class CLISnippetsResource(BaseCLIResource):
         """
         await self._cli._execute("snippet:disable", params={"name": name})
 
-    async def list(self) -> list[dict[str, Any]]:
+    async def list(self) -> list[str]:
         """List all CSS snippets.
 
         Returns:
-            List of snippet objects.
+            List of snippet names.
         """
         output = await self._cli._execute("snippets")
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)

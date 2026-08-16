@@ -4,9 +4,12 @@ from ._cli import ObsidianCLI
 from ._client import ObsidianClient
 from ._exceptions import (
     APIError,
+    APINotFoundError,
     AuthenticationError,
     BinaryNotFoundError,
     CLIError,
+    CLINotFoundError,
+    CLIParseError,
     CLITimeoutError,
     CommandError,
     NotFoundError,
@@ -20,9 +23,12 @@ from .models.vault import DocumentMap, FileStat, NoteJson, VaultDirectory
 
 __all__ = [
     "APIError",
+    "APINotFoundError",
     "AuthenticationError",
     "BinaryNotFoundError",
     "CLIError",
+    "CLINotFoundError",
+    "CLIParseError",
     "CLITimeoutError",
     "Command",
     "CommandError",

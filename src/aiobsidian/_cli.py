@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
+import re
 import shutil
 from functools import cached_property
 from typing import TYPE_CHECKING
 
 from ._constants import DEFAULT_CLI_TIMEOUT
-from ._exceptions import BinaryNotFoundError, CLITimeoutError, CommandError
+from ._exceptions import (
+    BinaryNotFoundError,
+    CLINotFoundError,
+    CLITimeoutError,
+    CommandError,
+)
 
 if TYPE_CHECKING:
     from .cli.aliases import CLIAliasesResource
@@ -38,6 +45,10 @@ if TYPE_CHECKING:
     from .cli.workspaces import CLIWorkspacesResource
 
 logger = logging.getLogger(__name__)
+
+_ERROR_PREFIX = "Error: "
+_NOT_FOUND_PATTERN = re.compile(r"\bnot found\b", re.IGNORECASE)
+_UNKNOWN_COMMAND_PATTERN = re.compile(r'^Error: Command "[^"]*" not found')
 
 
 class ObsidianCLI:
@@ -107,61 +118,130 @@ class ObsidianCLI:
         *,
         params: dict[str, str] | None = None,
         flags: list[str] | None = None,
+        output_format: str | None = None,
         timeout: float | None = None,
     ) -> str:
         """Execute an Obsidian CLI command.
+
+        The Obsidian CLI exits with status `0` even when a command fails and
+        prints the failure as `Error: ...` on standard output. Output starting
+        with that prefix is therefore treated as a failure and raised. As a
+        consequence, reading a note whose first line starts with `Error: ` also
+        raises instead of returning the text.
+
+        Cancelling the call kills the child process before the cancellation
+        propagates, so no orphan keeps writing to the vault. The command gets
+        no stdin, so one waiting for input fails instead of hanging.
 
         Args:
             command: CLI command name (e.g. `"read"`, `"daily:path"`).
             params: Key-value parameters passed as `key=value` arguments.
             flags: Extra CLI flags (e.g. `["overwrite"]`).
+            output_format: Value for the `format=` parameter. Only commands
+                that document it accept one; the rest ignore it and print
+                plain text.
             timeout: Override the default timeout for this command.
 
         Returns:
             Standard output from the command as a string.
 
         Raises:
-            CommandError: If the command exits with a non-zero status.
+            BinaryNotFoundError: If the binary cannot be executed.
+            CLINotFoundError: If the CLI reports a missing resource.
+            CommandError: If the command fails for any other reason.
             CLITimeoutError: If the command exceeds the timeout.
         """
         effective_timeout = timeout if timeout is not None else self._timeout
 
-        args: list[str] = [
-            self._binary,
-            command,
-            f"vault={self._vault}",
-            "format=json",
-        ]
+        args: list[str] = [self._binary, command, f"vault={self._vault}"]
+        if output_format is not None:
+            args.append(f"format={output_format}")
         if params:
             args.extend(f"{k}={v}" for k, v in params.items())
         if flags:
             args.extend(flags)
 
-        process = await asyncio.create_subprocess_exec(
-            *args,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *args,
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except OSError as exc:
+            raise BinaryNotFoundError(
+                f"Obsidian CLI binary {self._binary!r} could not be executed: "
+                f"{exc}. Install Obsidian v1.12+ or pass binary= explicitly."
+            ) from exc
 
         try:
             stdout_bytes, stderr_bytes = await asyncio.wait_for(
                 process.communicate(), timeout=effective_timeout
             )
         except TimeoutError:
-            process.kill()
-            await process.wait()
-            raise CLITimeoutError(command, effective_timeout)
+            await self._kill(process)
+            raise CLITimeoutError(command, effective_timeout) from None
+        except asyncio.CancelledError:
+            await self._kill(process)
+            raise
 
-        stdout = stdout_bytes.decode()
-        stderr = stderr_bytes.decode()
+        stdout = stdout_bytes.decode(errors="replace")
+        stderr = stderr_bytes.decode(errors="replace")
 
         if process.returncode != 0:
-            raise CommandError(command, process.returncode or 1, stderr)
+            raise self._build_error(command, process.returncode or 1, stdout, stderr)
 
         if stderr:
             logger.warning("CLI stderr for %r: %s", command, stderr)
 
+        if stdout.startswith(_ERROR_PREFIX):
+            raise self._build_error(command, 0, stdout, stderr)
+
         return stdout
+
+    @staticmethod
+    async def _kill(process: asyncio.subprocess.Process) -> None:
+        """Kill a running command and wait for the child to exit.
+
+        Args:
+            process: The child process to stop.
+        """
+        if process.returncode is not None:
+            return
+        with contextlib.suppress(ProcessLookupError):
+            process.kill()
+        with contextlib.suppress(ProcessLookupError, asyncio.CancelledError):
+            await asyncio.shield(process.wait())
+
+    @staticmethod
+    def _build_error(
+        command: str,
+        exit_code: int,
+        stdout: str,
+        stderr: str,
+    ) -> CommandError:
+        """Build the exception describing a failed command.
+
+        Args:
+            command: CLI command name.
+            exit_code: Process exit code.
+            stdout: Standard output of the command.
+            stderr: Standard error output of the command.
+
+        Returns:
+            `CLINotFoundError` if the CLI reported a missing resource,
+            `CommandError` otherwise. A command unknown to the CLI is a
+            plain `CommandError`, not a missing resource.
+        """
+        lines = stdout.strip().splitlines()
+        first_line = lines[0] if lines else ""
+        if (
+            first_line.startswith(_ERROR_PREFIX)
+            and _NOT_FOUND_PATTERN.search(first_line)
+            and not _UNKNOWN_COMMAND_PATTERN.match(first_line)
+        ):
+            return CLINotFoundError(command, exit_code, stderr, stdout)
+        return CommandError(command, exit_code, stderr, stdout)
 
     # -- resources ---------------------------------------------------------
 

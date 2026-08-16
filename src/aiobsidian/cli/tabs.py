@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from typing import Any
-
 from ._base import BaseCLIResource
 
 
@@ -27,22 +24,21 @@ class CLITabsResource(BaseCLIResource):
             params["view"] = view
         await self._cli._execute("tab:open", params=params or None)
 
-    async def recents(self) -> list[dict[str, Any]]:
+    async def recents(self) -> list[str]:
         """List recently opened files.
 
         Returns:
-            List of recently opened file objects.
+            List of file paths, most recent first.
         """
         output = await self._cli._execute("recents")
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)
 
-    async def list(self) -> list[dict[str, Any]]:
+    async def list(self) -> list[str]:
         """List open tabs.
 
         Returns:
-            List of open tab objects.
+            List of tabs as printed by the CLI, each prefixed with its view
+            type (e.g. ``"[markdown] welcome"``).
         """
         output = await self._cli._execute("tabs")
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)

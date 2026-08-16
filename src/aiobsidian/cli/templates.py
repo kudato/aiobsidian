@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from typing import Any
-
 from ._base import BaseCLIResource
 
 
@@ -45,12 +42,11 @@ class CLITemplatesResource(BaseCLIResource):
         """
         await self._cli._execute("template:insert", params={"name": name})
 
-    async def list(self) -> list[dict[str, Any]]:
+    async def list(self) -> list[str]:
         """List available templates.
 
         Returns:
-            List of template objects.
+            List of template names.
         """
         output = await self._cli._execute("templates")
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)
