@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from ._base import BaseCLIResource
@@ -22,6 +21,8 @@ class CLIOutlineResource(BaseCLIResource):
         Returns:
             List of heading objects forming the document outline.
         """
-        output = await self._cli._execute("outline", params={"file": path})
-        result: list[dict[str, Any]] = json.loads(output)
+        output = await self._cli._execute(
+            "outline", params={"file": path}, output_format="json"
+        )
+        result: list[dict[str, Any]] = self._parse_json("outline", output)
         return result

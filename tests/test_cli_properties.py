@@ -8,7 +8,15 @@ async def test_list(cli):
     cli._execute.return_value = json.dumps(props)
     result = await cli.properties.list("note.md")
     assert result == props
-    cli._execute.assert_awaited_once_with("properties", params={"path": "note.md"})
+    cli._execute.assert_awaited_once_with(
+        "properties", params={"path": "note.md"}, output_format="json"
+    )
+
+
+async def test_list_without_properties(cli):
+    cli._execute.return_value = "No properties found.\n"
+    result = await cli.properties.list("note.md")
+    assert result == {}
 
 
 async def test_read(cli):

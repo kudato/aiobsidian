@@ -1,22 +1,13 @@
 from __future__ import annotations
 
-import json
-
-TABS = [
-    {"file": "note.md", "active": True},
-    {"file": "todo.md", "active": False},
-]
-
-RECENTS = [
-    {"file": "note.md", "lastOpened": "2026-03-28T10:00:00Z"},
-    {"file": "old.md", "lastOpened": "2026-03-27T09:00:00Z"},
-]
+TABS_OUTPUT = "[markdown] welcome\n[search] Search\n"
+RECENTS_OUTPUT = "notes/note.md\nnotes/old.md\n"
 
 
 async def test_list(cli):
-    cli._execute.return_value = json.dumps(TABS)
+    cli._execute.return_value = TABS_OUTPUT
     result = await cli.tabs.list()
-    assert result == TABS
+    assert result == ["[markdown] welcome", "[search] Search"]
     cli._execute.assert_awaited_once_with("tabs")
 
 
@@ -39,7 +30,7 @@ async def test_open_no_params(cli):
 
 
 async def test_recents(cli):
-    cli._execute.return_value = json.dumps(RECENTS)
+    cli._execute.return_value = RECENTS_OUTPUT
     result = await cli.tabs.recents()
-    assert result == RECENTS
+    assert result == ["notes/note.md", "notes/old.md"]
     cli._execute.assert_awaited_once_with("recents")

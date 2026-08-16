@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from ._base import BaseCLIResource
@@ -36,8 +35,10 @@ class CLITasksResource(BaseCLIResource):
             flags.append("daily")
         if done:
             flags.append("done")
-        output = await self._cli._execute("tasks", params=params, flags=flags or None)
-        result: list[dict[str, Any]] = json.loads(output)
+        output = await self._cli._execute(
+            "tasks", params=params, flags=flags or None, output_format="json"
+        )
+        result: list[dict[str, Any]] = self._parse_json("tasks", output)
         return result
 
     async def toggle(self, path: str, line: int) -> None:

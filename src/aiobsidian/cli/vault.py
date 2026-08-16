@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
-from typing import Any
-
+from .._exceptions import CLIParseError
 from ._base import BaseCLIResource
 
 
@@ -115,95 +113,90 @@ class CLIVaultResource(BaseCLIResource):
         flags = ["permanent"] if permanent else None
         await self._cli._execute("delete", params={"path": path}, flags=flags)
 
-    async def info(self) -> dict[str, Any]:
+    async def info(self) -> dict[str, str]:
         """Get vault information.
 
         Returns:
-            Vault details including name and configuration.
+            Vault details keyed by field name: ``name``, ``path``, ``files``,
+            ``folders`` and ``size``.
         """
         output = await self._cli._execute("vault")
-        result: dict[str, Any] = json.loads(output)
-        return result
+        return self._parse_fields("vault", output)
 
-    async def file_info(self, path: str) -> dict[str, Any]:
+    async def file_info(self, path: str) -> dict[str, str]:
         """Get information about a file.
 
         Args:
             path: Path to the file relative to the vault root.
 
         Returns:
-            File metadata.
+            File metadata keyed by field name: ``path``, ``name``,
+            ``extension``, ``size``, ``created`` and ``modified``.
         """
         output = await self._cli._execute("file", params={"path": path})
-        result: dict[str, Any] = json.loads(output)
-        return result
+        return self._parse_fields("file", output)
 
-    async def folder_info(self, path: str) -> dict[str, Any]:
+    async def folder_info(self, path: str) -> dict[str, str]:
         """Get information about a folder.
 
         Args:
             path: Path to the folder relative to the vault root.
 
         Returns:
-            Folder metadata.
+            Folder metadata keyed by field name: ``path``, ``files``,
+            ``folders`` and ``size``.
         """
         output = await self._cli._execute("folder", params={"path": path})
-        result: dict[str, Any] = json.loads(output)
-        return result
+        return self._parse_fields("folder", output)
 
-    async def folders(self, path: str = "") -> list[str]:
+    async def folders(self, folder: str = "") -> list[str]:
         """List folders in the vault.
 
         Args:
-            path: Directory path relative to the vault root.
-                  Empty string lists all folders.
+            folder: Parent folder path relative to the vault root.
+                    Empty string lists all folders.
 
         Returns:
             List of folder paths.
         """
-        params = {"path": path} if path else None
+        params = {"folder": folder} if folder else None
         output = await self._cli._execute("folders", params=params)
-        result: list[str] = json.loads(output)
-        return result
+        return self._parse_lines(output)
 
-    async def wordcount(self, path: str) -> dict[str, Any]:
+    async def wordcount(self, path: str) -> dict[str, int]:
         """Get word and character count for a file.
 
         Args:
             path: Path to the file relative to the vault root.
 
         Returns:
-            Word count statistics.
+            Mapping with the ``words`` and ``characters`` counts.
+
+        Raises:
+            CLIParseError: If a count is not a number.
         """
         output = await self._cli._execute("wordcount", params={"file": path})
-        result: dict[str, Any] = json.loads(output)
-        return result
+        fields = self._parse_fields("wordcount", output, separator=":")
+        try:
+            return {key: int(value) for key, value in fields.items()}
+        except ValueError as exc:
+            raise CLIParseError("wordcount", output) from exc
 
-    async def list(
-        self,
-        path: str = "",
-        *,
-        ext: str | None = None,
-        folder: str | None = None,
-    ) -> list[str]:
+    async def list(self, folder: str = "", *, ext: str | None = None) -> list[str]:
         """List files in the vault.
 
         Args:
-            path: Directory path relative to the vault root.
-                  Empty string lists all files.
+            folder: Folder path relative to the vault root. Empty string
+                    lists every file in the vault.
             ext: Filter by file extension (e.g. ``"md"``).
-            folder: Filter by folder path.
 
         Returns:
             List of file paths.
         """
         params: dict[str, str] = {}
-        if path:
-            params["path"] = path
+        if folder:
+            params["folder"] = folder
         if ext is not None:
             params["ext"] = ext
-        if folder is not None:
-            params["folder"] = folder
         output = await self._cli._execute("files", params=params or None)
-        result: list[str] = json.loads(output)
-        return result
+        return self._parse_lines(output)

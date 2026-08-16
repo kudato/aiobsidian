@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from ._base import BaseCLIResource
@@ -13,18 +12,17 @@ class CLILinksResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
-    async def outgoing(self, path: str) -> list[dict[str, Any]]:
+    async def outgoing(self, path: str) -> list[str]:
         """Get outgoing links from a note.
 
         Args:
             path: Path or name of the note.
 
         Returns:
-            List of outgoing link objects.
+            List of paths the note links to.
         """
         output = await self._cli._execute("links", params={"file": path})
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)
 
     async def incoming(
         self, path: str, *, counts: bool = False
@@ -40,9 +38,9 @@ class CLILinksResource(BaseCLIResource):
         """
         flags = ["counts"] if counts else None
         output = await self._cli._execute(
-            "backlinks", params={"file": path}, flags=flags
+            "backlinks", params={"file": path}, flags=flags, output_format="json"
         )
-        result: list[dict[str, Any]] = json.loads(output)
+        result: list[dict[str, Any]] = self._parse_json("backlinks", output)
         return result
 
     async def unresolved(self) -> list[dict[str, Any]]:
@@ -51,26 +49,24 @@ class CLILinksResource(BaseCLIResource):
         Returns:
             List of unresolved link objects.
         """
-        output = await self._cli._execute("unresolved")
-        result: list[dict[str, Any]] = json.loads(output)
+        output = await self._cli._execute("unresolved", output_format="json")
+        result: list[dict[str, Any]] = self._parse_json("unresolved", output)
         return result
 
-    async def orphans(self) -> list[dict[str, Any]]:
-        """Get orphan notes (notes with no incoming or outgoing links).
+    async def orphans(self) -> list[str]:
+        """Get orphan notes (notes with no incoming links).
 
         Returns:
-            List of orphan note objects.
+            List of note paths with no incoming links.
         """
         output = await self._cli._execute("orphans")
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)
 
-    async def deadends(self) -> list[dict[str, Any]]:
+    async def deadends(self) -> list[str]:
         """Get notes with no outgoing links (dead ends).
 
         Returns:
-            List of dead-end note objects.
+            List of note paths with no outgoing links.
         """
         output = await self._cli._execute("deadends")
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)

@@ -16,6 +16,8 @@
 
 ::: aiobsidian.CLINotFoundError
 
+::: aiobsidian.CLIParseError
+
 ::: aiobsidian.CLITimeoutError
 
 ## REST API exceptions

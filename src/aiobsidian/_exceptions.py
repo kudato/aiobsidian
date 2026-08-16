@@ -102,6 +102,21 @@ class CLINotFoundError(CommandError, NotFoundError):
     """
 
 
+class CLIParseError(CLIError):
+    """The output of a CLI command could not be parsed.
+
+    Attributes:
+        command: The CLI command whose output could not be parsed.
+        output: Raw output of the command.
+    """
+
+    def __init__(self, command: str, output: str) -> None:
+        self.command = command
+        self.output = output
+        excerpt = output.strip()[:200]
+        super().__init__(f"Could not parse the output of {command!r}: {excerpt!r}")
+
+
 class CLITimeoutError(CLIError):
     """A CLI command exceeded the timeout limit.
 

@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from typing import Any
-
 from ._base import BaseCLIResource
 
 
@@ -13,15 +10,14 @@ class CLIWorkspacesResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
-    async def current(self) -> dict[str, Any]:
+    async def current(self) -> str:
         """Get the current workspace layout tree.
 
         Returns:
-            Current workspace tree structure.
+            The layout as a rendered tree, one pane group per section.
         """
         output = await self._cli._execute("workspace")
-        result: dict[str, Any] = json.loads(output)
-        return result
+        return output.strip()
 
     async def save(self, name: str) -> None:
         """Save the current workspace layout.
@@ -47,12 +43,11 @@ class CLIWorkspacesResource(BaseCLIResource):
         """
         await self._cli._execute("workspace:delete", params={"name": name})
 
-    async def list(self) -> list[dict[str, Any]]:
+    async def list(self) -> list[str]:
         """List all saved workspaces.
 
         Returns:
-            List of workspace objects.
+            List of workspace names, empty if none are saved.
         """
         output = await self._cli._execute("workspaces")
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)

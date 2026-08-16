@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from ._base import BaseCLIResource
@@ -57,6 +56,6 @@ class CLIBookmarksResource(BaseCLIResource):
         Returns:
             List of bookmark objects.
         """
-        output = await self._cli._execute("bookmarks")
-        result: list[dict[str, Any]] = json.loads(output)
+        output = await self._cli._execute("bookmarks", output_format="json")
+        result: list[dict[str, Any]] = self._parse_json("bookmarks", output)
         return result

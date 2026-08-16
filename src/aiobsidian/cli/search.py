@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from ._base import BaseCLIResource
@@ -52,8 +51,10 @@ class CLISearchResource(BaseCLIResource):
             flags.append("case")
         if matches:
             flags.append("matches")
-        output = await self._cli._execute("search", params=params, flags=flags or None)
-        result: list[dict[str, Any]] = json.loads(output)
+        output = await self._cli._execute(
+            "search", params=params, flags=flags or None, output_format="json"
+        )
+        result: list[dict[str, Any]] = self._parse_json("search", output)
         return result
 
     async def context(
@@ -85,6 +86,8 @@ class CLISearchResource(BaseCLIResource):
         if limit is not None:
             params["limit"] = str(limit)
         flags = ["case"] if case else None
-        output = await self._cli._execute("search:context", params=params, flags=flags)
-        result: list[dict[str, Any]] = json.loads(output)
+        output = await self._cli._execute(
+            "search:context", params=params, flags=flags, output_format="json"
+        )
+        result: list[dict[str, Any]] = self._parse_json("search:context", output)
         return result
