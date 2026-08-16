@@ -2,6 +2,20 @@
 
 The `client.vault` resource provides full CRUD operations on files and directories in your Obsidian vault.
 
+## Paths
+
+Paths are relative to the vault root, and a leading slash is ignored — `"Notes/hello.md"` and `"/Notes/hello.md"` address the same file.
+
+Every path is percent-encoded before it goes on the wire, so names containing `#`, `%`, `?`, spaces or non-ASCII characters work as written:
+
+```python
+await client.vault.get("Notes/note#hash.md")
+await client.vault.get("Notes/50% done.md")
+await client.vault.get("заметки/заметка.md")
+```
+
+Pass the raw file name, never a pre-encoded one: `"note%23hash.md"` addresses a file literally named `note%23hash.md`.
+
 ## Reading files
 
 ### Markdown content

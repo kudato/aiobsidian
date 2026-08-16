@@ -33,6 +33,13 @@ class ActiveFileResource(ContentResource):
         content_type: Literal[ContentType.DOCUMENT_MAP],
     ) -> DocumentMap: ...
 
+    @overload
+    async def get(
+        self,
+        *,
+        content_type: ContentType,
+    ) -> str | NoteJson | DocumentMap: ...
+
     async def get(
         self,
         *,

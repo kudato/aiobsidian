@@ -39,8 +39,10 @@ class ObsidianClient:
         timeout: Request timeout in seconds.
         verify_ssl: Whether to verify SSL certificates. Defaults to
             `False` because the plugin uses self-signed certificates.
-        http_client: Optional pre-configured `httpx.AsyncClient`. When
-            provided, the client will **not** be closed on `aclose()`.
+        http_client: Optional pre-configured `httpx.AsyncClient`. The
+            `api_key` is applied to every request either way. If the
+            client carries no `base_url`, `host`/`port`/`scheme` supply
+            one. It is **not** closed on `aclose()`.
     """
 
     def __init__(
@@ -63,6 +65,7 @@ class ObsidianClient:
         self._verify_ssl = verify_ssl
         self._external_client = http_client is not None
         self._http = http_client or self._build_http_client()
+        self._url_prefix = "" if str(self._http.base_url) else self._base_url
 
     @staticmethod
     def _import_httpx() -> Any:
@@ -85,7 +88,6 @@ class ObsidianClient:
         httpx = self._import_httpx()
         return httpx.AsyncClient(  # type: ignore[no-any-return]
             base_url=self._base_url,
-            headers={"Authorization": f"Bearer {self._api_key}"},
             timeout=self._timeout,
             verify=self._verify_ssl,
         )
@@ -111,7 +113,8 @@ class ObsidianClient:
             path: API endpoint path (e.g. `"/vault/note.md"`).
             content: Raw request body.
             json: JSON-serializable request body.
-            headers: Additional HTTP headers.
+            headers: Additional HTTP headers. The `Authorization` header
+                is added from `api_key` and can be overridden here.
             params: URL query parameters.
 
         Returns:
@@ -122,12 +125,16 @@ class ObsidianClient:
             APINotFoundError: If the resource is not found (HTTP 404).
             APIError: For any other HTTP error (status >= 400).
         """
+        request_headers: dict[str, Any] = {"Authorization": f"Bearer {self._api_key}"}
+        if headers:
+            request_headers.update(headers)
+
         response = await self._http.request(
             method,
-            path,
+            f"{self._url_prefix}{path}",
             content=content,
             json=json,
-            headers=headers,
+            headers=request_headers,
             params=params,
         )
         if response.status_code >= 400:

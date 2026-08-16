@@ -58,12 +58,17 @@ class SearchResource(BaseResource):
     async def jsonlogic(self, query: dict[str, Any]) -> list[SearchResult]:
         """Search using a JsonLogic query object.
 
+        Only files the query evaluates truthy for are returned, each
+        carrying what the expression evaluated to in `result`.
+
         Args:
             query: A JsonLogic query dictionary
                 (e.g. `{"glob": ["*.md"]}`).
 
         Returns:
-            A list of `SearchResult` objects.
+            A list of `SearchResult` objects. `result` holds any JSON
+            type: `True` for a predicate, the value itself for a field
+            lookup.
         """
         response = await self._client.request(
             "POST",

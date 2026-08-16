@@ -20,6 +20,23 @@ class BaseResource:
     def __init__(self, client: ObsidianClient) -> None:
         self._client = client
 
+    @staticmethod
+    def _encode_path(path: str) -> str:
+        """Percent-encode a vault-relative path for use in a request URL.
+
+        Leading and trailing slashes are stripped, so `"/notes/a.md"`
+        and `"notes/a.md"` address the same file. Characters that URL
+        syntax would otherwise claim (`#`, `?`, `%`) are escaped, while
+        the `/` separators are left intact.
+
+        Args:
+            path: Path relative to the vault root.
+
+        Returns:
+            The encoded path, without leading or trailing slashes.
+        """
+        return quote(path.strip("/"), safe="/")
+
 
 class ContentResource(BaseResource):
     """Base class for resources that operate on file content.

@@ -18,6 +18,11 @@ SIMPLE_RESULTS = [
 
 DATAVIEW_RESULTS = [{"filename": "games/elden-ring.md", "result": {"rating": 10}}]
 
+JSONLOGIC_BOOL_RESULTS = [
+    {"filename": "scratch/lib.md", "result": True},
+    {"filename": "scratch/fm.md", "result": True},
+]
+
 
 async def test_simple_search(mock_api, client):
     mock_api.post("/search/simple/").respond(200, json=SIMPLE_RESULTS)
@@ -59,6 +64,58 @@ async def test_jsonlogic_search(mock_api, client):
     assert len(results) == 1
     request: httpx.Request = route.calls[0].request
     assert request.headers["content-type"] == "application/vnd.olrapi.jsonlogic+json"
+
+
+async def test_jsonlogic_boolean_result(mock_api, client):
+    mock_api.post("/search/").respond(200, json=JSONLOGIC_BOOL_RESULTS)
+
+    results = await client.search.jsonlogic(
+        {"==": [{"var": "frontmatter.title"}, "Welcome"]}
+    )
+
+    assert [r.result for r in results] == [True, True]
+    assert all(isinstance(r.result, bool) for r in results)
+
+
+async def test_jsonlogic_string_result(mock_api, client):
+    mock_api.post("/search/").respond(
+        200, json=[{"filename": "notes/a.md", "result": "My Title"}]
+    )
+
+    results = await client.search.jsonlogic({"var": "frontmatter.title"})
+
+    assert results[0].result == "My Title"
+
+
+async def test_jsonlogic_number_result(mock_api, client):
+    mock_api.post("/search/").respond(
+        200, json=[{"filename": "notes/a.md", "result": 113}]
+    )
+
+    results = await client.search.jsonlogic({"var": "stat.size"})
+
+    assert results[0].result == 113
+    assert isinstance(results[0].result, int)
+
+
+async def test_jsonlogic_array_result(mock_api, client):
+    mock_api.post("/search/").respond(
+        200, json=[{"filename": "notes/a.md", "result": ["x", "y"]}]
+    )
+
+    results = await client.search.jsonlogic({"var": "tags"})
+
+    assert results[0].result == ["x", "y"]
+
+
+async def test_jsonlogic_null_result(mock_api, client):
+    mock_api.post("/search/").respond(
+        200, json=[{"filename": "notes/a.md", "result": None}]
+    )
+
+    results = await client.search.jsonlogic({"var": "frontmatter.missing"})
+
+    assert results[0].result is None
 
 
 async def test_simple_search_server_error(mock_api, client):

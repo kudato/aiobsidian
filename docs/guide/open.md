@@ -10,6 +10,12 @@ await client.open.open("Notes/hello.md")
 
 This will focus the file in the Obsidian editor.
 
+!!! warning
+    Opening is not read-only. If the file does not exist, Obsidian creates an
+    empty note at that path and opens it — the call succeeds instead of raising
+    `NotFoundError`. Check with `client.vault.get()` first if you need to know
+    whether the note was already there.
+
 ## Opening in a new tab
 
 ```python
