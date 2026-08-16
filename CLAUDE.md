@@ -79,8 +79,6 @@ Each resource is a `@cached_property` on `ObsidianCLI` or `ObsidianClient`. The 
 
 All exceptions carry `status_code`, `message`, and optional `error_code` from JSON body. Non-JSON error bodies fall back to `response.text`.
 
-Deciding what counts as a CLI failure belongs to `_execute()` — the Obsidian CLI exits `0` on failure and reports it on stdout. Never re-check output for errors inside resource methods; parse it as successful output.
-
 ### SSL
 
 `verify_ssl=False` by default because the Obsidian plugin uses self-signed certificates. Passed directly to `httpx.AsyncClient(verify=...)`.
@@ -186,7 +184,7 @@ chore: add project configuration and license
 1. Create `src/aiobsidian/cli/<name>.py`
    - Extend `BaseCLIResource` from `._base`
    - Add async methods that call `self._cli._execute()`
-   - Annotate `json.loads()` return values to satisfy mypy
+   - Parse output with the `_parse_*` helpers of `BaseCLIResource`, not `json.loads()`; pass `output_format="json"` only for commands that document `format=`
 2. Add `@cached_property` in `_cli.py`
    - Import resource class inside the property body (not at top level)
    - Add `TYPE_CHECKING` import at the top for the return type annotation
