@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
 import re
 import shutil
+import signal
 from functools import cached_property
 from typing import TYPE_CHECKING
 
@@ -176,6 +178,9 @@ class ObsidianCLI:
                 stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                # Its own process group, so that stopping the command
+                # stops whatever it started. See _kill.
+                start_new_session=True,
             )
         except OSError as exc:
             raise BinaryNotFoundError(
@@ -222,13 +227,20 @@ class ObsidianCLI:
 
     @staticmethod
     async def _kill(process: asyncio.subprocess.Process) -> None:
-        """Kill a running command and wait for the child to exit.
+        """Kill a running command, its own children included, and reap it.
+
+        The whole process group goes, not just the command: a grandchild
+        that outlived its parent would keep the vault open and keep the
+        pipe open with it, leaving whoever awaits the output stuck in
+        `communicate()` for as long as the grandchild runs.
 
         Args:
             process: The child process to stop.
         """
         if process.returncode is not None:
             return
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(process.pid, signal.SIGKILL)
         with contextlib.suppress(ProcessLookupError):
             process.kill()
         with contextlib.suppress(ProcessLookupError, asyncio.CancelledError):

@@ -15,6 +15,29 @@ from aiobsidian._exceptions import (
     NotFoundError,
 )
 
+SPAWN_KWARGS = {
+    "stdin": asyncio.subprocess.DEVNULL,
+    "stdout": asyncio.subprocess.PIPE,
+    "stderr": asyncio.subprocess.PIPE,
+    "start_new_session": True,
+}
+
+
+@pytest.fixture(autouse=True)
+def guard_killpg(request):
+    """Keep os.killpg away from process groups the tests do not own.
+
+    A mocked process answers `.pid` with a MagicMock, and MagicMock
+    coerces to 1 through `__index__`, so an unguarded `_kill` would ask
+    the OS to SIGKILL process group 1. A desktop refuses that; a
+    container running as root would not.
+    """
+    if "real_processes" in request.keywords:
+        yield None
+        return
+    with patch("aiobsidian._cli.os.killpg") as killpg:
+        yield killpg
+
 
 def _mock_process(
     stdout: bytes = b"",
@@ -98,12 +121,14 @@ class TestClose:
 
         assert cli._running == set()
 
+    @pytest.mark.real_processes
     async def test_aclose_kills_a_command_in_flight(self, tmp_path):
-        # A real child process: the guarantee under test is that no
-        # `obsidian` keeps running after the client is closed, and a
-        # mocked process cannot show that.
+        # Real processes, and two of them: the guarantee under test is
+        # that nothing survives the close, and a mock cannot show that.
+        # The backgrounded `sleep` inherits stdout, so killing only its
+        # parent would leave the pipe open and `communicate()` blocked.
         binary = tmp_path / "slow-obsidian"
-        binary.write_text("#!/bin/sh\nsleep 30\n")
+        binary.write_text("#!/bin/sh\nsleep 30 &\nwait\n")
         binary.chmod(0o755)
 
         cli = ObsidianCLI("TestVault", binary=str(binary))
@@ -140,9 +165,7 @@ class TestExecute:
             "read",
             "vault=TestVault",
             "path=note.md",
-            stdin=asyncio.subprocess.DEVNULL,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            **SPAWN_KWARGS,
         )
 
     async def test_output_format(self):
@@ -157,9 +180,7 @@ class TestExecute:
             "tags",
             "vault=TestVault",
             "format=json",
-            stdin=asyncio.subprocess.DEVNULL,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            **SPAWN_KWARGS,
         )
 
     async def test_command_error(self):
@@ -232,9 +253,7 @@ class TestExecute:
             "vault=TestVault",
             "path=note.md",
             "overwrite",
-            stdin=asyncio.subprocess.DEVNULL,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            **SPAWN_KWARGS,
         )
 
     async def test_timeout_override(self):
