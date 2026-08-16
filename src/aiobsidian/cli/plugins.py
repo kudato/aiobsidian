@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from ._base import BaseCLIResource
@@ -13,18 +12,18 @@ class CLIPluginsResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
-    async def info(self, plugin_id: str) -> dict[str, Any]:
+    async def info(self, plugin_id: str) -> dict[str, str]:
         """Get details about a plugin.
 
         Args:
             plugin_id: Plugin identifier.
 
         Returns:
-            Plugin details.
+            Plugin details keyed by field name (e.g. ``type``, ``name``,
+            ``enabled``).
         """
         output = await self._cli._execute("plugin", params={"id": plugin_id})
-        result: dict[str, Any] = json.loads(output)
-        return result
+        return self._parse_fields("plugin", output)
 
     async def restrict(self, *, on: bool) -> None:
         """Toggle restricted mode for plugins.
@@ -42,8 +41,8 @@ class CLIPluginsResource(BaseCLIResource):
         Returns:
             List of enabled plugin objects.
         """
-        output = await self._cli._execute("plugins:enabled")
-        result: list[dict[str, Any]] = json.loads(output)
+        output = await self._cli._execute("plugins:enabled", output_format="json")
+        result: list[dict[str, Any]] = self._parse_json("plugins:enabled", output)
         return result
 
     async def enable(self, plugin_id: str) -> None:
@@ -96,6 +95,6 @@ class CLIPluginsResource(BaseCLIResource):
             List of plugin objects.
         """
         flags = ["versions"] if versions else None
-        output = await self._cli._execute("plugins", flags=flags)
-        result: list[dict[str, Any]] = json.loads(output)
+        output = await self._cli._execute("plugins", flags=flags, output_format="json")
+        result: list[dict[str, Any]] = self._parse_json("plugins", output)
         return result

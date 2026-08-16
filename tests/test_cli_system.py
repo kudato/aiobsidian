@@ -1,29 +1,25 @@
 from __future__ import annotations
 
-import json
+HELP_OUTPUT = """Obsidian CLI
 
-COMMANDS = [
-    {"name": "read", "description": "Read a file"},
-    {"name": "create", "description": "Create a file"},
-]
+Usage: obsidian <command> [options]
 
-VAULTS = [
-    {"name": "MyVault", "path": "/vaults/MyVault"},
-    {"name": "Work", "path": "/vaults/Work"},
-]
+Commands:
+  read                  Read file contents
+"""
 
 
 async def test_version(cli):
-    cli._execute.return_value = "1.8.0\n"
+    cli._execute.return_value = "1.13.7 (installer 1.13.7)\n"
     result = await cli.system.version()
-    assert result == "1.8.0"
+    assert result == "1.13.7 (installer 1.13.7)"
     cli._execute.assert_awaited_once_with("version")
 
 
 async def test_help(cli):
-    cli._execute.return_value = json.dumps(COMMANDS)
+    cli._execute.return_value = HELP_OUTPUT
     result = await cli.system.help()
-    assert result == COMMANDS
+    assert result == HELP_OUTPUT.strip()
     cli._execute.assert_awaited_once_with("help")
 
 
@@ -40,7 +36,7 @@ async def test_restart(cli):
 
 
 async def test_vaults(cli):
-    cli._execute.return_value = json.dumps(VAULTS)
+    cli._execute.return_value = "MyVault\nWork\n"
     result = await cli.system.vaults()
-    assert result == VAULTS
+    assert result == ["MyVault", "Work"]
     cli._execute.assert_awaited_once_with("vaults")

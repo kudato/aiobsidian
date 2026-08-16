@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from ._base import BaseCLIResource
 
 
@@ -22,5 +20,4 @@ class CLIAliasesResource(BaseCLIResource):
             List of alias strings for the file.
         """
         output = await self._cli._execute("aliases", params={"file": path})
-        result: list[str] = json.loads(output)
-        return result
+        return self._parse_lines(output)

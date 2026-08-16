@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 
 BOOKMARKS_LIST = [
-    {"type": "file", "path": "notes/important.md", "title": "Important"},
-    {"type": "folder", "path": "projects/"},
+    {"value": "notes/important.md"},
+    {"value": "projects/"},
 ]
 
 
@@ -12,7 +12,13 @@ async def test_list(cli):
     cli._execute.return_value = json.dumps(BOOKMARKS_LIST)
     result = await cli.bookmarks.list()
     assert result == BOOKMARKS_LIST
-    cli._execute.assert_awaited_once_with("bookmarks")
+    cli._execute.assert_awaited_once_with("bookmarks", output_format="json")
+
+
+async def test_list_empty(cli):
+    cli._execute.return_value = "No bookmarks found.\n"
+    result = await cli.bookmarks.list()
+    assert result == []
 
 
 async def test_add_file(cli):

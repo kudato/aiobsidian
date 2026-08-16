@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from typing import Any
-
 from ._base import BaseCLIResource
 
 
@@ -22,16 +19,15 @@ class CLICommandsResource(BaseCLIResource):
         """
         await self._cli._execute("command", params={"id": command_id})
 
-    async def list(self, *, filter: str | None = None) -> list[dict[str, Any]]:
+    async def list(self, *, filter: str | None = None) -> list[str]:
         """List available Obsidian commands.
 
         Args:
             filter: Filter commands by ID prefix.
 
         Returns:
-            List of command objects.
+            List of command IDs (e.g. `"editor:toggle-bold"`).
         """
         params = {"filter": filter} if filter else None
         output = await self._cli._execute("commands", params=params)
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)

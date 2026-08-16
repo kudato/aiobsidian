@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
-from typing import Any
-
+from .._exceptions import CLIParseError
 from ._base import BaseCLIResource
 
 
@@ -13,18 +11,26 @@ class CLIHistoryResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
-    async def versions(self, path: str) -> list[dict[str, Any]]:
+    async def versions(self, path: str) -> list[dict[str, str]]:
         """List versions of a specific file in local history.
 
         Args:
             path: Path to the file relative to the vault root.
 
         Returns:
-            List of version objects for the file.
+            List of versions, each with the ``version`` number, the
+            ``modified`` timestamp and the ``size`` of that version.
+
+        Raises:
+            CLIParseError: If a version row has an unexpected shape.
         """
         output = await self._cli._execute("history", params={"path": path})
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        versions: list[dict[str, str]] = []
+        for row in self._parse_rows(output):
+            if len(row) != 3:
+                raise CLIParseError("history", output)
+            versions.append({"version": row[0], "modified": row[1], "size": row[2]})
+        return versions
 
     async def open(self, path: str) -> None:
         """Open the File Recovery UI for a file.
@@ -88,12 +94,11 @@ class CLIHistoryResource(BaseCLIResource):
             "history:restore", params={"path": path, "version": version}
         )
 
-    async def list(self) -> list[dict[str, Any]]:
+    async def list(self) -> list[str]:
         """List files that have local history.
 
         Returns:
-            List of file objects with local history.
+            List of file paths with local history.
         """
         output = await self._cli._execute("history:list")
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)
