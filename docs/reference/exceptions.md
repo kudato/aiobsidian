@@ -4,6 +4,8 @@
 
 ::: aiobsidian.ObsidianError
 
+::: aiobsidian.NotFoundError
+
 ## CLI exceptions
 
 ::: aiobsidian.CLIError
@@ -11,6 +13,8 @@
 ::: aiobsidian.BinaryNotFoundError
 
 ::: aiobsidian.CommandError
+
+::: aiobsidian.CLINotFoundError
 
 ::: aiobsidian.CLITimeoutError
 
@@ -20,4 +24,4 @@
 
 ::: aiobsidian.AuthenticationError
 
-::: aiobsidian.NotFoundError
+::: aiobsidian.APINotFoundError

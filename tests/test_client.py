@@ -3,7 +3,12 @@ import pytest
 import respx
 
 from aiobsidian._client import ObsidianClient
-from aiobsidian._exceptions import APIError, AuthenticationError, NotFoundError
+from aiobsidian._exceptions import (
+    APIError,
+    APINotFoundError,
+    AuthenticationError,
+    NotFoundError,
+)
 
 
 async def test_client_default_base_url():
@@ -42,9 +47,11 @@ async def test_client_raises_not_found_error(mock_api, client):
     mock_api.get("/vault/missing.md").respond(
         404, json={"message": "Not found", "errorCode": 40401}
     )
-    with pytest.raises(NotFoundError) as exc_info:
+    with pytest.raises(APINotFoundError) as exc_info:
         await client.request("GET", "/vault/missing.md")
     assert exc_info.value.error_code == 40401
+    assert isinstance(exc_info.value, NotFoundError)
+    assert isinstance(exc_info.value, APIError)
 
 
 async def test_client_raises_api_error(mock_api, client):
