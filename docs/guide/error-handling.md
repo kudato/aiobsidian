@@ -13,10 +13,23 @@ ObsidianError                   # Base exception for all aiobsidian errors
 │   │   └── CLINotFoundError    # ... because the resource does not exist
 │   ├── CLIParseError           # Command output could not be parsed
 │   └── CLITimeoutError         # Command exceeded timeout
-└── APIError                    # HTTP error from the REST API
-    ├── AuthenticationError     # 401 Unauthorized
-    └── APINotFoundError        # 404 Not Found
+└── APIError                    # Base exception for REST errors
+    ├── APIStatusError          # The server answered with status >= 400
+    │   ├── AuthenticationError # 401 Unauthorized
+    │   └── APINotFoundError    # 404 Not Found
+    └── APIRequestError         # No usable response came back
+        ├── APIConnectionError  # The server could not be reached
+        ├── APITimeoutError     # The request took too long
+        └── APIProtocolError    # The exchange broke down
 ```
+
+`CLIError` and `APIError` are the two transport roots: catching either one
+covers every failure of an operation on that transport, whether or not the
+request or command reached Obsidian.
+
+Misusing the library is not one of those failures and stays a plain builtin, as
+elsewhere in Python: a bad argument raises `TypeError` or `ValueError`, and
+using a client after `aclose()` raises `RuntimeError`.
 
 `CLINotFoundError` and `APINotFoundError` also inherit from `NotFoundError`, so a
 missing note can be handled the same way on both transports:
@@ -90,31 +103,80 @@ letting a `json.JSONDecodeError` escape the `ObsidianError` hierarchy.
 ```python
 from aiobsidian import (
     ObsidianClient,
-    APIError,
+    APIConnectionError,
     APINotFoundError,
+    APIStatusError,
+    APITimeoutError,
     AuthenticationError,
 )
 
 async with ObsidianClient(api_key="your-api-key") as client:
     try:
         content = await client.vault.get("nonexistent.md")
+    except APIConnectionError:
+        print("Obsidian is not reachable — is it running with the plugin enabled?")
+    except APITimeoutError:
+        print("The server did not answer in time")
     except APINotFoundError:
         print("File not found")
     except AuthenticationError:
         print("Invalid API key")
-    except APIError as e:
+    except APIStatusError as e:
         print(f"API error [{e.status_code}]: {e.message}")
 ```
 
-### APIError attributes
+### When no usable response comes back
 
-All API exceptions (`APIError`, `AuthenticationError`, `APINotFoundError`) have these attributes:
+`APIRequestError` and its three subclasses cover the failures that produce no
+response to inspect, and they are kept apart because they point at different
+things to fix:
 
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `status_code` | `int` | HTTP status code (e.g. 401, 404, 500) |
-| `message` | `str` | Error message from the API response |
-| `error_code` | `int \| None` | Optional numeric error code from the API |
+| Exception | Meaning | Typical cause |
+|-----------|---------|---------------|
+| `APIConnectionError` | The server was never reached | Obsidian closed, plugin disabled, wrong port, unreachable host |
+| `APITimeoutError` | It did not answer in time | A slow or wedged request |
+| `APIProtocolError` | It answered, and the exchange broke | Malformed HTTP, a body that belied its headers, a redirect loop |
+
+Only `APIConnectionError` suggests checking whether Obsidian is running. The
+other two happen while it plainly is.
+
+A request that could not be sent at all never gets that far: an unparseable
+`host`, a `scheme` that is not HTTP, a path that will not form a URL or a header
+the HTTP layer refuses raises `ValueError`, because the argument is what needs
+fixing.
+
+The underlying `httpx` exception is available as `__cause__` and never escapes
+on its own — `httpx` is an optional dependency, so catching it would mean
+importing a package the caller may not have installed.
+
+### Attributes
+
+| Exception | Attributes |
+|-----------|-----------|
+| `APIStatusError` | `status_code`, `message`, `error_code` |
+| `AuthenticationError` | `status_code`, `message`, `error_code` |
+| `APINotFoundError` | `status_code`, `message`, `error_code` |
+| `APIRequestError` | `method`, `url`, `detail` |
+| `APIConnectionError` | `method`, `url`, `detail` |
+| `APITimeoutError` | `method`, `url`, `detail` |
+| `APIProtocolError` | `method`, `url`, `detail` |
+
+### Upgrading from 0.4.0
+
+`APIError` used to be the status-carrying class and is now the REST root. Code
+that reads a status code off it must catch `APIStatusError` instead:
+
+```python
+except APIError as e:        # still catches status errors, but also
+    print(e.status_code)     # connection ones, which have no status_code
+
+except APIStatusError as e:  # what that code meant
+    print(e.status_code)
+```
+
+`APIError(404, "Not found")` still constructs, because `Exception` accepts any
+arguments — it just produces a useless message and no attributes. Search for it
+rather than relying on a `TypeError`.
 
 ## Catching all aiobsidian errors
 

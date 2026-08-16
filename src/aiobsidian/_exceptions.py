@@ -15,7 +15,15 @@ class NotFoundError(ObsidianError):
 
 
 class APIError(ObsidianError):
-    """Error returned by the Obsidian REST API.
+    """Base exception for Obsidian REST API errors.
+
+    The counterpart of `CLIError`: catching it covers a request the
+    server refused as well as one that never reached it.
+    """
+
+
+class APIStatusError(APIError):
+    """The REST API answered with an error status.
 
     Attributes:
         status_code: HTTP status code of the response.
@@ -37,16 +45,77 @@ class APIError(ObsidianError):
             msg += f" (error_code={error_code})"
         super().__init__(msg)
 
-    def __reduce__(self) -> tuple[type[APIError], tuple[int, str, int | None]]:
+    def __reduce__(self) -> tuple[type[APIStatusError], tuple[int, str, int | None]]:
         return type(self), (self.status_code, self.message, self.error_code)
 
 
-class AuthenticationError(APIError):
+class AuthenticationError(APIStatusError):
     """HTTP 401 Unauthorized — invalid or missing API key."""
 
 
-class APINotFoundError(APIError, NotFoundError):
+class APINotFoundError(APIStatusError, NotFoundError):
     """HTTP 404 Not Found — the requested resource does not exist."""
+
+
+class APIRequestError(APIError):
+    """A request that produced no usable response.
+
+    The other half of `APIError`: `APIStatusError` means the server
+    answered and refused, this means nothing came back that could be
+    read as an answer — whether or not the server sent bytes.
+
+    Attributes:
+        method: HTTP method of the request that failed.
+        url: URL the request was sent to.
+        detail: What the HTTP transport reported.
+    """
+
+    _problem = "failed"
+    _hint = ""
+
+    def __init__(self, method: str, url: str, detail: str) -> None:
+        self.method = method
+        self.url = url
+        self.detail = detail
+        message = f"{method} {url} {self._problem}: {detail}"
+        if self._hint:
+            message = f"{message}. {self._hint}"
+        super().__init__(message)
+
+    def __reduce__(self) -> tuple[type[APIRequestError], tuple[str, str, str]]:
+        return type(self), (self.method, self.url, self.detail)
+
+
+class APIConnectionError(APIRequestError):
+    """The REST API server could not be reached.
+
+    A refused connection, a dropped one, an unreachable host or a proxy
+    that would not forward.
+    """
+
+    _problem = "could not be reached"
+    _hint = "Is Obsidian running with the Local REST API plugin enabled?"
+
+
+class APITimeoutError(APIRequestError):
+    """A request to the REST API exceeded its timeout."""
+
+    _problem = "timed out"
+
+
+class APIProtocolError(APIRequestError):
+    """The exchange with the REST API server broke down.
+
+    The connection was made and the server responded, but its response
+    could not be used: malformed HTTP, a body that did not match its
+    declared encoding or length, or a redirect loop. It says nothing
+    about whether Obsidian is running — it plainly is.
+
+    A request that could not be sent in the first place is a bad
+    argument, and raises `ValueError` instead.
+    """
+
+    _problem = "did not complete"
 
 
 class CLIError(ObsidianError):
