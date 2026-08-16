@@ -25,7 +25,7 @@ asyncio.run(main())
 | Resource | Access | Description |
 |----------|--------|-------------|
 | **vault** | `cli.vault` | Read, create, append, prepend, move, rename, delete, list |
-| **daily** | `cli.daily` | Daily note: read, create, append, prepend, path |
+| **daily** | `cli.daily` | Daily note: read, open, append, prepend, path |
 | **search** | `cli.search` | Full-text search |
 | **properties** | `cli.properties` | YAML frontmatter properties: list, read, set, remove |
 | **tags** | `cli.tags` | Tags: list, get notes by tag, rename |
@@ -125,7 +125,12 @@ await cli.daily.append("- [x] Completed task")
 
 # Get the path
 path = await cli.daily.path()
+
+# Create it if it is missing, and show it in the UI
+path = await cli.daily.open()
 ```
+
+Only today's daily note is reachable: no CLI command takes a date.
 
 ---
 

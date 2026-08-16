@@ -16,20 +16,43 @@ async def test_list(cli):
 
 
 async def test_views(cli):
-    cli._execute.return_value = "All\nActive\n"
-    result = await cli.bases.views("databases/tasks.base")
-    assert result == ["All", "Active"]
-    cli._execute.assert_awaited_once_with(
-        "base:views", params={"file": "databases/tasks.base"}
-    )
+    cli._execute.return_value = "All\ttable\nActive\tcards\n"
+    result = await cli.bases.views()
+    assert result == [
+        {"name": "All", "type": "table"},
+        {"name": "Active", "type": "cards"},
+    ]
+    cli._execute.assert_awaited_once_with("base:views")
+
+
+async def test_views_without_any(cli):
+    cli._execute.return_value = "No views defined.\n"
+    result = await cli.bases.views()
+    assert result == []
 
 
 async def test_create(cli):
-    cli._execute.return_value = ""
-    await cli.bases.create("databases/tasks.base", name="New Task", status="todo")
+    cli._execute.return_value = "Created: databases/New Task.md\n"
+    await cli.bases.create("databases/tasks.base", name="New Task")
     cli._execute.assert_awaited_once_with(
         "base:create",
-        params={"file": "databases/tasks.base", "name": "New Task", "status": "todo"},
+        params={"path": "databases/tasks.base", "name": "New Task"},
+    )
+
+
+async def test_create_with_view_and_content(cli):
+    cli._execute.return_value = "Created: databases/New Task.md\n"
+    await cli.bases.create(
+        "databases/tasks.base", view="Active", name="New Task", content="# Task"
+    )
+    cli._execute.assert_awaited_once_with(
+        "base:create",
+        params={
+            "path": "databases/tasks.base",
+            "view": "Active",
+            "name": "New Task",
+            "content": "# Task",
+        },
     )
 
 
@@ -38,7 +61,7 @@ async def test_query(cli):
     result = await cli.bases.query("databases/tasks.base")
     assert result == RECORDS
     cli._execute.assert_awaited_once_with(
-        "base:query", params={"file": "databases/tasks.base"}, output_format="json"
+        "base:query", params={"path": "databases/tasks.base"}, output_format="json"
     )
 
 
@@ -48,7 +71,7 @@ async def test_query_empty_view(cli):
     assert result == RECORDS
     cli._execute.assert_awaited_once_with(
         "base:query",
-        params={"file": "databases/tasks.base", "view": ""},
+        params={"path": "databases/tasks.base", "view": ""},
         output_format="json",
     )
 
@@ -59,6 +82,6 @@ async def test_query_with_view(cli):
     assert result == RECORDS
     cli._execute.assert_awaited_once_with(
         "base:query",
-        params={"file": "databases/tasks.base", "view": "Active"},
+        params={"path": "databases/tasks.base", "view": "Active"},
         output_format="json",
     )

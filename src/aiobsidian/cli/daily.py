@@ -10,17 +10,17 @@ class CLIDailyResource(BaseCLIResource):
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
-    async def read(self, *, date: str | None = None) -> str:
-        """Read the content of a daily note.
+    async def read(self) -> str:
+        """Read the content of today's daily note.
 
-        Args:
-            date: Date in ``YYYY-MM-DD`` format. Defaults to today.
+        The CLI has no command that reaches a past daily note. Get its
+        path from the Daily notes settings and read it with
+        `vault.read()`.
 
         Returns:
             Daily note content as a string.
         """
-        params = {"date": date} if date is not None else None
-        return await self._cli._execute("daily:read", params=params)
+        return await self._cli._execute("daily:read")
 
     async def path(self) -> str:
         """Get the file path of today's daily note.
@@ -31,9 +31,14 @@ class CLIDailyResource(BaseCLIResource):
         output = await self._cli._execute("daily:path")
         return output.strip()
 
-    async def create(self) -> None:
-        """Create today's daily note."""
-        await self._cli._execute("daily")
+    async def open(self) -> str:
+        """Open today's daily note in the Obsidian UI, creating it first.
+
+        Returns:
+            Path to the daily note relative to the vault root.
+        """
+        output = await self._cli._execute("daily")
+        return output.strip().removeprefix("Opened: ")
 
     async def append(self, content: str) -> None:
         """Append content to today's daily note.
