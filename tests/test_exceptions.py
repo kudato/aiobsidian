@@ -29,6 +29,7 @@ CASES = [
     APIConnectionError("GET", "https://127.0.0.1:27124/", "Connection refused"),
     APITimeoutError("GET", "https://127.0.0.1:27124/", "timed out"),
     APIProtocolError("GET", "https://127.0.0.1:27124/", "illegal status line"),
+    APIRequestError("GET", "https://127.0.0.1:27124/", "something went wrong"),
     AuthenticationError(401, "Unauthorized"),
     APINotFoundError(404, "Not found", 40401),
     BinaryNotFoundError("binary not found"),
@@ -37,6 +38,18 @@ CASES = [
     CLIParseError("tags", "plain text"),
     CLITimeoutError("read", 30.0),
 ]
+
+
+# Split by name, not by isinstance: selecting with isinstance would make
+# the transport-root tests vacuous under the very mutation they exist to
+# catch, because a class re-parented off APIError would quietly drop out
+# of the list instead of failing.
+REST_CASES = [
+    error
+    for error in CASES
+    if type(error).__name__.startswith(("API", "Authentication"))
+]
+CLI_CASES = [error for error in CASES if error not in REST_CASES]
 
 
 @pytest.mark.parametrize("error", CASES, ids=lambda e: type(e).__name__)
@@ -60,20 +73,19 @@ class TestHierarchy:
     only thing that notices, and they notice at runtime.
     """
 
-    @pytest.mark.parametrize(
-        "error",
-        [error for error in CASES if isinstance(error, APIError)],
-        ids=lambda e: type(e).__name__,
-    )
+    def test_the_two_groups_cover_every_case(self):
+        assert len(REST_CASES) + len(CLI_CASES) == len(CASES)
+        assert len(REST_CASES) == 8
+        assert len(CLI_CASES) == 5
+
+    @pytest.mark.parametrize("error", REST_CASES, ids=lambda e: type(e).__name__)
     def test_api_error_is_the_rest_transport_root(self, error):
+        assert isinstance(error, APIError)
         assert not isinstance(error, CLIError)
 
-    @pytest.mark.parametrize(
-        "error",
-        [error for error in CASES if isinstance(error, CLIError)],
-        ids=lambda e: type(e).__name__,
-    )
+    @pytest.mark.parametrize("error", CLI_CASES, ids=lambda e: type(e).__name__)
     def test_cli_error_is_the_cli_transport_root(self, error):
+        assert isinstance(error, CLIError)
         assert not isinstance(error, APIError)
 
     def test_a_refused_request_is_not_a_status_error(self):

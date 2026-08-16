@@ -1,3 +1,5 @@
+import asyncio
+
 import httpx
 import pytest
 import respx
@@ -226,7 +228,6 @@ class TestTransportErrors:
         "raised",
         [
             httpx.RemoteProtocolError("illegal status line"),
-            httpx.LocalProtocolError("illegal header"),
             httpx.DecodingError("incorrect header check"),
             httpx.TooManyRedirects("Exceeded maximum allowed redirects."),
         ],
@@ -251,20 +252,68 @@ class TestTransportErrors:
         with pytest.raises(APIConnectionError):
             await client.request("GET", "/x")
 
-    async def test_an_invalid_url_is_a_value_error(self, client):
-        # Not an httpx.RequestError at all: it is raised while building
-        # the request, before any transport is touched.
+
+class TestUnsendableRequests:
+    """A request the transport refuses to send is a bad argument.
+
+    None of these reach the server, so calling them a connection or a
+    protocol failure would point the caller at Obsidian instead of at
+    the argument they got wrong.
+    """
+
+    async def test_an_unparseable_url(self, client):
         with pytest.raises(ValueError) as exc_info:
             await client.request("GET", "http://℀.com/x")
 
         assert not isinstance(exc_info.value, ObsidianError)
         assert isinstance(exc_info.value.__cause__, httpx.InvalidURL)
 
-    async def test_an_error_without_a_request_falls_back_to_the_given_path(
-        self, mock_api, client
-    ):
-        # httpx attaches the request to every error it raises from
-        # request(); the fallback is there for the day it does not.
+    async def test_a_scheme_that_is_not_http(self):
+        client = ObsidianClient("key", scheme="ftp")
+
+        with pytest.raises(ValueError) as exc_info:
+            await client.request("GET", "/vault/note.md")
+
+        assert not isinstance(exc_info.value, ObsidianError)
+        assert isinstance(exc_info.value.__cause__, httpx.UnsupportedProtocol)
+        await client.aclose()
+
+    async def test_an_illegal_header(self):
+        # A real socket, deliberately: httpx builds the request happily
+        # and h11 rejects the header only once a connection exists, so
+        # neither a mock transport nor a dead port reaches this path.
+        server = await asyncio.start_server(lambda reader, writer: None, "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+
+        async with server:
+            client = ObsidianClient("key", host="127.0.0.1", port=port, scheme="http")
+            with pytest.raises(ValueError) as exc_info:
+                await client.request("GET", "/x", headers={"X-Bad": "a\nb"})
+            await client.aclose()
+
+        assert not isinstance(exc_info.value, ObsidianError)
+        assert isinstance(exc_info.value.__cause__, httpx.LocalProtocolError)
+
+    async def test_a_host_that_makes_no_url(self):
+        # httpx parses the base URL as the client is built, so this one
+        # escapes the constructor rather than a request.
+        with pytest.raises(ValueError) as exc_info:
+            ObsidianClient("key", host="℀.com")
+
+        assert not isinstance(exc_info.value, ObsidianError)
+        assert isinstance(exc_info.value.__cause__, httpx.InvalidURL)
+
+    async def test_a_lone_surrogate_in_the_path(self, client):
+        # UnicodeEncodeError is a ValueError, so it already meets the
+        # documented contract and is left alone.
+        with pytest.raises(ValueError):
+            await client.request("GET", "/vault/\udcff.md")
+
+
+class TestFailedUrl:
+    async def test_the_url_httpx_attached_is_preferred(self, mock_api, client):
+        # The caller passed a relative path; the error names the
+        # absolute URL the request actually went to.
         mock_api.get("/x").mock(side_effect=httpx.ConnectError("refused"))
 
         with pytest.raises(APIConnectionError) as exc_info:

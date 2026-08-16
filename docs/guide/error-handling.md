@@ -140,6 +140,11 @@ things to fix:
 Only `APIConnectionError` suggests checking whether Obsidian is running. The
 other two happen while it plainly is.
 
+A request that could not be sent at all never gets that far: an unparseable
+`host`, a `scheme` that is not HTTP, a path that will not form a URL or a header
+the HTTP layer refuses raises `ValueError`, because the argument is what needs
+fixing.
+
 The underlying `httpx` exception is available as `__cause__` and never escapes
 on its own — `httpx` is an optional dependency, so catching it would mean
 importing a package the caller may not have installed.

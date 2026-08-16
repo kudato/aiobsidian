@@ -58,10 +58,11 @@ class APINotFoundError(APIStatusError, NotFoundError):
 
 
 class APIRequestError(APIError):
-    """A request that never produced a usable response.
+    """A request that produced no usable response.
 
     The other half of `APIError`: `APIStatusError` means the server
-    answered and refused, this means it did not answer at all.
+    answered and refused, this means nothing came back that could be
+    read as an answer — whether or not the server sent bytes.
 
     Attributes:
         method: HTTP method of the request that failed.
@@ -105,10 +106,13 @@ class APITimeoutError(APIRequestError):
 class APIProtocolError(APIRequestError):
     """The exchange with the REST API server broke down.
 
-    The connection was made and the server answered, but the answer
+    The connection was made and the server responded, but its response
     could not be used: malformed HTTP, a body that did not match its
     declared encoding or length, or a redirect loop. It says nothing
     about whether Obsidian is running — it plainly is.
+
+    A request that could not be sent in the first place is a bad
+    argument, and raises `ValueError` instead.
     """
 
     _problem = "did not complete"
