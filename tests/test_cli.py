@@ -107,6 +107,56 @@ class TestClose:
 
         assert cli._running == set()
 
+    async def test_cancelling_aclose_still_signals_everything(self, guard_killpg):
+        # Cancelling mid-close must not abandon the commands not reached
+        # yet: the signals go out before anything is awaited, so the
+        # cancellation can only interrupt the collecting of the dead.
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        processes = []
+        for pid in (101, 102, 103):
+            process = _mock_process(returncode=None)
+            process.pid = pid
+            process.kill = MagicMock()
+            process.wait = AsyncMock(side_effect=asyncio.CancelledError)
+            processes.append(process)
+            cli._running.add(process)
+
+        with pytest.raises(asyncio.CancelledError):
+            await cli.aclose()
+
+        assert guard_killpg.call_count == 3
+        assert cli._running == set()
+        for process in processes:
+            process.kill.assert_called_once()
+
+    async def test_every_command_is_signalled_before_anything_is_awaited(
+        self, guard_killpg
+    ):
+        # The ordering is the whole safety argument. If a command were
+        # signalled only when its turn to be collected came, a command
+        # that finished in the meantime would be signalled after its
+        # owner had taken its output — by then the OS is free to have
+        # handed its pid to somebody else — and a cancellation would
+        # leave the rest of them alive.
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        signalled_by_first_await = None
+
+        async def wait():
+            nonlocal signalled_by_first_await
+            signalled_by_first_await = guard_killpg.call_count
+
+        for pid in (201, 202, 203):
+            process = _mock_process(returncode=None)
+            process.pid = pid
+            process.kill = MagicMock()
+            process.wait = wait
+            cli._running.add(process)
+
+        await cli.aclose()
+
+        assert signalled_by_first_await == 3
+        assert cli._running == set()
+
     async def test_an_external_kill_is_not_blamed_on_the_close(self):
         # Signal death plus a closed client is not proof that the close
         # did it: something else may have killed the command, and then
@@ -196,21 +246,6 @@ async def _assert_dead(pid: int, *, timeout: float = 5.0) -> None:
             await asyncio.sleep(0.02)
 
 
-async def _assert_nothing_survives(marker, *, timeout: float = 5.0) -> None:
-    """Assert the fake binary left no process of its own running.
-
-    An empty marker means the command was stopped before it could fork,
-    which is the stronger outcome, not a missed assertion.
-
-    Args:
-        marker: File the binary writes its child's pid into.
-        timeout: How long to keep checking before failing.
-    """
-    reported = marker.read_text().strip() if marker.exists() else ""
-    if reported:
-        await _assert_dead(int(reported), timeout=timeout)
-
-
 @pytest.mark.real_processes
 class TestCloseKillsRealProcesses:
     """Real children, because a mock cannot show that nothing survives.
@@ -298,9 +333,12 @@ class TestCloseKillsRealProcesses:
 
         await cli.aclose()
 
+        # The pid marker is no use here: aclose() stops the command
+        # before the shell reaches the `echo`, and an empty marker
+        # cannot tell that apart from a fork that has not reported yet.
+        # What pins the behaviour is that the counter has drained.
         assert cli._starting == 0
         assert cli._running == set()
-        await _assert_nothing_survives(marker)
         async with asyncio.timeout(5):
             with pytest.raises(RuntimeError, match="closed"):
                 await task

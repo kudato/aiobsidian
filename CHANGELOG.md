@@ -15,9 +15,10 @@ the entries below are breaking.
 - `ObsidianCLI.aclose()`, so either client can be released without an `isinstance` check
 - `ObsidianCLI.run()` for commands the library does not wrap, the CLI counterpart of `ObsidianClient.request()`
 - Resource and model classes are importable from `aiobsidian.cli`, `aiobsidian.rest` and `aiobsidian.models`
-- `PropertyType` and `PropertyValue` for typed frontmatter, `MatchSpan` for search results
-- `APIStatusError`, `APIRequestError`, `APIConnectionError`, `APITimeoutError`, `APIProtocolError`
-- `tasks.reopen()`, `vault.folders()`, `vault.folder_info()`
+- `PropertyType` and `PropertyValue` for typed frontmatter, and `JsonValue` for what `patch()` accepts
+- `APIStatusError`, `APIRequestError`, `APIConnectionError`, `APITimeoutError` and `APIProtocolError`
+- `CLINotFoundError` and `CLIParseError` are public, so a missing note and unparseable output can be told apart from any other command failure
+- `tasks.reopen()`, to undo `tasks.complete()`
 
 ### Removed
 - **Breaking**: the REST `periodic` resource, `ObsidianClient.periodic` and `Period` — the plugin has no such endpoints
@@ -32,8 +33,9 @@ the entries below are breaking.
 - **Breaking**: `properties.read()` returns `str | list[str] | None` parsed from the CLI's text output instead of JSON that never arrives, and `properties.set()` sends the value's type
 - **Breaking**: `search.query()` returns `list[str]` of paths; the CLI reports no match counts
 - **Breaking**: `sync`, `publish`, `bases`, `daily` and `dev` methods return what those commands actually print
-- **Breaking**: every on/off switch is spelled `set_*(value)` — `sync.set_paused()`, `plugins.set_restricted()`, `dev.set_mobile()`, `dev.set_debugger()`. `sync.set_paused(True)` pauses, where `sync.toggle(on=True)` resumed
+- **Breaking**: `tasks.complete()` takes the note and the line, not a task id the CLI has no notion of
 - **Breaking**: leaving an `ObsidianCLI` context manager now closes the client. It was a no-op before, so one instance could serve several `async with` blocks; entering a closed one now raises `RuntimeError`
+- **Breaking**: a request the HTTP layer refuses to send — an unparseable `host`, a `scheme` that is not HTTP, a `port` out of range, an illegal header — raises `ValueError` instead of surfacing as a transport failure or an `ExceptionGroup`
 - **Breaking**: patching against Local REST API 5.x sends the 1.x patch protocol, and `DocumentMap` reports targets in the spelling `patch()` accepts
 - Closing an `ObsidianCLI` kills every command still running, and the command's own children with it
 
@@ -42,6 +44,7 @@ the entries below are breaking.
 - Cancelling or timing out a command left the processes it had started behind, holding the vault and the caller's pipe. Commands run in their own process group
 - `httpx` exceptions escaped the REST client, so catching "Obsidian is not running" meant importing an optional dependency
 - Content containing `\n` or `\t` was corrupted on the way through the CLI
+- Boolean options were sent with a `--` prefix the CLI does not use, so none of them ever took effect
 - `vault.append()` wrote to the wrong note, and `api_key` was ignored when an external `http_client` was supplied
 - Every resource declares `__slots__`; only the base classes did, so instances carried a `__dict__`
 - Output is returned as stored: `history.read()`, `sync.read()` and `random.read()` no longer include the header the CLI prints above it, and `templates.read()` keeps its whitespace

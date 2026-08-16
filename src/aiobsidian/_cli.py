@@ -316,17 +316,19 @@ class ObsidianCLI:
         return stdout
 
     @staticmethod
-    async def _kill(process: asyncio.subprocess.Process) -> None:
-        """Kill a running command, its own children included, and reap it.
+    def _signal(process: asyncio.subprocess.Process) -> None:
+        """SIGKILL a command and everything it started.
 
         The whole process group goes, not just the command: a grandchild
         that outlived its parent would keep the vault open and keep the
         pipe open with it, leaving whoever awaits the output stuck in
-        `communicate()` for as long as the grandchild runs.
+        `communicate()` for as long as the grandchild runs. The group is
+        signalled even when the command itself has already exited,
+        because that is precisely when a grandchild is what is left.
 
-        The group is signalled even when the command itself has already
-        exited, because that is precisely when a grandchild is what is
-        left to kill.
+        Deliberately synchronous. It is what makes killing several
+        commands safe under cancellation: signal them all first, and no
+        later `await` can be interrupted while one is still alive.
 
         Args:
             process: The child process to stop.
@@ -334,15 +336,34 @@ class ObsidianCLI:
         if _CAN_SIGNAL_GROUPS:
             with contextlib.suppress(ProcessLookupError, PermissionError):
                 os.killpg(process.pid, signal.SIGKILL)
+        if process.returncode is None:
+            with contextlib.suppress(ProcessLookupError):
+                process.kill()
+
+    @staticmethod
+    async def _reap(process: asyncio.subprocess.Process) -> None:
+        """Wait for a signalled command to be collected.
+
+        Shielded, so the child is reaped even when the caller is
+        cancelled; the cancellation itself is not swallowed.
+
+        Args:
+            process: The child process to wait for.
+        """
         if process.returncode is not None:
             return
         with contextlib.suppress(ProcessLookupError):
-            process.kill()
-        # Shielded so the child is reaped even under cancellation, but
-        # the cancellation itself is not swallowed: whoever asked for it
-        # gets it once the child is gone.
-        with contextlib.suppress(ProcessLookupError):
             await asyncio.shield(process.wait())
+
+    @classmethod
+    async def _kill(cls, process: asyncio.subprocess.Process) -> None:
+        """Stop a command and wait for it to be collected.
+
+        Args:
+            process: The child process to stop.
+        """
+        cls._signal(process)
+        await cls._reap(process)
 
     @staticmethod
     def _build_error(
@@ -578,21 +599,32 @@ class ObsidianCLI:
         `obsidian` process is still writing to the vault. That task gets
         a `RuntimeError` naming the close as the cause.
 
+        Cancelling this call is safe: every command is signalled before
+        anything is awaited, so the cancellation can only interrupt the
+        collecting of processes that are already dead. The one command
+        it cannot account for is one caught mid-spawn — asyncio kills
+        the command it was starting but cannot reach a child that
+        command had already started.
+
         Closed is final: any further command raises `RuntimeError`.
         Calling this more than once is harmless.
         """
         self._closed = True
         while True:
-            for process in list(self._running):
-                if process not in self._running:
-                    # It finished on its own while an earlier kill was
-                    # awaited, and its owner has taken its output.
-                    # Signalling its group now would aim at a pid the
-                    # OS is free to have given to somebody else.
-                    continue
+            # Signalling every one of them before anything is awaited
+            # buys two things. A cancellation arriving during the reaping
+            # below cannot leave a command alive, and no command can
+            # finish and be reaped between being listed and being
+            # signalled, which would aim SIGKILL at a pid the OS is free
+            # to have handed to somebody else.
+            signalled = list(self._running)
+            for process in signalled:
                 self._running.discard(process)
                 self._killed_by_close.add(process)
-                await self._kill(process)
+                self._signal(process)
+
+            for process in signalled:
+                await self._reap(process)
 
             # A command counted but not yet registered was spawned as
             # this call started. Waiting for it is what makes the
