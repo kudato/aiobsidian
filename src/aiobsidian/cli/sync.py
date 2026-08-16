@@ -6,9 +6,9 @@ from ._base import BaseCLIResource
 class CLISyncResource(BaseCLIResource):
     """CLI resource for Obsidian Sync operations.
 
-    Every command except `toggle` needs Sync to be set up for the vault
-    and answers `Error: Sync is not set up for this vault.` otherwise,
-    which surfaces as a `CommandError`.
+    Every command except `set_paused` needs Sync to be set up for the
+    vault and answers `Error: Sync is not set up for this vault.`
+    otherwise, which surfaces as a `CommandError`.
 
     Attributes:
         _cli: Reference to the parent ``ObsidianCLI`` instance.
@@ -16,13 +16,15 @@ class CLISyncResource(BaseCLIResource):
 
     __slots__ = ()
 
-    async def toggle(self, *, on: bool) -> None:
+    async def set_paused(self, value: bool) -> None:
         """Pause or resume Obsidian Sync.
 
         Args:
-            on: If ``True``, resume sync; if ``False``, pause sync.
+            value: ``True`` pauses sync, ``False`` resumes it.
         """
-        await self._cli._execute("sync", flags=["on" if on else "off"])
+        # Inverted on purpose: the CLI names the flags after the state
+        # it puts sync into, so `on` resumes and `off` pauses.
+        await self._cli._execute("sync", flags=["off" if value else "on"])
 
     async def open(self) -> None:
         """Open the Sync history UI."""

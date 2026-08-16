@@ -29,13 +29,21 @@ class CLIDevResource(BaseCLIResource):
         return output.strip()
 
     async def console(self, *, limit: int | None = None) -> list[str]:
-        """Show console messages.
+        """Show captured console messages.
+
+        Needs the debugger attached — see `set_debugger()`.
 
         Args:
-            limit: Maximum number of messages to return.
+            limit: How many of the most recent messages to return.
+                The CLI defaults to 50 and keeps at most 200, so ask for
+                more than 50 to see more than 50; there is no marker for
+                what was left out.
 
         Returns:
             List of captured messages, each prefixed with its timestamp.
+
+        Raises:
+            CommandError: If the debugger is not attached.
         """
         params: dict[str, str] = {}
         if limit is not None:
@@ -44,7 +52,10 @@ class CLIDevResource(BaseCLIResource):
         return self._parse_lines(output)
 
     async def errors(self) -> list[str]:
-        """Show JavaScript errors.
+        """Show captured JavaScript errors.
+
+        Collected from the moment Obsidian starts, with or without the
+        debugger, but only the last 50 are kept.
 
         Returns:
             List of captured errors, empty if none were captured.
@@ -132,22 +143,35 @@ class CLIDevResource(BaseCLIResource):
         output = await self._cli._execute("dev:css", params=params)
         return output.strip()
 
-    async def mobile(self, *, on: bool) -> None:
-        """Toggle mobile emulation.
+    async def set_mobile(self, value: bool) -> None:
+        """Turn mobile emulation on or off.
+
+        Obsidian reloads its window right after answering, unless the
+        setting was already in the state asked for; give it a moment
+        before the next command.
 
         Args:
-            on: ``True`` to enable, ``False`` to disable.
+            value: ``True`` enables emulation, ``False`` disables it.
         """
-        flags = ["on"] if on else ["off"]
+        flags = ["on"] if value else ["off"]
         await self._cli._execute("dev:mobile", flags=flags)
 
-    async def debug(self, *, on: bool) -> None:
-        """Start or stop console capture.
+    async def set_debugger(self, value: bool) -> None:
+        """Attach or detach the Chrome DevTools Protocol debugger.
+
+        `console()` needs it attached and fails otherwise. Detaching
+        also discards everything it captured, so read the messages
+        first — and pass `console(limit=...)`, because it returns only
+        the last 50 by default and nothing says so.
+
+        `errors()` does not depend on it: JavaScript errors are
+        collected from the moment Obsidian starts, attached or not.
 
         Args:
-            on: ``True`` to start, ``False`` to stop capture.
+            value: ``True`` attaches the debugger, ``False`` detaches
+                it and clears the captured console messages.
         """
-        flags = ["on"] if on else ["off"]
+        flags = ["on"] if value else ["off"]
         await self._cli._execute("dev:debug", flags=flags)
 
     async def cdp(self, method: str, params: str) -> str:

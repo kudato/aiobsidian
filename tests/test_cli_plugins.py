@@ -19,15 +19,15 @@ async def test_info(cli):
     cli._execute.assert_awaited_once_with("plugin", params={"id": "dataview"})
 
 
-async def test_restrict_on(cli):
+async def test_set_restricted_true(cli):
     cli._execute.return_value = ""
-    await cli.plugins.restrict(on=True)
+    await cli.plugins.set_restricted(True)
     cli._execute.assert_awaited_once_with("plugins:restrict", flags=["on"])
 
 
-async def test_restrict_off(cli):
+async def test_set_restricted_false(cli):
     cli._execute.return_value = ""
-    await cli.plugins.restrict(on=False)
+    await cli.plugins.set_restricted(False)
     cli._execute.assert_awaited_once_with("plugins:restrict", flags=["off"])
 
 
