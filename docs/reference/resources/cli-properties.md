@@ -1,3 +1,3 @@
 # CLI Properties Resource
 
-::: aiobsidian.cli.properties.CLIPropertiesResource
+::: aiobsidian.cli.CLIPropertiesResource

@@ -1,3 +1,3 @@
 # CLI Aliases Resource
 
-::: aiobsidian.cli.aliases.CLIAliasesResource
+::: aiobsidian.cli.CLIAliasesResource

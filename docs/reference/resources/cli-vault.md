@@ -1,3 +1,3 @@
 # CLI Vault Resource
 
-::: aiobsidian.cli.vault.CLIVaultResource
+::: aiobsidian.cli.CLIVaultResource

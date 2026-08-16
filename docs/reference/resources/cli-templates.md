@@ -1,3 +1,3 @@
 # CLI Templates Resource
 
-::: aiobsidian.cli.templates.CLITemplatesResource
+::: aiobsidian.cli.CLITemplatesResource

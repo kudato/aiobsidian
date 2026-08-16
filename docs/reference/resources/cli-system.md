@@ -1,3 +1,3 @@
 # CLI System Resource
 
-::: aiobsidian.cli.system.CLISystemResource
+::: aiobsidian.cli.CLISystemResource

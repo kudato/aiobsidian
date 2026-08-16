@@ -1,3 +1,3 @@
 # CLI Tabs Resource
 
-::: aiobsidian.cli.tabs.CLITabsResource
+::: aiobsidian.cli.CLITabsResource
