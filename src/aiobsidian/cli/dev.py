@@ -50,17 +50,18 @@ class CLIDevResource(BaseCLIResource):
         output = await self._cli._execute("dev:errors")
         return self._parse_lines(output)
 
-    async def screenshot(self, path: str) -> str:
-        """Capture a screenshot (base64 PNG).
+    async def screenshot(self, path: str) -> None:
+        """Capture a screenshot of the Obsidian window.
+
+        The CLI answers before the capture has been written, so the file
+        may not exist yet when this returns. Poll for it rather than
+        opening it straight away.
 
         Args:
-            path: File path for the screenshot.
-
-        Returns:
-            Base64-encoded PNG data.
+            path: Where to write the PNG. A relative path is resolved
+                against the vault root.
         """
-        output = await self._cli._execute("dev:screenshot", params={"path": path})
-        return output.strip()
+        await self._cli._execute("dev:screenshot", params={"path": path})
 
     async def dom(
         self,
@@ -81,8 +82,25 @@ class CLIDevResource(BaseCLIResource):
             css: Return this CSS property value from matched elements.
 
         Returns:
-            DOM inspection result.
+            DOM inspection result. The element's outer HTML unless one of
+            ``text``, ``attr`` or ``css`` narrows it.
+
+        Raises:
+            TypeError: If more than one of ``text``, ``attr`` and ``css``
+                is requested. The CLI answers only the first one it finds
+                and drops the rest.
         """
+        requested = [
+            name
+            for name, wanted in (("text", text), ("attr", attr), ("css", css))
+            if wanted is not None and wanted is not False
+        ]
+        if len(requested) > 1:
+            raise TypeError(
+                f"dom() answers one of text, attr and css, not {len(requested)}: "
+                f"got {', '.join(requested)}"
+            )
+
         params: dict[str, str] = {"selector": selector}
         if attr is not None:
             params["attr"] = attr

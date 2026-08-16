@@ -25,14 +25,14 @@ class CLITemplatesResource(BaseCLIResource):
             resolve: If ``True``, resolve template variables in the output.
 
         Returns:
-            Template content as a string.
+            Template content, byte for byte as it is stored. Leading and
+            trailing whitespace is part of a template and is kept.
         """
         params: dict[str, str] = {"name": name}
         if title is not None:
             params["title"] = title
         flags = ["resolve"] if resolve else None
-        output = await self._cli._execute("template:read", params=params, flags=flags)
-        return output.strip()
+        return await self._cli._execute("template:read", params=params, flags=flags)
 
     async def insert(self, name: str) -> None:
         """Insert a template into the active file.

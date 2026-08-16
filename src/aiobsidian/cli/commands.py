@@ -23,7 +23,8 @@ class CLICommandsResource(BaseCLIResource):
         """List available Obsidian commands.
 
         Args:
-            filter: Filter commands by ID prefix.
+            filter: Filter commands by ID prefix. An empty string is no
+                filter at all, which is how the CLI reads it too.
 
         Returns:
             List of command IDs (e.g. `"editor:toggle-bold"`).

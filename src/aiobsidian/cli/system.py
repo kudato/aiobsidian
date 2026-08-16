@@ -14,7 +14,8 @@ class CLISystemResource(BaseCLIResource):
         """Get the Obsidian version.
 
         Returns:
-            Obsidian version string.
+            The app version followed by the installer build, exactly as
+            the CLI prints it: `"1.13.7 (installer 1.13.7)"`.
         """
         output = await self._cli._execute("version")
         return output.strip()

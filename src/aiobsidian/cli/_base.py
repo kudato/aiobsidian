@@ -171,6 +171,24 @@ class BaseCLIResource:
             return content
         return output
 
+    @staticmethod
+    def _strip_path_header(output: str) -> str:
+        """Drop the path line the CLI prints before a note it picked itself.
+
+        `random:read` names the note it landed on, leaves a blank line and
+        then prints the content.
+
+        Args:
+            output: Raw output of the command.
+
+        Returns:
+            The content, or the whole output when the header is missing.
+        """
+        path, blank, content = (output.split("\n", 2) + ["", ""])[:3]
+        if blank == "" and path:
+            return content
+        return output
+
     @classmethod
     def _parse_rows(cls, output: str, *, separator: str = "\t") -> list[list[str]]:
         """Parse tabular output into rows of columns.
