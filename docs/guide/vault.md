@@ -145,7 +145,8 @@ await client.vault.patch(
     Do not pre-serialize the value with `json.dumps()` — that stores the JSON
     text as a string. Pass the Python value directly.
 
-The field must already exist; `REPLACE` on a missing key fails with `APIError [400]`.
+The field must already exist; `REPLACE` on a missing key fails with
+`APIStatusError [400]`.
 
 ### Patch operations
 

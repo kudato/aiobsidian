@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from aiobsidian._exceptions import APIError
+from aiobsidian._exceptions import APIStatusError
 from aiobsidian.models.search import SearchResult
 
 SIMPLE_RESULTS = [
@@ -113,7 +113,7 @@ async def test_simple_search_server_error(mock_api, client):
         500, json={"message": "Internal server error"}
     )
 
-    with pytest.raises(APIError) as exc_info:
+    with pytest.raises(APIStatusError) as exc_info:
         await client.search.simple("query")
 
     assert exc_info.value.status_code == 500

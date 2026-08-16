@@ -4,7 +4,14 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from ._constants import DEFAULT_HOST, DEFAULT_PORT, DEFAULT_SCHEME, DEFAULT_TIMEOUT
-from ._exceptions import APIError, APINotFoundError, AuthenticationError
+from ._exceptions import (
+    APIConnectionError,
+    APINotFoundError,
+    APIProtocolError,
+    APIStatusError,
+    APITimeoutError,
+    AuthenticationError,
+)
 
 if TYPE_CHECKING:
     import httpx
@@ -56,6 +63,12 @@ class ObsidianClient:
         verify_ssl: bool = False,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
+        if not 0 <= port <= 65535:
+            # Out of range, the OS rejects the connect() with an
+            # OverflowError that anyio wraps in an ExceptionGroup, so
+            # nothing the caller could reasonably catch ever sees it.
+            raise ValueError(f"port must be between 0 and 65535, got {port}")
+
         self._host = host
         self._port = port
         self._scheme = scheme
@@ -64,6 +77,7 @@ class ObsidianClient:
         self._timeout = timeout
         self._verify_ssl = verify_ssl
         self._external_client = http_client is not None
+        self._httpx = self._import_httpx()
         self._http = http_client or self._build_http_client()
         self._url_prefix = "" if str(self._http.base_url) else self._base_url
 
@@ -86,11 +100,18 @@ class ObsidianClient:
 
     def _build_http_client(self) -> httpx.AsyncClient:
         httpx = self._import_httpx()
-        return httpx.AsyncClient(  # type: ignore[no-any-return]
-            base_url=self._base_url,
-            timeout=self._timeout,
-            verify=self._verify_ssl,
-        )
+        try:
+            return httpx.AsyncClient(  # type: ignore[no-any-return]
+                base_url=self._base_url,
+                timeout=self._timeout,
+                verify=self._verify_ssl,
+            )
+        except httpx.InvalidURL as exc:
+            # host, port and scheme are public parameters, and httpx
+            # parses the URL they make while the client is being built.
+            raise ValueError(
+                f"host, port and scheme make no valid URL: {self._base_url!r} — {exc}"
+            ) from exc
 
     async def request(
         self,
@@ -121,25 +142,78 @@ class ObsidianClient:
             The `httpx.Response` object.
 
         Raises:
+            ValueError: If the request cannot be built — an unparseable
+                URL, a scheme that is not HTTP, an illegal header. A
+                lone surrogate in `path` raises `UnicodeEncodeError`,
+                which is a `ValueError` too.
+            APIConnectionError: If the server cannot be reached.
+            APITimeoutError: If the request exceeds the timeout.
+            APIProtocolError: If the exchange with the server breaks down.
             AuthenticationError: If the API key is invalid (HTTP 401).
             APINotFoundError: If the resource is not found (HTTP 404).
-            APIError: For any other HTTP error (status >= 400).
+            APIStatusError: For any other HTTP error (status >= 400).
         """
         request_headers: dict[str, Any] = {"Authorization": f"Bearer {self._api_key}"}
         if headers:
             request_headers.update(headers)
 
-        response = await self._http.request(
-            method,
-            f"{self._url_prefix}{path}",
-            content=content,
-            json=json,
-            headers=request_headers,
-            params=params,
-        )
+        url = f"{self._url_prefix}{path}"
+        httpx = self._httpx
+        try:
+            response = await self._http.request(
+                method,
+                url,
+                content=content,
+                json=json,
+                headers=request_headers,
+                params=params,
+            )
+        except (
+            httpx.InvalidURL,
+            httpx.UnsupportedProtocol,
+            httpx.LocalProtocolError,
+        ) as exc:
+            # None of these three reach the server: the URL will not
+            # parse, its scheme is not HTTP, or the headers are not
+            # legal. They are bad arguments, and this library reports
+            # those as ValueError rather than as a transport failure.
+            raise ValueError(f"{method} {url} cannot be sent: {exc}") from exc
+        except httpx.TimeoutException as exc:
+            raise APITimeoutError(*self._failure(method, url, exc)) from exc
+        except (httpx.NetworkError, httpx.ProxyError) as exc:
+            raise APIConnectionError(*self._failure(method, url, exc)) from exc
+        except httpx.RequestError as exc:
+            # What is left answered, or half-answered, and the exchange
+            # broke: bad framing, a body that belied its own headers, a
+            # redirect loop. Reporting those as unreachable would send
+            # the caller to restart an Obsidian that is plainly running.
+            raise APIProtocolError(*self._failure(method, url, exc)) from exc
+
         if response.status_code >= 400:
             self._raise_for_status(response)
         return response
+
+    @staticmethod
+    def _failure(
+        method: str, fallback_url: str, exc: httpx.RequestError
+    ) -> tuple[str, str, str]:
+        """Describe a failed request for the exception that reports it.
+
+        Args:
+            method: HTTP method of the request.
+            fallback_url: URL to name when httpx attached no request to
+                the error. It is what the caller passed, so it may be
+                relative.
+            exc: The error the HTTP transport raised.
+
+        Returns:
+            The method, the URL and what the transport reported.
+        """
+        try:
+            url = str(exc.request.url)
+        except RuntimeError:
+            url = fallback_url
+        return method, url, str(exc) or type(exc).__name__
 
     @staticmethod
     def _raise_for_status(response: httpx.Response) -> None:
@@ -157,7 +231,7 @@ class ObsidianClient:
             raise AuthenticationError(status, message, error_code)
         if status == 404:
             raise APINotFoundError(status, message, error_code)
-        raise APIError(status, message, error_code)
+        raise APIStatusError(status, message, error_code)
 
     # -- resources ---------------------------------------------------------
 
