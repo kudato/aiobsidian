@@ -22,7 +22,7 @@ class CLIOutlineResource(BaseCLIResource):
             List of heading objects forming the document outline.
         """
         output = await self._cli._execute(
-            "outline", params={"file": path}, output_format="json"
+            "outline", params={"path": path}, output_format="json"
         )
         result: list[dict[str, Any]] = self._parse_json("outline", output)
         return result

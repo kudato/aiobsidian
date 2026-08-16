@@ -306,7 +306,7 @@ async def test_wordcount(cli):
     cli._execute.return_value = "words: 500\ncharacters: 2800\n"
     result = await cli.vault.wordcount("note.md")
     assert result == {"words": 500, "characters": 2800}
-    cli._execute.assert_awaited_once_with("wordcount", params={"file": "note.md"})
+    cli._execute.assert_awaited_once_with("wordcount", params={"path": "note.md"})
 
 
 async def test_wordcount_non_numeric(cli):

@@ -19,5 +19,5 @@ class CLIAliasesResource(BaseCLIResource):
         Returns:
             List of alias strings for the file.
         """
-        output = await self._cli._execute("aliases", params={"file": path})
+        output = await self._cli._execute("aliases", params={"path": path})
         return self._parse_lines(output)

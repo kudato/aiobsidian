@@ -13,7 +13,7 @@ async def test_get(cli):
     result = await cli.outline.get("notes/guide.md")
     assert result == OUTLINE
     cli._execute.assert_awaited_once_with(
-        "outline", params={"file": "notes/guide.md"}, output_format="json"
+        "outline", params={"path": "notes/guide.md"}, output_format="json"
     )
 
 

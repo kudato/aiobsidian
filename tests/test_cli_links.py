@@ -15,7 +15,7 @@ async def test_outgoing(cli):
     cli._execute.return_value = "notes/setup.md\nnotes/config.md\n"
     result = await cli.links.outgoing("note.md")
     assert result == ["notes/setup.md", "notes/config.md"]
-    cli._execute.assert_awaited_once_with("links", params={"file": "note.md"})
+    cli._execute.assert_awaited_once_with("links", params={"path": "note.md"})
 
 
 async def test_outgoing_without_links(cli):
@@ -29,7 +29,7 @@ async def test_incoming(cli):
     result = await cli.links.incoming("note.md")
     assert result == INCOMING
     cli._execute.assert_awaited_once_with(
-        "backlinks", params={"file": "note.md"}, flags=None, output_format="json"
+        "backlinks", params={"path": "note.md"}, flags=None, output_format="json"
     )
 
 
@@ -39,7 +39,7 @@ async def test_incoming_with_counts(cli):
     assert result == INCOMING
     cli._execute.assert_awaited_once_with(
         "backlinks",
-        params={"file": "note.md"},
+        params={"path": "note.md"},
         flags=["counts"],
         output_format="json",
     )
