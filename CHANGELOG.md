@@ -36,6 +36,7 @@ return.
 - **Breaking**: `properties.read()` returns `PropertyValue` parsed from the CLI's text output, and `properties.set()` takes any `JsonValue` and sends the value's type
 - **Breaking**: `search.query()` returns `list[str]` of paths; the CLI reports no match counts
 - **Breaking**: `tasks.complete()` takes the note and the line, not a task id the CLI has no notion of
+- **Breaking**: every on/off switch is spelled `set_<thing>(value)`, so `sync.toggle(on=)`, `plugins.restrict(on=)`, `dev.mobile(on=)` and `dev.debug(on=)` are `sync.set_paused()`, `plugins.set_restricted()`, `dev.set_mobile()` and `dev.set_debugger()`. `toggle` is left to mean what it says, as in `tasks.toggle()`. Mind that `set_paused(True)` pauses, where `toggle(on=True)` resumed
 - **Breaking**: `vault.list()` and `vault.folders()` call their first argument `folder`, and it now does something. Both sent `path=`, which `files` and `folders` ignore, so `vault.list("Notes")` listed the whole vault
 - **Breaking**: `sync.read()` and `sync.restore()` take `version` as an `int`
 - **Breaking**: `dev.dom()` takes `match_all=` rather than shadowing `all`, `dev.screenshot()` returns `None` because the CLI writes the file and prints nothing, `vault.create()` defaults `content` to `""`, and `publish.add()` and `publish.open()` return the CLI's reply instead of `None`
