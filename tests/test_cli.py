@@ -142,8 +142,12 @@ class TestClose:
         signalled_by_first_await = None
 
         async def wait():
+            # Only the first await answers the question. Recording every
+            # one of them would leave the count from the last, which is 3
+            # however late the signalling happened.
             nonlocal signalled_by_first_await
-            signalled_by_first_await = guard_killpg.call_count
+            if signalled_by_first_await is None:
+                signalled_by_first_await = guard_killpg.call_count
 
         for pid in (201, 202, 203):
             process = _mock_process(returncode=None)
@@ -342,6 +346,33 @@ class TestCloseKillsRealProcesses:
         async with asyncio.timeout(5):
             with pytest.raises(RuntimeError, match="closed"):
                 await task
+
+    async def test_cancelling_the_wait_for_a_spawn_hands_the_killing_back(
+        self, tmp_path
+    ):
+        # The one gap in the cancellation guarantee, pinned rather than
+        # claimed away. A command caught mid-spawn has no pid yet, so
+        # there is nothing aclose() can signal on its behalf and all it
+        # can do is wait. Cancelling that wait hands the killing back to
+        # the command's own task, which does it as soon as it runs.
+        binary, _ = _slow_binary(tmp_path, leader_waits=True)
+        cli = ObsidianCLI("TestVault", binary=str(binary))
+        task = asyncio.create_task(cli._execute("append", params={"content": "x"}))
+        await asyncio.sleep(0)
+        assert cli._starting == 1
+
+        closing = asyncio.create_task(cli.aclose())
+        await asyncio.sleep(0)
+        assert not closing.done()
+        closing.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await closing
+
+        async with asyncio.timeout(5):
+            with pytest.raises(RuntimeError, match="closed"):
+                await task
+        assert cli._running == set()
+        assert cli._starting == 0
 
     async def test_a_command_spawned_during_aclose_says_which_race_it_lost(
         self, tmp_path

@@ -599,12 +599,16 @@ class ObsidianCLI:
         `obsidian` process is still writing to the vault. That task gets
         a `RuntimeError` naming the close as the cause.
 
-        Cancelling this call is safe: every command is signalled before
-        anything is awaited, so the cancellation can only interrupt the
-        collecting of processes that are already dead. The one command
-        it cannot account for is one caught mid-spawn — asyncio kills
-        the command it was starting but cannot reach a child that
-        command had already started.
+        Cancelling the collecting is safe: every command is signalled
+        before anything is awaited, so a cancellation there can only
+        interrupt the collecting of processes that are already dead.
+
+        A command caught mid-spawn is what that cannot cover. It has no
+        pid yet, so there is nothing to signal on its behalf; this call
+        waits for it instead, and cancelling that wait hands the killing
+        back to the command's own task, which does it as soon as it
+        runs. If that task is cancelled in the same window, asyncio
+        kills the command but not a child the command had started.
 
         Closed is final: any further command raises `RuntimeError`.
         Calling this more than once is harmless.

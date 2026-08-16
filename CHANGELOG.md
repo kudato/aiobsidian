@@ -9,34 +9,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 This release is the result of auditing both transports against a live
 Obsidian 1.13.7 and against the CLI command definitions inside the app
 itself. Much of the surface was wrong rather than missing, so most of
-the entries below are breaking.
+the entries below are breaking, and 39 CLI methods changed what they
+return.
 
 ### Added
 - `ObsidianCLI.aclose()`, so either client can be released without an `isinstance` check
 - `ObsidianCLI.run()` for commands the library does not wrap, the CLI counterpart of `ObsidianClient.request()`
 - Resource and model classes are importable from `aiobsidian.cli`, `aiobsidian.rest` and `aiobsidian.models`
-- `PropertyType` and `PropertyValue` for typed frontmatter, and `JsonValue` for what `patch()` accepts
+- `PropertyType` and `PropertyValue` for typed frontmatter, and `JsonValue` for what `patch()` and `properties.set()` accept
 - `APIStatusError`, `APIRequestError`, `APIConnectionError`, `APITimeoutError` and `APIProtocolError`
-- `CLINotFoundError` and `CLIParseError` are public, so a missing note and unparseable output can be told apart from any other command failure
-- `tasks.reopen()`, to undo `tasks.complete()`
+- `APINotFoundError`, `CLINotFoundError` and `CLIParseError`, so a missing note and unparseable output can be told apart from any other failure of that transport
+- `tasks.reopen()` to undo `tasks.complete()`, `tasks.list(todo=)`, `daily.open()`, `publish.add(changed=)` and `CommandError.stdout`
 
 ### Removed
 - **Breaking**: the REST `periodic` resource, `ObsidianClient.periodic` and `Period` — the plugin has no such endpoints
 - **Breaking**: `SearchResource.dataview()` and `ContentType.DATAVIEW_DQL`, for the same reason
 - **Breaking**: `tasks.create()`, `tags.rename()` and `daily.create()` — no such CLI commands exist
-- **Breaking**: parameters the CLI does not accept, including `search.query(matches=)`, `search.context(lines=)`, `daily.read(date=)`, `vault.create(silent=)` and `bases.views(path=)`
+- **Breaking**: parameters the CLI does not accept — `search.query(matches=)`, `search.context(lines=)`, `daily.read(date=)`, `vault.create(silent=)`, `vault.list(path=)`, `bases.views(path=)`, `publish.status(path=)` and `bases.create(**fields)`
 
 ### Changed
-- **Breaking**: `APIError` is now the REST transport root and no longer carries `status_code`, `message` or `error_code`. Catch `APIStatusError` for those; `AuthenticationError` and `APINotFoundError` are unchanged in behaviour
-- **Breaking**: CLI resources address notes by exact path. They sent `file=`, which resolves like a wikilink, so a name matching two notes picked one at random and a path that did not exist still resolved
-- **Breaking**: CLI resources send the parameter names the CLI requires — `name=` rather than `property=` or `new-name=`, `path=` rather than `file=`
-- **Breaking**: `properties.read()` returns `str | list[str] | None` parsed from the CLI's text output instead of JSON that never arrives, and `properties.set()` sends the value's type
+- **Breaking**: `NotFoundError` hangs off `ObsidianError` rather than `APIError` and carries no `status_code`. It is what both transports now raise for something that does not exist, through `APINotFoundError` and `CLINotFoundError`, so `issubclass(NotFoundError, APIError)` is `False` and an `except NotFoundError` written for REST also catches a missing note over the CLI
+- **Breaking**: `APIError` is the REST transport root and no longer carries `status_code`, `message` or `error_code`. Catch `APIStatusError` for those; `AuthenticationError` moves under it, unchanged in behaviour
+- **Breaking**: CLI methods return what the command prints. The `list[dict[str, Any]]` and `dict[str, Any]` annotations described JSON that never arrives: 21 methods across `bases`, `commands`, `dev`, `history`, `links`, `publish`, `search`, `snippets`, `sync`, `system`, `tabs`, `tags`, `templates`, `themes` and `workspaces` return `list[str]`, the record-shaped ones return `dict[str, str]` — `dict[str, int]` for `vault.wordcount()` — and `hotkeys.get()`, `system.help()`, `themes.current()` and `workspaces.current()` return `str`
+- **Breaking**: CLI resources address notes by exact path. They sent `file=`, which resolves like a wikilink, so a name matching two notes picked one at random and a path that did not exist still resolved. `bookmarks.add()` and `tabs.open()` keep `file=`, where the CLI takes it as one of several alternatives to `folder=`, `url=` or `view=`
+- **Breaking**: CLI resources send the parameter names the CLI requires — `name=` rather than `property=` or `new-name=`
+- **Breaking**: `properties.read()` returns `PropertyValue` parsed from the CLI's text output, and `properties.set()` takes any `JsonValue` and sends the value's type
 - **Breaking**: `search.query()` returns `list[str]` of paths; the CLI reports no match counts
-- **Breaking**: `sync`, `publish`, `bases`, `daily` and `dev` methods return what those commands actually print
 - **Breaking**: `tasks.complete()` takes the note and the line, not a task id the CLI has no notion of
+- **Breaking**: `vault.list()` and `vault.folders()` call their first argument `folder`, and it now does something. Both sent `path=`, which `files` and `folders` ignore, so `vault.list("Notes")` listed the whole vault
+- **Breaking**: `sync.read()` and `sync.restore()` take `version` as an `int`
+- **Breaking**: `dev.dom()` takes `match_all=` rather than shadowing `all`, `dev.screenshot()` returns `None` because the CLI writes the file and prints nothing, `vault.create()` defaults `content` to `""`, and `publish.add()` and `publish.open()` return the CLI's reply instead of `None`
 - **Breaking**: leaving an `ObsidianCLI` context manager now closes the client. It was a no-op before, so one instance could serve several `async with` blocks; entering a closed one now raises `RuntimeError`
 - **Breaking**: a request the HTTP layer refuses to send — an unparseable `host`, a `scheme` that is not HTTP, a `port` out of range, an illegal header — raises `ValueError` instead of surfacing as a transport failure or an `ExceptionGroup`
 - **Breaking**: patching against Local REST API 5.x sends the 1.x patch protocol, and `DocumentMap` reports targets in the spelling `patch()` accepts
+- `SearchResult.result` accepts the strings, numbers and booleans a query returns, not only objects and arrays
 - Closing an `ObsidianCLI` kills every command still running, and the command's own children with it
 
 ### Fixed
