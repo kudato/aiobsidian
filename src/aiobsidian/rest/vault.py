@@ -57,7 +57,7 @@ class VaultResource(ContentResource):
             depending on the requested content type.
 
         Raises:
-            NotFoundError: If the file does not exist.
+            APINotFoundError: If the file does not exist.
         """
         return await self._get_content(f"{self._BASE_URL}/{path}", content_type)
 
@@ -83,7 +83,7 @@ class VaultResource(ContentResource):
             content: Markdown content to append.
 
         Raises:
-            NotFoundError: If the file does not exist.
+            APINotFoundError: If the file does not exist.
         """
         await self._append_content(f"{self._BASE_URL}/{path}", content)
 
@@ -111,7 +111,7 @@ class VaultResource(ContentResource):
             target_delimiter: Delimiter for nested targets.
 
         Raises:
-            NotFoundError: If the file does not exist.
+            APINotFoundError: If the file does not exist.
         """
         await self._patch_content(
             f"{self._BASE_URL}/{path}",
@@ -129,7 +129,7 @@ class VaultResource(ContentResource):
             path: Path to the file relative to the vault root.
 
         Raises:
-            NotFoundError: If the file does not exist.
+            APINotFoundError: If the file does not exist.
         """
         await self._client.request("DELETE", f"{self._BASE_URL}/{path}")
 

@@ -4,7 +4,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from ._constants import DEFAULT_HOST, DEFAULT_PORT, DEFAULT_SCHEME, DEFAULT_TIMEOUT
-from ._exceptions import APIError, AuthenticationError, NotFoundError
+from ._exceptions import APIError, APINotFoundError, AuthenticationError
 
 if TYPE_CHECKING:
     import httpx
@@ -119,7 +119,7 @@ class ObsidianClient:
 
         Raises:
             AuthenticationError: If the API key is invalid (HTTP 401).
-            NotFoundError: If the resource is not found (HTTP 404).
+            APINotFoundError: If the resource is not found (HTTP 404).
             APIError: For any other HTTP error (status >= 400).
         """
         response = await self._http.request(
@@ -149,7 +149,7 @@ class ObsidianClient:
         if status == 401:
             raise AuthenticationError(status, message, error_code)
         if status == 404:
-            raise NotFoundError(status, message, error_code)
+            raise APINotFoundError(status, message, error_code)
         raise APIError(status, message, error_code)
 
     # -- resources ---------------------------------------------------------

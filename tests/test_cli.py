@@ -9,9 +9,22 @@ import pytest
 from aiobsidian._cli import ObsidianCLI
 from aiobsidian._exceptions import (
     BinaryNotFoundError,
+    CLINotFoundError,
     CLITimeoutError,
     CommandError,
+    NotFoundError,
 )
+
+
+def _mock_process(
+    stdout: bytes = b"",
+    stderr: bytes = b"",
+    returncode: int = 0,
+) -> AsyncMock:
+    process = AsyncMock()
+    process.communicate.return_value = (stdout, stderr)
+    process.returncode = returncode
+    return process
 
 
 class TestResolveBinary:
@@ -154,6 +167,124 @@ class TestExecute:
                 await cli._execute("read", timeout=5.0)
 
         assert exc_info.value.timeout == 5.0
+
+
+class TestErrorDetection:
+    """The CLI exits 0 and reports failures as `Error: ...` on stdout.
+
+    Error texts are taken verbatim from Obsidian 1.13.7.
+    """
+
+    async def test_missing_file_raises_not_found(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(b'Error: File "missing.md" not found.\n')
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CLINotFoundError) as exc_info:
+                await cli._execute("read", params={"path": "missing.md"})
+
+        error = exc_info.value
+        assert error.command == "read"
+        assert error.exit_code == 0
+        assert error.stdout == 'Error: File "missing.md" not found.\n'
+        assert 'File "missing.md" not found.' in str(error)
+        assert isinstance(error, NotFoundError)
+        assert isinstance(error, CommandError)
+
+    async def test_missing_folder_raises_not_found(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(b'Error: Folder "archive" not found.\n')
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CLINotFoundError):
+                await cli._execute("folder", params={"path": "archive"})
+
+    async def test_missing_base_file_raises_not_found(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(b"Error: Base file not found: missing.base\n")
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CLINotFoundError):
+                await cli._execute("base:query", params={"path": "missing.base"})
+
+    async def test_unknown_command_is_not_a_missing_resource(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(
+            b'Error: Command "nosuch" not found. '
+            b"It may require a plugin to be enabled.\n"
+        )
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CommandError) as exc_info:
+                await cli._execute("nosuch")
+
+        assert not isinstance(exc_info.value, CLINotFoundError)
+
+    async def test_missing_parameter_raises_command_error(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(
+            b"Error: Missing required parameter: id=<command-id>\n"
+            b"Usage: command id=<command-id>\n"
+        )
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CommandError) as exc_info:
+                await cli._execute("command")
+
+        assert not isinstance(exc_info.value, CLINotFoundError)
+        assert "Missing required parameter" in exc_info.value.stdout
+
+    async def test_note_starting_with_error_prefix_raises(self):
+        """Documented trade-off: such content is indistinguishable from a failure."""
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(b"Error: something went wrong yesterday\n")
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CommandError):
+                await cli._execute("read", params={"path": "log.md"})
+
+    async def test_error_prefix_inside_output_is_returned(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(b"# Log\n\nError: disk full\n")
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            result = await cli._execute("read", params={"path": "log.md"})
+
+        assert result == "# Log\n\nError: disk full\n"
+
+    async def test_non_zero_exit_with_missing_file_raises_not_found(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(b'Error: File "missing.md" not found.\n', returncode=1)
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CLINotFoundError) as exc_info:
+                await cli._execute("read", params={"path": "missing.md"})
+
+        assert exc_info.value.exit_code == 1
+
+
+class TestBinaryExecution:
+    async def test_missing_binary_raises_binary_not_found(self):
+        cli = ObsidianCLI("TestVault", binary="/nonexistent/obsidian")
+
+        with patch(
+            "asyncio.create_subprocess_exec",
+            side_effect=FileNotFoundError(2, "No such file or directory"),
+        ):
+            with pytest.raises(BinaryNotFoundError) as exc_info:
+                await cli._execute("read", params={"path": "note.md"})
+
+        assert "/nonexistent/obsidian" in str(exc_info.value)
+
+    async def test_non_executable_binary_raises_binary_not_found(self):
+        cli = ObsidianCLI("TestVault", binary="/etc/hosts")
+
+        with patch(
+            "asyncio.create_subprocess_exec",
+            side_effect=PermissionError(13, "Permission denied"),
+        ):
+            with pytest.raises(BinaryNotFoundError):
+                await cli._execute("read", params={"path": "note.md"})
 
 
 class TestResources:
