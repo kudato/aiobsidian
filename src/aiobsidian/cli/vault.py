@@ -33,12 +33,11 @@ class CLIVaultResource(BaseCLIResource):
     async def create(
         self,
         path: str,
-        content: str,
+        content: str = "",
         *,
         name: str | None = None,
         template: str | None = None,
         overwrite: bool = False,
-        silent: bool = False,
     ) -> None:
         """Create a new file in the vault.
 
@@ -46,26 +45,54 @@ class CLIVaultResource(BaseCLIResource):
         calls, so the file is built up incrementally rather than atomically.
 
         Args:
-            path: Path for the new file relative to the vault root.
-            content: File content.
-            name: Display name for the note.
-            template: Template to use for the new file.
+            path: Path for the new file relative to the vault root. When
+                ``name`` is given this is the folder to create it in.
+            content: File content. Cannot be combined with ``template``.
+            name: File name, without a directory prefix, appended to
+                ``path``.
+            template: Template to fill the new file with. The CLI reads
+                the template instead of ``content``, never both.
             overwrite: If ``True``, overwrite an existing file.
-            silent: If ``True``, suppress output.
+
+        Raises:
+            ValueError: If both ``content`` and ``template`` are given.
         """
+        if content and template is not None:
+            raise ValueError(
+                "create() takes content or template, not both: "
+                "the CLI writes the template and drops the content"
+            )
+        params: dict[str, str] = {"path": path}
         parts = self._split_content(content)
-        params: dict[str, str] = {"path": path, "content": parts[0]}
-        if name is not None:
-            params["name"] = name
         if template is not None:
             params["template"] = template
-        flags: list[str] = []
-        if overwrite:
-            flags.append("overwrite")
-        if silent:
-            flags.append("silent")
-        await self._cli._execute("create", params=params, flags=flags or None)
-        await self._write_parts("append", parts[1:], params={"path": path})
+        else:
+            params["content"] = parts[0]
+        if name is not None:
+            params["name"] = name
+        flags = ["overwrite"] if overwrite else None
+        await self._cli._execute("create", params=params, flags=flags)
+        await self._write_parts(
+            "append", parts[1:], params={"path": self._created_path(path, name)}
+        )
+
+    @staticmethod
+    def _created_path(path: str, name: str | None) -> str:
+        """Work out where the CLI puts a file it was asked to create.
+
+        `create` joins `path` and `name` when both are given, and adds a
+        `.md` extension when the result has none. The rest of a content
+        write is appended to that file, not to `path`.
+
+        Args:
+            path: Path passed to `create`.
+            name: File name passed to `create`, if any.
+
+        Returns:
+            Path of the created file, relative to the vault root.
+        """
+        target = f"{path.rstrip('/')}/{name}" if name is not None else path
+        return target if target.rfind(".") > 0 else f"{target}.md"
 
     async def append(self, path: str, content: str, *, inline: bool = False) -> None:
         """Append content to a vault file.

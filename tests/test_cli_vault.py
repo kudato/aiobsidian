@@ -21,10 +21,18 @@ async def test_read(cli):
 
 
 async def test_create(cli):
-    cli._execute.return_value = ""
+    cli._execute.return_value = "Created: note.md\n"
     await cli.vault.create("note.md", "content")
     cli._execute.assert_awaited_once_with(
         "create", params={"path": "note.md", "content": "content"}, flags=None
+    )
+
+
+async def test_create_empty(cli):
+    cli._execute.return_value = "Created: note.md\n"
+    await cli.vault.create("note.md")
+    cli._execute.assert_awaited_once_with(
+        "create", params={"path": "note.md", "content": ""}, flags=None
     )
 
 
@@ -39,54 +47,42 @@ async def test_create_overwrite(cli):
 
 
 async def test_create_with_name(cli):
-    cli._execute.return_value = ""
-    await cli.vault.create("note.md", "content", name="My Note")
+    cli._execute.return_value = "Created: notes/My Note.md\n"
+    await cli.vault.create("notes", "content", name="My Note")
     cli._execute.assert_awaited_once_with(
         "create",
-        params={"path": "note.md", "content": "content", "name": "My Note"},
+        params={"path": "notes", "content": "content", "name": "My Note"},
         flags=None,
     )
 
 
 async def test_create_with_template(cli):
-    cli._execute.return_value = ""
-    await cli.vault.create("note.md", "content", template="daily")
+    cli._execute.return_value = "Created: note.md\n"
+    await cli.vault.create("note.md", template="daily")
     cli._execute.assert_awaited_once_with(
         "create",
-        params={"path": "note.md", "content": "content", "template": "daily"},
+        params={"path": "note.md", "template": "daily"},
         flags=None,
     )
 
 
-async def test_create_silent(cli):
-    cli._execute.return_value = ""
-    await cli.vault.create("note.md", "content", silent=True)
-    cli._execute.assert_awaited_once_with(
-        "create",
-        params={"path": "note.md", "content": "content"},
-        flags=["silent"],
-    )
+async def test_create_rejects_content_and_template(cli):
+    with pytest.raises(ValueError, match="content or template"):
+        await cli.vault.create("note.md", "content", template="daily")
+    cli._execute.assert_not_awaited()
 
 
 async def test_create_all_params(cli):
-    cli._execute.return_value = ""
-    await cli.vault.create(
-        "note.md",
-        "content",
-        name="My Note",
-        template="daily",
-        overwrite=True,
-        silent=True,
-    )
+    cli._execute.return_value = "Created: notes/My Note.md\n"
+    await cli.vault.create("notes", template="daily", name="My Note", overwrite=True)
     cli._execute.assert_awaited_once_with(
         "create",
         params={
-            "path": "note.md",
-            "content": "content",
-            "name": "My Note",
+            "path": "notes",
             "template": "daily",
+            "name": "My Note",
         },
-        flags=["overwrite", "silent"],
+        flags=["overwrite"],
     )
 
 
@@ -115,7 +111,7 @@ async def test_prepend(cli):
 
 
 async def test_create_with_backslash_escapes(cli):
-    cli._execute.return_value = ""
+    cli._execute.return_value = "Created: note.md\n"
     await cli.vault.create("note.md", r"C:\notes\temp")
     assert cli._execute.await_args_list == [
         call("create", params={"path": "note.md", "content": "C:\\"}, flags=None),
