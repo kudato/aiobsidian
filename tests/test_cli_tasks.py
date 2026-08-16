@@ -7,6 +7,9 @@ TASKS = [
     {"status": "x", "text": "- [x] Write docs", "file": "todo.md", "line": "4"},
 ]
 
+DONE_TASKS = [TASKS[1]]
+TODO_TASKS = [TASKS[0]]
+
 
 async def test_list(cli):
     cli._execute.return_value = json.dumps(TASKS)
@@ -41,19 +44,28 @@ async def test_list_daily(cli):
     )
 
 
-async def test_list_done(cli):
-    cli._execute.return_value = json.dumps(TASKS)
+async def test_list_done_returns_completed_only(cli):
+    cli._execute.return_value = json.dumps(DONE_TASKS)
     result = await cli.tasks.list(done=True)
-    assert result == TASKS
+    assert result == DONE_TASKS
     cli._execute.assert_awaited_once_with(
         "tasks", params=None, flags=["done"], output_format="json"
     )
 
 
+async def test_list_todo(cli):
+    cli._execute.return_value = json.dumps(TODO_TASKS)
+    result = await cli.tasks.list(todo=True)
+    assert result == TODO_TASKS
+    cli._execute.assert_awaited_once_with(
+        "tasks", params=None, flags=["todo"], output_format="json"
+    )
+
+
 async def test_list_all_flags(cli):
-    cli._execute.return_value = json.dumps(TASKS)
+    cli._execute.return_value = json.dumps(DONE_TASKS)
     result = await cli.tasks.list(path="notes", daily=True, done=True)
-    assert result == TASKS
+    assert result == DONE_TASKS
     cli._execute.assert_awaited_once_with(
         "tasks",
         params={"path": "notes"},
@@ -63,36 +75,24 @@ async def test_list_all_flags(cli):
 
 
 async def test_toggle(cli):
-    cli._execute.return_value = ""
+    cli._execute.return_value = "todo.md:5 [x] Buy milk\n"
     await cli.tasks.toggle("todo.md", 5)
     cli._execute.assert_awaited_once_with(
         "task", params={"path": "todo.md", "line": "5"}, flags=["toggle"]
     )
 
 
-async def test_create(cli):
-    cli._execute.return_value = ""
-    await cli.tasks.create("Buy milk")
-    cli._execute.assert_awaited_once_with("task:create", params={"content": "Buy milk"})
-
-
-async def test_create_with_tags(cli):
-    cli._execute.return_value = ""
-    await cli.tasks.create("Buy milk", tags="shopping,errands")
-    cli._execute.assert_awaited_once_with(
-        "task:create", params={"content": "Buy milk", "tags": "shopping,errands"}
-    )
-
-
-async def test_create_empty_tags(cli):
-    cli._execute.return_value = ""
-    await cli.tasks.create("Buy milk", tags="")
-    cli._execute.assert_awaited_once_with(
-        "task:create", params={"content": "Buy milk", "tags": ""}
-    )
-
-
 async def test_complete(cli):
-    cli._execute.return_value = ""
-    await cli.tasks.complete("1")
-    cli._execute.assert_awaited_once_with("task:complete", params={"task": "1"})
+    cli._execute.return_value = "todo.md:5 [x] Buy milk\n"
+    await cli.tasks.complete("todo.md", 5)
+    cli._execute.assert_awaited_once_with(
+        "task", params={"path": "todo.md", "line": "5"}, flags=["done"]
+    )
+
+
+async def test_reopen(cli):
+    cli._execute.return_value = "todo.md:5 [ ] Buy milk\n"
+    await cli.tasks.reopen("todo.md", 5)
+    cli._execute.assert_awaited_once_with(
+        "task", params={"path": "todo.md", "line": "5"}, flags=["todo"]
+    )

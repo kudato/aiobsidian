@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-import json
-from typing import Any
-
 from ._base import BaseCLIResource
 
 
 class CLISyncResource(BaseCLIResource):
     """CLI resource for Obsidian Sync operations.
+
+    Every command except `toggle` needs Sync to be set up for the vault
+    and answers `Error: Sync is not set up for this vault.` otherwise,
+    which surfaces as a `CommandError`.
 
     Attributes:
         _cli: Reference to the parent ``ObsidianCLI`` instance.
@@ -19,66 +20,74 @@ class CLISyncResource(BaseCLIResource):
         Args:
             on: If ``True``, resume sync; if ``False``, pause sync.
         """
-        await self._cli._execute("sync:on" if on else "sync:off")
+        await self._cli._execute("sync", flags=["on" if on else "off"])
 
     async def open(self) -> None:
         """Open the Sync history UI."""
         await self._cli._execute("sync:open")
 
-    async def status(self) -> dict[str, Any]:
+    async def status(self) -> dict[str, str]:
         """Get sync status information.
 
         Returns:
-            Sync status details.
+            Status keyed by field name: ``status``, and, once the vault is
+            set up, ``vault``, ``device``, ``vault size`` and
+            ``account usage``. A vault without Sync answers with the
+            ``status`` field alone.
         """
         output = await self._cli._execute("sync:status")
-        result: dict[str, Any] = json.loads(output)
-        return result
+        # A vault without Sync adds a plain sentence after the status line.
+        return self._parse_fields("sync:status", output, separator=":", strict=False)
 
-    async def history(self, path: str) -> list[dict[str, Any]]:
+    async def history(self, path: str) -> list[str]:
         """List sync version history for a file.
 
         Args:
             path: Path to the file relative to the vault root.
 
         Returns:
-            List of version objects.
+            One line per version, each starting with the version number to
+            pass to `read()` and `restore()`. Version ``0`` is the current
+            one. Empty if the file has no sync history.
         """
         output = await self._cli._execute("sync:history", params={"path": path})
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)
 
-    async def read(self, path: str, *, version: str) -> str:
+    async def read(self, path: str, *, version: int) -> str:
         """Read a specific sync version of a file.
 
         Args:
             path: Path to the file relative to the vault root.
-            version: Version identifier.
+            version: Version number as printed by `history()`, counting
+                from ``0`` for the current version.
 
         Returns:
-            File content at the specified version.
+            File content at that version, without the header line the CLI
+            prints before it.
         """
-        return await self._cli._execute(
-            "sync:read", params={"path": path, "version": version}
+        output = await self._cli._execute(
+            "sync:read", params={"path": path, "version": str(version)}
         )
+        return self._strip_content_header(output)
 
-    async def restore(self, path: str, *, version: str) -> None:
+    async def restore(self, path: str, *, version: int) -> None:
         """Restore a file to a specific sync version.
 
         Args:
             path: Path to the file relative to the vault root.
-            version: Version identifier to restore.
+            version: Version number as printed by `history()`. Version
+                ``0`` is the current one and cannot be restored.
         """
         await self._cli._execute(
-            "sync:restore", params={"path": path, "version": version}
+            "sync:restore", params={"path": path, "version": str(version)}
         )
 
-    async def deleted(self) -> list[dict[str, Any]]:
+    async def deleted(self) -> list[str]:
         """List files deleted via sync.
 
         Returns:
-            List of deleted file objects.
+            One line per deleted file, newest first, each starting with the
+            timestamp of the deletion. Empty if none were deleted.
         """
         output = await self._cli._execute("sync:deleted")
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)

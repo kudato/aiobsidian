@@ -1,76 +1,93 @@
 from __future__ import annotations
 
-import json
-from typing import Any
-
 from ._base import BaseCLIResource
 
 
 class CLIPublishResource(BaseCLIResource):
     """CLI resource for Obsidian Publish operations.
 
+    Obsidian registers the `publish:*` commands only for a vault with a
+    configured Publish site. Without one the CLI answers
+    `Error: Command "publish:status" not found. It may require a plugin to
+    be enabled.`, which surfaces as a `CommandError`.
+
     Attributes:
         _cli: Reference to the parent ``ObsidianCLI`` instance.
     """
 
-    async def open(self, path: str | None = None) -> None:
-        """Open a file on the published site.
+    async def open(self, path: str | None = None) -> str:
+        """Open a file on the published site in a browser.
 
         Args:
-            path: Path to the file to open. If ``None``, opens the
-                site root.
+            path: Path to the file to open. Defaults to the file active
+                in the Obsidian UI.
+
+        Returns:
+            The URL that was opened.
         """
         params = {"path": path} if path is not None else None
-        await self._cli._execute("publish:open", params=params)
+        output = await self._cli._execute("publish:open", params=params)
+        return output.strip()
 
-    async def site(self) -> dict[str, Any]:
+    async def site(self) -> dict[str, str]:
         """Get Publish site information.
 
         Returns:
-            Site configuration details.
+            Site details keyed by field name: ``slug``, ``url`` and, when
+            one is set, ``custom`` for the custom domain.
         """
         output = await self._cli._execute("publish:site")
-        result: dict[str, Any] = json.loads(output)
-        return result
+        return self._parse_fields("publish:site", output)
 
-    async def status(self, path: str | None = None) -> dict[str, Any]:
-        """Get publication status.
-
-        Args:
-            path: Optional file path to check status for.
+    async def status(self) -> list[dict[str, str]]:
+        """List the changes waiting to be published.
 
         Returns:
-            Publication status details.
+            One entry per changed file, with its ``type`` — ``new``,
+            ``changed`` or ``deleted`` — and its ``path``. Empty when the
+            site is up to date.
         """
-        params = {"path": path} if path is not None else None
-        output = await self._cli._execute("publish:status", params=params)
-        result: dict[str, Any] = json.loads(output)
-        return result
+        output = await self._cli._execute("publish:status")
+        return [
+            {"type": row[0], "path": row[1]}
+            for row in self._parse_rows(output)
+            if len(row) == 2
+        ]
 
-    async def add(self, path: str | None = None) -> None:
-        """Publish a file or all changed files.
+    async def add(self, path: str | None = None, *, changed: bool = False) -> str:
+        """Publish a file, or every new and changed file.
 
         Args:
-            path: Path to the file to publish. If ``None``, publishes
-                all changed files.
-        """
-        params = {"path": path} if path is not None else None
-        await self._cli._execute("publish:add", params=params)
+            path: Path to the file to publish. Defaults to the file active
+                in the Obsidian UI.
+            changed: If ``True``, publish every new and changed file and
+                ignore ``path``.
 
-    async def remove(self, path: str) -> None:
+        Returns:
+            The CLI's report of what was published.
+        """
+        if changed:
+            output = await self._cli._execute("publish:add", flags=["changed"])
+        else:
+            params = {"path": path} if path is not None else None
+            output = await self._cli._execute("publish:add", params=params)
+        return output.strip()
+
+    async def remove(self, path: str | None = None) -> None:
         """Unpublish a file.
 
         Args:
-            path: Path to the file to unpublish.
+            path: Path to the file to unpublish. Defaults to the file
+                active in the Obsidian UI.
         """
-        await self._cli._execute("publish:remove", params={"path": path})
+        params = {"path": path} if path is not None else None
+        await self._cli._execute("publish:remove", params=params)
 
-    async def list(self) -> list[dict[str, Any]]:
+    async def list(self) -> list[str]:
         """List published files.
 
         Returns:
-            List of published file objects.
+            Paths of the published files, sorted by the CLI.
         """
         output = await self._cli._execute("publish:list")
-        result: list[dict[str, Any]] = json.loads(output)
-        return result
+        return self._parse_lines(output)
