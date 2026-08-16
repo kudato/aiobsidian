@@ -88,8 +88,6 @@ import httpx
 from aiobsidian import ObsidianClient
 
 custom_http = httpx.AsyncClient(
-    base_url="https://127.0.0.1:27124",
-    headers={"Authorization": "Bearer your-api-key"},
     timeout=60.0,
     verify=False,
     limits=httpx.Limits(max_connections=10),
@@ -100,6 +98,8 @@ client = ObsidianClient(
     http_client=custom_http,
 )
 ```
+
+The `api_key` is applied to every request, so the client needs no `Authorization` header of its own. It needs no `base_url` either — `host`, `port` and `scheme` supply one when it has none. Set `base_url` yourself only to route requests elsewhere, e.g. through a proxy; it then wins over `host`/`port`/`scheme`.
 
 !!! note
     When you provide an external `httpx.AsyncClient`, aiobsidian will **not** close it when `aclose()` is called. You are responsible for managing its lifecycle.

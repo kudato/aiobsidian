@@ -16,10 +16,9 @@ def mock_api():
 
 @pytest.fixture()
 async def client(mock_api):
-    http = httpx.AsyncClient(
-        base_url="https://127.0.0.1:27124",
-        headers={"Authorization": "Bearer test-key"},
-    )
+    # No Authorization header here on purpose: the client must install it
+    # itself, whoever built the transport.
+    http = httpx.AsyncClient(base_url="https://127.0.0.1:27124")
     async with ObsidianClient("test-key", http_client=http) as c:
         yield c
 
