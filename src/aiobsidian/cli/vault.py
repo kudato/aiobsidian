@@ -190,7 +190,7 @@ class CLIVaultResource(BaseCLIResource):
         Raises:
             CLIParseError: If a count is not a number.
         """
-        output = await self._cli._execute("wordcount", params={"file": path})
+        output = await self._cli._execute("wordcount", params={"path": path})
         fields = self._parse_fields("wordcount", output, separator=":")
         try:
             return {key: int(value) for key, value in fields.items()}

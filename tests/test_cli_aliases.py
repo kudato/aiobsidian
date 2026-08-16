@@ -6,7 +6,7 @@ async def test_get(cli):
     result = await cli.aliases.get("notes/my-note.md")
     assert result == ["home", "start"]
     cli._execute.assert_awaited_once_with(
-        "aliases", params={"file": "notes/my-note.md"}
+        "aliases", params={"path": "notes/my-note.md"}
     )
 
 

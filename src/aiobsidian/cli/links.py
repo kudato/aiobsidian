@@ -16,12 +16,12 @@ class CLILinksResource(BaseCLIResource):
         """Get outgoing links from a note.
 
         Args:
-            path: Path or name of the note.
+            path: Path to the note relative to the vault root.
 
         Returns:
             List of paths the note links to.
         """
-        output = await self._cli._execute("links", params={"file": path})
+        output = await self._cli._execute("links", params={"path": path})
         return self._parse_lines(output)
 
     async def incoming(
@@ -30,7 +30,7 @@ class CLILinksResource(BaseCLIResource):
         """Get backlinks (incoming links) to a note.
 
         Args:
-            path: Path or name of the note.
+            path: Path to the note relative to the vault root.
             counts: If ``True``, include reference counts.
 
         Returns:
@@ -38,7 +38,7 @@ class CLILinksResource(BaseCLIResource):
         """
         flags = ["counts"] if counts else None
         output = await self._cli._execute(
-            "backlinks", params={"file": path}, flags=flags, output_format="json"
+            "backlinks", params={"path": path}, flags=flags, output_format="json"
         )
         result: list[dict[str, Any]] = self._parse_json("backlinks", output)
         return result
