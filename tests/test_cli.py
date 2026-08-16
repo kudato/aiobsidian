@@ -23,22 +23,6 @@ SPAWN_KWARGS = {
 }
 
 
-@pytest.fixture(autouse=True)
-def guard_killpg(request):
-    """Keep os.killpg away from process groups the tests do not own.
-
-    A mocked process answers `.pid` with a MagicMock, and MagicMock
-    coerces to 1 through `__index__`, so an unguarded `_kill` would ask
-    the OS to SIGKILL process group 1. A desktop refuses that; a
-    container running as root would not.
-    """
-    if "real_processes" in request.keywords:
-        yield None
-        return
-    with patch("aiobsidian._cli.os.killpg") as killpg:
-        yield killpg
-
-
 def _mock_process(
     stdout: bytes = b"",
     stderr: bytes = b"",
@@ -121,20 +105,86 @@ class TestClose:
 
         assert cli._running == set()
 
-    @pytest.mark.real_processes
-    async def test_aclose_kills_a_command_in_flight(self, tmp_path):
-        # Real processes, and two of them: the guarantee under test is
-        # that nothing survives the close, and a mock cannot show that.
-        # The backgrounded `sleep` inherits stdout, so killing only its
-        # parent would leave the pipe open and `communicate()` blocked.
-        binary = tmp_path / "slow-obsidian"
-        binary.write_text("#!/bin/sh\nsleep 30 &\nwait\n")
-        binary.chmod(0o755)
+    async def test_an_external_kill_is_not_blamed_on_the_close(self):
+        # Signal death plus a closed client is not proof that the close
+        # did it: something else may have killed the command, and then
+        # the real CommandError is what the caller needs. The command is
+        # held mid-flight so the close lands at a known moment.
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        released = asyncio.Event()
 
+        async def communicate():
+            await released.wait()
+            return b"", b"Killed"
+
+        process = _mock_process(returncode=-9)
+        process.communicate = communicate
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            task = asyncio.create_task(cli._execute("append"))
+            while not cli._running:
+                await asyncio.sleep(0)
+            cli._closed = True
+            released.set()
+
+            with pytest.raises(CommandError) as exc_info:
+                await task
+
+        assert exc_info.value.exit_code == -9
+        assert exc_info.value.stderr == "Killed"
+
+
+def _slow_binary(tmp_path, *, leader_waits: bool):
+    """Write a fake `obsidian` that leaves a child of its own behind.
+
+    The child inherits stdout, so killing only the command would leave
+    the pipe open and `communicate()` blocked. It touches a marker
+    before the parent settles, so a test can wait for the child to
+    genuinely exist instead of racing the fork.
+
+    Args:
+        tmp_path: Directory to write into.
+        leader_waits: Whether the command outlives its child. `False`
+            leaves the child orphaned, which is the case that skips a
+            `_kill` guarded on the command's own exit status.
+
+    Returns:
+        The path of the binary and the path of the marker.
+    """
+    marker = tmp_path / "child-started"
+    tail = "wait\n" if leader_waits else "exit 0\n"
+    binary = tmp_path / "slow-obsidian"
+    binary.write_text(f"#!/bin/sh\nsleep 30 &\n: > {marker}\n{tail}")
+    binary.chmod(0o755)
+    return binary, marker
+
+
+async def _await_file(path, *, timeout: float = 5.0):
+    """Wait for a path to appear.
+
+    Args:
+        path: File to wait for.
+        timeout: How long to wait before giving up.
+    """
+    async with asyncio.timeout(timeout):
+        while not path.exists():
+            await asyncio.sleep(0.01)
+
+
+@pytest.mark.real_processes
+class TestCloseKillsRealProcesses:
+    """Real children, because a mock cannot show that nothing survives.
+
+    Each test waits for the grandchild to actually exist before closing.
+    Without that wait the tests pass even with the process-group kill
+    deleted, because the shell has usually not forked yet.
+    """
+
+    async def test_aclose_kills_a_command_in_flight(self, tmp_path):
+        binary, marker = _slow_binary(tmp_path, leader_waits=True)
         cli = ObsidianCLI("TestVault", binary=str(binary))
         task = asyncio.create_task(cli._execute("read", params={"path": "big.md"}))
-        while not cli._running:
-            await asyncio.sleep(0.01)
+        await _await_file(marker)
         process = next(iter(cli._running))
 
         await cli.aclose()
@@ -143,6 +193,56 @@ class TestClose:
             with pytest.raises(RuntimeError, match="closed while it ran"):
                 await task
         assert process.returncode is not None
+        assert cli._running == set()
+        assert cli._killed_by_close == set()
+
+    async def test_aclose_kills_a_child_that_outlived_the_command(self, tmp_path):
+        # The command exits first, so a _kill that returns early on its
+        # exit status never signals the group and the orphan survives,
+        # holding the pipe and the vault.
+        binary, marker = _slow_binary(tmp_path, leader_waits=False)
+        cli = ObsidianCLI("TestVault", binary=str(binary))
+        task = asyncio.create_task(cli._execute("read", params={"path": "big.md"}))
+        await _await_file(marker)
+
+        await cli.aclose()
+
+        async with asyncio.timeout(5):
+            with pytest.raises(RuntimeError, match="closed while it ran"):
+                await task
+
+    async def test_a_timeout_kills_a_child_that_outlived_the_command(self, tmp_path):
+        binary, _ = _slow_binary(tmp_path, leader_waits=False)
+        cli = ObsidianCLI("TestVault", binary=str(binary))
+
+        async with asyncio.timeout(5):
+            with pytest.raises(CLITimeoutError):
+                await cli._execute("read", params={"path": "big.md"}, timeout=0.5)
+
+    async def test_cancellation_kills_a_child_that_outlived_the_command(self, tmp_path):
+        binary, marker = _slow_binary(tmp_path, leader_waits=False)
+        cli = ObsidianCLI("TestVault", binary=str(binary))
+        task = asyncio.create_task(cli._execute("read", params={"path": "big.md"}))
+        await _await_file(marker)
+
+        task.cancel()
+        async with asyncio.timeout(5):
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+    async def test_a_command_spawned_during_aclose_does_not_survive_it(self, tmp_path):
+        # aclose() takes its snapshot of the running commands before this
+        # one is in it, so the command has to notice the close itself.
+        binary, marker = _slow_binary(tmp_path, leader_waits=True)
+        cli = ObsidianCLI("TestVault", binary=str(binary))
+        task = asyncio.create_task(cli._execute("append", params={"content": "x"}))
+        await asyncio.sleep(0)  # let the spawn start, but not finish
+
+        await cli.aclose()
+
+        async with asyncio.timeout(5):
+            with pytest.raises(RuntimeError, match="closed"):
+                await task
         assert cli._running == set()
 
 

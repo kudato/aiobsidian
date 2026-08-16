@@ -23,18 +23,18 @@ def _defined_names(package, base):
     """Collect the public classes a package defines across its modules.
 
     Args:
-        package: Package to walk. Modules whose name starts with an
-            underscore are private and are skipped.
+        package: Package to walk, subpackages included. Modules whose
+            name starts with an underscore are private and are skipped.
         base: Base class the collected classes inherit from.
 
     Returns:
         Set of class names.
     """
     names = set()
-    for info in pkgutil.iter_modules(package.__path__):
-        if info.name.startswith("_"):
+    for info in pkgutil.walk_packages(package.__path__, f"{package.__name__}."):
+        if info.name.rpartition(".")[2].startswith("_"):
             continue
-        module = importlib.import_module(f"{package.__name__}.{info.name}")
+        module = importlib.import_module(info.name)
         names |= {
             obj.__name__
             for obj in vars(module).values()

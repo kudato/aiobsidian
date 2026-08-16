@@ -20,15 +20,15 @@ def _resource_classes(package, base):
     """Collect the resource classes a package defines itself.
 
     Args:
-        package: Package to walk.
+        package: Package to walk, subpackages included.
         base: Base class every resource inherits from.
 
     Returns:
         Resource classes, excluding those merely imported into a module.
     """
     found = []
-    for info in pkgutil.iter_modules(package.__path__):
-        module = importlib.import_module(f"{package.__name__}.{info.name}")
+    for info in pkgutil.walk_packages(package.__path__, f"{package.__name__}."):
+        module = importlib.import_module(info.name)
         found.extend(
             obj
             for obj in vars(module).values()

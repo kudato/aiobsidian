@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- `ObsidianCLI.aclose()`, so either client can be released without an `isinstance` check
+- `ObsidianCLI.run()` for commands the library does not wrap, the CLI counterpart of `ObsidianClient.request()`
+- Resource and model classes are importable from `aiobsidian.cli`, `aiobsidian.rest` and `aiobsidian.models`
+
+### Changed
+- **Breaking**: leaving an `ObsidianCLI` context manager now closes the client. It was a no-op before, so one instance could be used across several `async with` blocks; the second one now raises `RuntimeError`
+- Closing an `ObsidianCLI` kills every command still running, and the command's own children with it
+
+### Fixed
+- Cancelling or timing out a command left the processes it had started behind, holding the vault and the caller's pipe. Commands now run in their own process group
+- Every resource declares `__slots__`; only the base classes did, so instances carried a `__dict__`
+
 ## [0.4.0] — 2026-03-29
 
 ### Added

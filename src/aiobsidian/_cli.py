@@ -48,6 +48,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_CAN_SIGNAL_GROUPS = hasattr(os, "killpg") and hasattr(signal, "SIGKILL")
+"""Whether a whole process group can be signalled. False on Windows,
+where `start_new_session` is accepted and ignored, so a command's own
+children are beyond reach and only the command itself can be stopped."""
+
 _ERROR_PREFIX = "Error: "
 _NOT_FOUND_PATTERN = re.compile(r"\bnot found\b", re.IGNORECASE)
 _UNKNOWN_COMMAND_PATTERN = re.compile(r'^Error: Command "[^"]*" not found')
@@ -88,6 +93,7 @@ class ObsidianCLI:
         self._timeout = timeout
         self._binary = self._resolve_binary(binary)
         self._running: set[asyncio.subprocess.Process] = set()
+        self._killed_by_close: set[asyncio.subprocess.Process] = set()
         self._closed = False
 
     def __repr__(self) -> str:
@@ -153,7 +159,8 @@ class ObsidianCLI:
             Standard output of the command, exactly as printed.
 
         Raises:
-            RuntimeError: If the client has been closed.
+            RuntimeError: If the client is closed, or is closed while the
+                command runs.
             BinaryNotFoundError: If the binary cannot be executed.
             CLINotFoundError: If the CLI reports a missing resource.
             CommandError: If the command fails for any other reason.
@@ -202,7 +209,8 @@ class ObsidianCLI:
             Standard output from the command as a string.
 
         Raises:
-            RuntimeError: If the client has been closed.
+            RuntimeError: If the client is closed, or is closed while the
+                command runs.
             BinaryNotFoundError: If the binary cannot be executed.
             CLINotFoundError: If the CLI reports a missing resource.
             CommandError: If the command fails for any other reason.
@@ -239,7 +247,19 @@ class ObsidianCLI:
                 f"{exc}. Install Obsidian v1.12+ or pass binary= explicitly."
             ) from exc
 
+        # Registering and re-checking without an await in between is what
+        # makes this safe: aclose() either set _closed before the check,
+        # and this kills its own child, or it has yet to take its
+        # snapshot of _running, which by then contains the child.
         self._running.add(process)
+        if self._closed:
+            self._running.discard(process)
+            await self._kill(process)
+            raise RuntimeError(
+                f"Cannot run {command!r}: this ObsidianCLI was closed while "
+                f"the command was starting."
+            )
+
         try:
             stdout_bytes, stderr_bytes = await asyncio.wait_for(
                 process.communicate(), timeout=effective_timeout
@@ -252,11 +272,14 @@ class ObsidianCLI:
             raise
         finally:
             self._running.discard(process)
+            killed_by_close = process in self._killed_by_close
+            self._killed_by_close.discard(process)
 
-        # A signal we did not send is somebody else's business, but a
-        # signal plus a closed client is aclose() killing this command,
-        # and "exit_code=-9, no output" would not say so.
-        if self._closed and (process.returncode or 0) < 0:
+        if killed_by_close:
+            # Otherwise this surfaces as "exit_code=-9, no output", which
+            # names neither the cause nor the culprit. Membership, not a
+            # signal death plus a closed client: something else may have
+            # killed the command, and that is somebody else's business.
             raise RuntimeError(
                 f"Command {command!r} was killed: this ObsidianCLI was closed "
                 f"while it ran."
@@ -285,13 +308,18 @@ class ObsidianCLI:
         pipe open with it, leaving whoever awaits the output stuck in
         `communicate()` for as long as the grandchild runs.
 
+        The group is signalled even when the command itself has already
+        exited, because that is precisely when a grandchild is what is
+        left to kill.
+
         Args:
             process: The child process to stop.
         """
+        if _CAN_SIGNAL_GROUPS:
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.killpg(process.pid, signal.SIGKILL)
         if process.returncode is not None:
             return
-        with contextlib.suppress(ProcessLookupError, PermissionError):
-            os.killpg(process.pid, signal.SIGKILL)
         with contextlib.suppress(ProcessLookupError):
             process.kill()
         with contextlib.suppress(ProcessLookupError, asyncio.CancelledError):
@@ -532,5 +560,6 @@ class ObsidianCLI:
         """
         self._closed = True
         for process in list(self._running):
+            self._killed_by_close.add(process)
             await self._kill(process)
-        self._running.clear()
+            self._running.discard(process)
