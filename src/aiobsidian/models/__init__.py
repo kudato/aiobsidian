@@ -3,7 +3,7 @@
 from .commands import Command
 from .search import MatchSpan, SearchMatch, SearchResult
 from .system import ServerStatus, Versions
-from .vault import DocumentMap, FileStat, NoteJson, VaultDirectory
+from .vault import DocumentMap, FileStat, NoteJson
 
 __all__ = [
     "Command",
@@ -14,6 +14,5 @@ __all__ = [
     "SearchMatch",
     "SearchResult",
     "ServerStatus",
-    "VaultDirectory",
     "Versions",
 ]

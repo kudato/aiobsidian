@@ -38,7 +38,7 @@ missing note can be handled the same way on both transports:
 from aiobsidian import NotFoundError
 
 try:
-    content = await cli.vault.read("note.md")   # or client.vault.get("note.md")
+    content = await cli.vault.read("note.md")   # client.vault.read() is the same call
 except NotFoundError:
     print("Note does not exist")
 ```
@@ -112,7 +112,7 @@ from aiobsidian import (
 
 async with ObsidianClient(api_key="your-api-key") as client:
     try:
-        content = await client.vault.get("nonexistent.md")
+        content = await client.vault.read("nonexistent.md")
     except APIConnectionError:
         print("Obsidian is not reachable — is it running with the plugin enabled?")
     except APITimeoutError:

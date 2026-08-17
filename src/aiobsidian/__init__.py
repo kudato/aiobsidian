@@ -37,7 +37,6 @@ from .models import (
     SearchMatch,
     SearchResult,
     ServerStatus,
-    VaultDirectory,
     Versions,
 )
 
@@ -75,5 +74,4 @@ __all__ = [
     "ServerStatus",
     "TargetType",
     "Versions",
-    "VaultDirectory",
 ]

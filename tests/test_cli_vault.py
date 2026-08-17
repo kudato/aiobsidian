@@ -20,25 +20,9 @@ async def test_read(cli):
     cli._execute.assert_awaited_once_with("read", params={"path": "note.md"})
 
 
-async def test_create(cli):
+async def test_write(cli):
     cli._execute.return_value = "Created: note.md\n"
-    await cli.vault.create("note.md", "content")
-    cli._execute.assert_awaited_once_with(
-        "create", params={"path": "note.md", "content": "content"}, flags=None
-    )
-
-
-async def test_create_empty(cli):
-    cli._execute.return_value = "Created: note.md\n"
-    await cli.vault.create("note.md")
-    cli._execute.assert_awaited_once_with(
-        "create", params={"path": "note.md", "content": ""}, flags=None
-    )
-
-
-async def test_create_overwrite(cli):
-    cli._execute.return_value = ""
-    await cli.vault.create("note.md", "content", overwrite=True)
+    await cli.vault.write("note.md", "content")
     cli._execute.assert_awaited_once_with(
         "create",
         params={"path": "note.md", "content": "content"},
@@ -46,35 +30,53 @@ async def test_create_overwrite(cli):
     )
 
 
-async def test_create_with_name(cli):
+async def test_write_empty(cli):
+    cli._execute.return_value = "Created: note.md\n"
+    await cli.vault.write("note.md")
+    cli._execute.assert_awaited_once_with(
+        "create", params={"path": "note.md", "content": ""}, flags=["overwrite"]
+    )
+
+
+async def test_write_without_overwrite(cli):
+    cli._execute.return_value = ""
+    await cli.vault.write("note.md", "content", overwrite=False)
+    cli._execute.assert_awaited_once_with(
+        "create",
+        params={"path": "note.md", "content": "content"},
+        flags=None,
+    )
+
+
+async def test_write_with_name(cli):
     cli._execute.return_value = "Created: notes/My Note.md\n"
-    await cli.vault.create("notes", "content", name="My Note")
+    await cli.vault.write("notes", "content", name="My Note")
     cli._execute.assert_awaited_once_with(
         "create",
         params={"path": "notes", "content": "content", "name": "My Note"},
-        flags=None,
+        flags=["overwrite"],
     )
 
 
-async def test_create_with_template(cli):
+async def test_write_with_template(cli):
     cli._execute.return_value = "Created: note.md\n"
-    await cli.vault.create("note.md", template="daily")
+    await cli.vault.write("note.md", template="daily")
     cli._execute.assert_awaited_once_with(
         "create",
         params={"path": "note.md", "template": "daily"},
-        flags=None,
+        flags=["overwrite"],
     )
 
 
-async def test_create_rejects_content_and_template(cli):
+async def test_write_rejects_content_and_template(cli):
     with pytest.raises(ValueError, match="content or template"):
-        await cli.vault.create("note.md", "content", template="daily")
+        await cli.vault.write("note.md", "content", template="daily")
     cli._execute.assert_not_awaited()
 
 
-async def test_create_all_params(cli):
+async def test_write_all_params(cli):
     cli._execute.return_value = "Created: notes/My Note.md\n"
-    await cli.vault.create("notes", template="daily", name="My Note", overwrite=True)
+    await cli.vault.write("notes", template="daily", name="My Note", overwrite=False)
     cli._execute.assert_awaited_once_with(
         "create",
         params={
@@ -82,7 +84,7 @@ async def test_create_all_params(cli):
             "template": "daily",
             "name": "My Note",
         },
-        flags=["overwrite"],
+        flags=None,
     )
 
 
@@ -110,11 +112,15 @@ async def test_prepend(cli):
     )
 
 
-async def test_create_with_backslash_escapes(cli):
+async def test_write_with_backslash_escapes(cli):
     cli._execute.return_value = "Created: note.md\n"
-    await cli.vault.create("note.md", r"C:\notes\temp")
+    await cli.vault.write("note.md", r"C:\notes\temp")
     assert cli._execute.await_args_list == [
-        call("create", params={"path": "note.md", "content": "C:\\"}, flags=None),
+        call(
+            "create",
+            params={"path": "note.md", "content": "C:\\"},
+            flags=["overwrite"],
+        ),
         call(
             "append",
             params={"path": "note.md", "content": "notes\\"},

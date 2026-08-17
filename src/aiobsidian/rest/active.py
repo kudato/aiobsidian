@@ -15,39 +15,39 @@ class ActiveFileResource(ContentResource):
     _BASE_URL = "/active/"
 
     @overload
-    async def get(
+    async def read(
         self,
         *,
         content_type: Literal[ContentType.MARKDOWN] = ...,
     ) -> str: ...
 
     @overload
-    async def get(
+    async def read(
         self,
         *,
         content_type: Literal[ContentType.NOTE_JSON],
     ) -> NoteJson: ...
 
     @overload
-    async def get(
+    async def read(
         self,
         *,
         content_type: Literal[ContentType.DOCUMENT_MAP],
     ) -> DocumentMap: ...
 
     @overload
-    async def get(
+    async def read(
         self,
         *,
         content_type: ContentType,
     ) -> str | NoteJson | DocumentMap: ...
 
-    async def get(
+    async def read(
         self,
         *,
         content_type: ContentType = ContentType.MARKDOWN,
     ) -> str | NoteJson | DocumentMap:
-        """Get the content of the active file.
+        """Read the content of the active file.
 
         Args:
             content_type: Desired response format. Use
@@ -61,7 +61,7 @@ class ActiveFileResource(ContentResource):
         """
         return await self._get_content(self._BASE_URL, content_type)
 
-    async def update(self, content: str) -> None:
+    async def write(self, content: str) -> None:
         """Replace the entire content of the active file.
 
         Args:

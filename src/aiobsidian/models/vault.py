@@ -56,13 +56,3 @@ class DocumentMap(BaseModel):
     headings: list[str]
     blocks: list[str]
     frontmatter_fields: list[str] = Field(default=[], alias="frontmatterFields")
-
-
-class VaultDirectory(BaseModel):
-    """Directory listing of files in the vault.
-
-    Attributes:
-        files: List of file paths relative to the vault root.
-    """
-
-    files: list[str]

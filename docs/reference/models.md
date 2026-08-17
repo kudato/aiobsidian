@@ -8,8 +8,6 @@
 
 ::: aiobsidian.models.DocumentMap
 
-::: aiobsidian.models.VaultDirectory
-
 ## Search Models
 
 ::: aiobsidian.models.MatchSpan
