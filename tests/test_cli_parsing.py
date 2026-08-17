@@ -377,9 +377,9 @@ class TestParseFieldsAs:
         ],
     )
     def test_a_blank_line(self, output):
-        # Only the one newline the output ends with is the CLI's own, so
-        # a blank line is a field it did not print — a description that
-        # ends in a newline of its own, among other things.
+        # Obsidian ends the output with a newline only when the last
+        # field did not end with one itself, so a blank line anywhere is
+        # a field the CLI never printed.
         with pytest.raises(CLIParseError):
             BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
 
