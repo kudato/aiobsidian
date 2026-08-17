@@ -3,9 +3,14 @@ from __future__ import annotations
 import pytest
 
 from aiobsidian._exceptions import CLIParseError
-from aiobsidian.models.publish import PublishChange
+from aiobsidian.models.publish import PublishChange, PublishSite
 
-SITE_INFO = "slug\tmysite\nurl\thttps://publish.obsidian.md/mysite\ncustom\thttps://notes.example.com\n"
+# Obsidian prints the custom domain only for a site that has one.
+SITE_INFO = (
+    "slug\tmysite\n"
+    "url\thttps://publish.obsidian.md/mysite\n"
+    "custom\thttps://notes.example.com\n"
+)
 
 PUBLISHED_FILES = "about.md\nindex.md\n"
 
@@ -32,12 +37,27 @@ async def test_open_active_file(cli):
 async def test_site(cli):
     cli._execute.return_value = SITE_INFO
     result = await cli.publish.site()
-    assert result == {
-        "slug": "mysite",
-        "url": "https://publish.obsidian.md/mysite",
-        "custom": "https://notes.example.com",
-    }
+    assert result == PublishSite(
+        slug="mysite",
+        url="https://publish.obsidian.md/mysite",
+        custom_domain="https://notes.example.com",
+    )
     cli._execute.assert_awaited_once_with("publish:site")
+
+
+async def test_site_without_a_custom_domain(cli):
+    cli._execute.return_value = (
+        "slug\tmysite\nurl\thttps://publish.obsidian.md/mysite\n"
+    )
+    result = await cli.publish.site()
+    assert result.custom_domain is None
+
+
+async def test_site_without_the_url_field(cli):
+    cli._execute.return_value = "slug\tmysite\n"
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.publish.site()
+    assert exc_info.value.command == "publish:site"
 
 
 async def test_list(cli):

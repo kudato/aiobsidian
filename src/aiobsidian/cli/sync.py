@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+from ..models import SyncStatus
 from ._base import BaseCLIResource
 
 
 class CLISyncResource(BaseCLIResource):
     """CLI resource for Obsidian Sync operations.
 
-    Every command except `set_paused` needs Sync to be set up for the
-    vault and answers `Error: Sync is not set up for this vault.`
-    otherwise, which surfaces as a `CommandError`.
+    Every command except `set_paused` and `status` needs Sync to be set
+    up for the vault and answers `Error: Sync is not set up for this
+    vault.` otherwise, which surfaces as a `CommandError`.
 
     Attributes:
         _cli: Reference to the parent ``ObsidianCLI`` instance.
@@ -30,18 +31,23 @@ class CLISyncResource(BaseCLIResource):
         """Open the Sync history UI."""
         await self._cli._execute("sync:open")
 
-    async def status(self) -> dict[str, str]:
+    async def status(self) -> SyncStatus:
         """Get sync status information.
 
+        This is the one Sync command a vault without Sync answers: it
+        reports the status alone rather than failing.
+
         Returns:
-            Status keyed by field name: ``status``, and, once the vault is
-            set up, ``vault``, ``device``, ``vault size`` and
-            ``account usage``. A vault without Sync answers with the
-            ``status`` field alone.
+            What Sync is doing, and what it knows about this vault.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
         """
         output = await self._cli._execute("sync:status")
         # A vault without Sync adds a plain sentence after the status line.
-        return self._parse_fields("sync:status", output, separator=":", strict=False)
+        return self._parse_fields_as(
+            "sync:status", output, SyncStatus, separator=":", strict=False
+        )
 
     async def history(self, path: str) -> list[str]:
         """List sync version history for a file.

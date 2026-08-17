@@ -1,10 +1,23 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from unittest.mock import call
 
 import pytest
 
 from aiobsidian._exceptions import CLIParseError
+from aiobsidian.models.vault import FileInfo, FolderInfo, VaultInfo, WordCount
+
+VAULT_INFO = (
+    "name\tTestVault\npath\t/vaults/TestVault\nfiles\t47\nfolders\t14\nsize\t2825\n"
+)
+
+# `created` and `modified` come straight from the file system record,
+# where Obsidian keeps them as milliseconds since the epoch.
+FILE_INFO = (
+    "path\tnote.md\nname\tnote\nextension\tmd\nsize\t137\n"
+    "created\t1786836399339\nmodified\t1786836399341\n"
+)
 
 
 async def test_open(cli):
@@ -246,48 +259,79 @@ async def test_list_empty_vault(cli):
 
 
 async def test_info(cli):
-    cli._execute.return_value = (
-        "name\tTestVault\npath\t/vaults/TestVault\nfiles\t47\nfolders\t14\nsize\t2825\n"
-    )
+    cli._execute.return_value = VAULT_INFO
     result = await cli.vault.info()
-    assert result == {
-        "name": "TestVault",
-        "path": "/vaults/TestVault",
-        "files": "47",
-        "folders": "14",
-        "size": "2825",
-    }
+    assert result == VaultInfo(
+        name="TestVault",
+        path="/vaults/TestVault",
+        files=47,
+        folders=14,
+        size=2825,
+    )
     cli._execute.assert_awaited_once_with("vault")
+
+
+async def test_info_counts_are_numbers(cli):
+    cli._execute.return_value = VAULT_INFO
+    result = await cli.vault.info()
+    assert isinstance(result.files, int)
+    assert isinstance(result.folders, int)
+    assert isinstance(result.size, int)
 
 
 async def test_info_unexpected_output(cli):
     cli._execute.return_value = "not a field list\n"
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.vault.info()
+    assert exc_info.value.command == "vault"
+
+
+async def test_info_without_the_path_field(cli):
+    cli._execute.return_value = "name\tTestVault\nfiles\t47\nfolders\t14\nsize\t2825\n"
     with pytest.raises(CLIParseError):
         await cli.vault.info()
 
 
 async def test_file_info(cli):
-    cli._execute.return_value = (
-        "path\tnote.md\nname\tnote\nextension\tmd\nsize\t137\n"
-        "created\t1786836399339\nmodified\t1786836399341\n"
-    )
+    cli._execute.return_value = FILE_INFO
     result = await cli.vault.file_info("note.md")
-    assert result == {
-        "path": "note.md",
-        "name": "note",
-        "extension": "md",
-        "size": "137",
-        "created": "1786836399339",
-        "modified": "1786836399341",
-    }
+    assert result == FileInfo(
+        path="note.md",
+        name="note",
+        extension="md",
+        size=137,
+        created=datetime(2026, 8, 15, 23, 26, 39, 339000, tzinfo=UTC),
+        modified=datetime(2026, 8, 15, 23, 26, 39, 341000, tzinfo=UTC),
+    )
     cli._execute.assert_awaited_once_with("file", params={"path": "note.md"})
+
+
+async def test_file_info_reads_the_timestamps_as_milliseconds(cli):
+    cli._execute.return_value = FILE_INFO
+    result = await cli.vault.file_info("note.md")
+    assert result.created.timestamp() * 1000 == 1786836399339
+    assert result.modified.timestamp() * 1000 == 1786836399341
+
+
+async def test_file_info_without_a_numeric_timestamp(cli):
+    cli._execute.return_value = FILE_INFO.replace("1786836399339", "just now")
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.vault.file_info("note.md")
+    assert exc_info.value.command == "file"
 
 
 async def test_folder_info(cli):
     cli._execute.return_value = "path\tnotes\nfiles\t3\nfolders\t0\nsize\t305\n"
     result = await cli.vault.folder_info("notes")
-    assert result == {"path": "notes", "files": "3", "folders": "0", "size": "305"}
+    assert result == FolderInfo(path="notes", files=3, folders=0, size=305)
     cli._execute.assert_awaited_once_with("folder", params={"path": "notes"})
+
+
+async def test_folder_info_unexpected_output(cli):
+    cli._execute.return_value = "path\tnotes\nfiles\tthree\nfolders\t0\nsize\t305\n"
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.vault.folder_info("notes")
+    assert exc_info.value.command == "folder"
 
 
 async def test_folders(cli):
@@ -307,11 +351,19 @@ async def test_folders_with_parent(cli):
 async def test_wordcount(cli):
     cli._execute.return_value = "words: 500\ncharacters: 2800\n"
     result = await cli.vault.wordcount("note.md")
-    assert result == {"words": 500, "characters": 2800}
+    assert result == WordCount(words=500, characters=2800)
+    assert isinstance(result.words, int)
     cli._execute.assert_awaited_once_with("wordcount", params={"path": "note.md"})
 
 
 async def test_wordcount_non_numeric(cli):
-    cli._execute.return_value = "words: many\n"
+    cli._execute.return_value = "words: many\ncharacters: 2800\n"
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.vault.wordcount("note.md")
+    assert exc_info.value.command == "wordcount"
+
+
+async def test_wordcount_without_the_character_count(cli):
+    cli._execute.return_value = "words: 500\n"
     with pytest.raises(CLIParseError):
         await cli.vault.wordcount("note.md")

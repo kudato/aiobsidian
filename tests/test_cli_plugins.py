@@ -5,7 +5,7 @@ import json
 import pytest
 
 from aiobsidian._exceptions import CLIParseError
-from aiobsidian.models.plugins import Plugin
+from aiobsidian.models.plugins import Plugin, PluginInfo
 
 # `plugins` lists everything installed. Core plugins ship with the app and
 # report no version; only community ones carry a number.
@@ -21,12 +21,61 @@ ENABLED_PLUGINS = [
     {"id": "bookmarks"},
 ]
 
+# A community plugin is described from its manifest, so it names an author
+# and a version. Obsidian keeps the description last and leaves it out when
+# the manifest has none.
+COMMUNITY_INFO = (
+    "type\tcommunity\n"
+    "name\tLocal REST API with MCP\n"
+    "version\t5.1.0\n"
+    "author\tAdam Coddington\n"
+    "enabled\ttrue\n"
+    "description\tA secure REST API and Model Context Protocol (MCP) server "
+    "for your vault.\n"
+)
+
+# A core plugin has no manifest, and its name is translated.
+CORE_INFO = "type\tcore\nname\tЕжедневные заметки\nenabled\ttrue\n"
+
 
 async def test_info(cli):
-    cli._execute.return_value = "type\tcommunity\nname\tDataview\nenabled\ttrue\n"
-    result = await cli.plugins.info("dataview")
-    assert result == {"type": "community", "name": "Dataview", "enabled": "true"}
-    cli._execute.assert_awaited_once_with("plugin", params={"id": "dataview"})
+    cli._execute.return_value = COMMUNITY_INFO
+    result = await cli.plugins.info("obsidian-local-rest-api")
+    assert result == PluginInfo(
+        type="community",
+        name="Local REST API with MCP",
+        version="5.1.0",
+        author="Adam Coddington",
+        enabled=True,
+        description=(
+            "A secure REST API and Model Context Protocol (MCP) server for your vault."
+        ),
+    )
+    cli._execute.assert_awaited_once_with(
+        "plugin", params={"id": "obsidian-local-rest-api"}
+    )
+
+
+async def test_info_of_a_core_plugin(cli):
+    cli._execute.return_value = CORE_INFO
+    result = await cli.plugins.info("daily-notes")
+    assert result == PluginInfo(type="core", name="Ежедневные заметки", enabled=True)
+    assert result.version is None
+    assert result.author is None
+    assert result.description is None
+
+
+async def test_info_of_a_disabled_plugin(cli):
+    cli._execute.return_value = CORE_INFO.replace("true", "false")
+    result = await cli.plugins.info("daily-notes")
+    assert result.enabled is False
+
+
+async def test_info_without_the_enabled_field(cli):
+    cli._execute.return_value = "type\tcore\nname\tBacklinks\n"
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.plugins.info("backlink")
+    assert exc_info.value.command == "plugin"
 
 
 async def test_set_restricted_true(cli):

@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import pytest
+
+from aiobsidian._exceptions import CLIParseError
+from aiobsidian.models.sync import SyncStatus
+
 STATUS = (
     "status: synced\n"
     "vault: MyVault\n"
@@ -45,20 +50,52 @@ async def test_open(cli):
 async def test_status(cli):
     cli._execute.return_value = STATUS
     result = await cli.sync.status()
-    assert result == {
-        "status": "synced",
-        "vault": "MyVault",
-        "device": "MacBook",
-        "vault size": "3.2 MB",
-        "account usage": "3.2 MB / 10 GB",
-    }
+    assert result == SyncStatus(
+        status="synced",
+        vault="MyVault",
+        device="MacBook",
+        vault_size="3.2 MB",
+        account_used="3.2 MB",
+        account_limit="10 GB",
+    )
     cli._execute.assert_awaited_once_with("sync:status")
 
 
 async def test_status_without_sync(cli):
     cli._execute.return_value = STATUS_NOT_SET_UP
     result = await cli.sync.status()
-    assert result == {"status": "disconnected"}
+    assert result == SyncStatus(status="disconnected")
+    assert result.vault is None
+    assert result.vault_size is None
+    assert result.account_used is None
+    assert result.account_limit is None
+
+
+async def test_status_without_the_quota(cli):
+    # Obsidian asks its server for the quota and prints the vault and
+    # the account sizes only once it answers.
+    cli._execute.return_value = "status: syncing\nvault: MyVault\ndevice: MacBook\n"
+    result = await cli.sync.status()
+    assert result == SyncStatus(status="syncing", vault="MyVault", device="MacBook")
+
+
+async def test_status_with_a_colon_in_the_device_name(cli):
+    cli._execute.return_value = "status: synced\ndevice: MacBook: work\n"
+    result = await cli.sync.status()
+    assert result.device == "MacBook: work"
+
+
+async def test_status_with_one_size_in_the_usage_line(cli):
+    cli._execute.return_value = STATUS.replace(" / 10 GB", "")
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.sync.status()
+    assert exc_info.value.command == "sync:status"
+
+
+async def test_status_without_the_status_field(cli):
+    cli._execute.return_value = "vault: MyVault\ndevice: MacBook\n"
+    with pytest.raises(CLIParseError):
+        await cli.sync.status()
 
 
 async def test_history(cli):

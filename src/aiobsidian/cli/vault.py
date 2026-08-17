@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .._exceptions import CLIParseError
+from ..models import FileInfo, FolderInfo, VaultInfo, WordCount
 from ._base import BaseCLIResource
 
 
@@ -159,41 +159,47 @@ class CLIVaultResource(BaseCLIResource):
         flags = ["permanent"] if permanent else None
         await self._cli._execute("delete", params={"path": path}, flags=flags)
 
-    async def info(self) -> dict[str, str]:
+    async def info(self) -> VaultInfo:
         """Get vault information.
 
         Returns:
-            Vault details keyed by field name: ``name``, ``path``, ``files``,
-            ``folders`` and ``size``.
+            The vault's name, where it lives and what it holds.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
         """
         output = await self._cli._execute("vault")
-        return self._parse_fields("vault", output)
+        return self._parse_fields_as("vault", output, VaultInfo)
 
-    async def file_info(self, path: str) -> dict[str, str]:
+    async def file_info(self, path: str) -> FileInfo:
         """Get information about a file.
 
         Args:
             path: Path to the file relative to the vault root.
 
         Returns:
-            File metadata keyed by field name: ``path``, ``name``,
-            ``extension``, ``size``, ``created`` and ``modified``.
+            The file's name, size and timestamps.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
         """
         output = await self._cli._execute("file", params={"path": path})
-        return self._parse_fields("file", output)
+        return self._parse_fields_as("file", output, FileInfo)
 
-    async def folder_info(self, path: str) -> dict[str, str]:
+    async def folder_info(self, path: str) -> FolderInfo:
         """Get information about a folder.
 
         Args:
             path: Path to the folder relative to the vault root.
 
         Returns:
-            Folder metadata keyed by field name: ``path``, ``files``,
-            ``folders`` and ``size``.
+            What the folder holds, at any depth below it.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
         """
         output = await self._cli._execute("folder", params={"path": path})
-        return self._parse_fields("folder", output)
+        return self._parse_fields_as("folder", output, FolderInfo)
 
     async def folders(self, folder: str = "") -> list[str]:
         """List folders in the vault.
@@ -209,24 +215,22 @@ class CLIVaultResource(BaseCLIResource):
         output = await self._cli._execute("folders", params=params)
         return self._parse_lines(output)
 
-    async def wordcount(self, path: str) -> dict[str, int]:
+    async def wordcount(self, path: str) -> WordCount:
         """Get word and character count for a file.
 
         Args:
-            path: Path to the file relative to the vault root.
+            path: Path to a Markdown file relative to the vault root.
+                The CLI counts nothing else and reports any other
+                extension as a failure.
 
         Returns:
-            Mapping with the ``words`` and ``characters`` counts.
+            How much text the note holds.
 
         Raises:
-            CLIParseError: If a count is not a number.
+            CLIParseError: If the output has an unexpected shape.
         """
         output = await self._cli._execute("wordcount", params={"path": path})
-        fields = self._parse_fields("wordcount", output, separator=":")
-        try:
-            return {key: int(value) for key, value in fields.items()}
-        except ValueError as exc:
-            raise CLIParseError("wordcount", output) from exc
+        return self._parse_fields_as("wordcount", output, WordCount, separator=":")
 
     async def list(self, folder: str = "", *, ext: str | None = None) -> list[str]:
         """List files in the vault.
