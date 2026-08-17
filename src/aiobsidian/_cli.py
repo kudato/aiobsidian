@@ -95,7 +95,7 @@ class ObsidianCLI:
         self._running: set[asyncio.subprocess.Process] = set()
         self._killed_by_close: set[asyncio.subprocess.Process] = set()
         self._collecting: set[asyncio.Task[None]] = set()
-        self._starting = 0
+        self._unsettled = 0
         self._settled = asyncio.Event()
         self._settled.set()
         self._closed = False
@@ -245,7 +245,7 @@ class ObsidianCLI:
         # Counted from here, before the spawn can be awaited, so that a
         # concurrent aclose() knows a command exists that is not in
         # _running yet and waits for it rather than returning early.
-        self._one_more_starting()
+        self._unsettle()
         try:
             spawn = asyncio.create_task(
                 asyncio.create_subprocess_exec(
@@ -270,7 +270,7 @@ class ObsidianCLI:
                 # still inside the `finally` that lowers its own count, so
                 # the total never reaches zero in between and aclose()
                 # goes on waiting for a command that is on its way.
-                self._one_more_starting()
+                self._unsettle()
                 spawn.add_done_callback(self._reclaim)
                 raise
             except OSError as exc:
@@ -280,7 +280,7 @@ class ObsidianCLI:
                 ) from exc
             self._running.add(process)
         finally:
-            self._one_fewer_starting()
+            self._settle()
 
         # Registering and re-checking without an await in between is what
         # makes this safe: aclose() either set _closed before the check,
@@ -402,7 +402,7 @@ class ObsidianCLI:
                 behind.
         """
         if spawn.cancelled() or spawn.exception() is not None:
-            self._one_fewer_starting()
+            self._settle()
             return
         process = spawn.result()
         self._signal(process)
@@ -427,27 +427,29 @@ class ObsidianCLI:
         try:
             await self._reap(process)
         finally:
-            self._one_fewer_starting()
+            self._settle()
 
-    def _one_more_starting(self) -> None:
-        """Count a command that has begun starting.
+    def _unsettle(self) -> None:
+        """Count one more command whose fate is undecided.
 
-        The count and the event are one fact in two spellings — the
-        event is set exactly when the count is zero — so both are kept
-        here rather than at each place a command comes and goes.
+        Coming up, or up and being killed off — either way `aclose()`
+        cannot yet promise that nothing of it is running. The count and
+        the event are one fact in two spellings, the event being set
+        exactly when the count is zero, so both are kept here rather
+        than at each place a command comes and goes.
         """
-        self._starting += 1
+        self._unsettled += 1
         self._settled.clear()
 
-    def _one_fewer_starting(self) -> None:
-        """Count a command that has finished starting.
+    def _settle(self) -> None:
+        """Count one command whose fate is decided.
 
-        Finished either way: running, refused by the OS, or killed
-        before anyone could use it. What the count tells `aclose()` is
-        that nothing is on its way, not that anything succeeded.
+        Decided, not successful: it is running, or the OS refused it, or
+        it is dead. Any of the three is something `aclose()` can act on,
+        which is all the count is for.
         """
-        self._starting -= 1
-        if not self._starting:
+        self._unsettled -= 1
+        if not self._unsettled:
             self._settled.set()
 
     @staticmethod
@@ -689,10 +691,10 @@ class ObsidianCLI:
         interrupt the collecting of processes that are already dead.
 
         A command caught mid-spawn is waited for instead of signalled: it
-        has no pid yet, so there is nothing to aim at on its behalf.
-        Cancelling that wait hands the killing back to the command's own
-        task, which does it as soon as the pid exists — whether or not
-        that task is itself cancelled in the same window.
+        has no pid yet, so there is nothing to aim at on its behalf. One
+        that was abandoned mid-spawn is killed by the spawn itself as
+        soon as its pid exists, so cancelling that wait gives up the
+        waiting and not the killing.
 
         Closed is final: any further command raises `RuntimeError`.
         Calling this more than once is harmless.
@@ -718,6 +720,6 @@ class ObsidianCLI:
             # this call started. Waiting for it is what makes the
             # guarantee above true at the moment aclose() returns,
             # rather than whenever its owner task next runs.
-            if not self._starting:
+            if not self._unsettled:
                 return
             await self._settled.wait()

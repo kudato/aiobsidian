@@ -73,18 +73,22 @@ class TestContextManager:
             await cli._execute("version")
 
 
-async def _close_over_a_cancelled_spawn(cli, task, finish) -> None:
+async def _close_over_a_cancelled_spawn(cli, task, finish) -> asyncio.Task[None]:
     """Cancel a command mid-spawn and close the client on top of it.
 
     The handshake both closing tests are built on, and an assertion in
     its own right: the close must still be waiting while the spawn is
-    on its way, whatever that spawn is about to hand back. What each
-    test says for itself is what became of the command afterwards.
+    on its way, whatever that spawn is about to hand back. It is handed
+    back still running, because what each test says for itself is what
+    the close does with what the spawn left it.
 
     Args:
         cli: Client to close.
         task: The command's task, suspended inside the spawn.
         finish: What the spawn is waiting on before it ends.
+
+    Returns:
+        The close, running, with the spawn now free to end.
     """
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
@@ -94,8 +98,7 @@ async def _close_over_a_cancelled_spawn(cli, task, finish) -> None:
     await asyncio.sleep(0)
     assert not closing.done()
     finish.set()
-    async with asyncio.timeout(5):
-        await closing
+    return closing
 
 
 class TestClose:
@@ -191,23 +194,21 @@ class TestClose:
     ):
         # The spawn is held open so the cancel lands inside it, where the
         # command exists for nobody. What aclose() has to show is that it
-        # was not abandoned there: by the time the close returns the
-        # group has been signalled and the command collected, which is
-        # the difference between a command told to stop and a stopped
-        # one.
+        # was not abandoned there, and that the close outlasts it: a
+        # command told to stop is not a stopped one until the corpse has
+        # been collected, so the dying is held open too and the close is
+        # caught still waiting on it.
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
         finish = asyncio.Event()
+        dying = asyncio.Event()
+        dead = asyncio.Event()
         process = _mock_process(returncode=None)
         process.pid = 4242
         process.kill = MagicMock()
-        settled_by_the_collecting = None
 
         async def wait():
-            # Read where the collecting starts, not where it ends: after
-            # it the count has drained whatever order the two happened
-            # in, and the order is the claim.
-            nonlocal settled_by_the_collecting
-            settled_by_the_collecting = cli._settled.is_set()
+            dying.set()
+            await dead.wait()
             return -9
 
         process.wait = wait
@@ -219,13 +220,20 @@ class TestClose:
         with patch("asyncio.create_subprocess_exec", spawn):
             task = asyncio.create_task(cli._execute("append", params={"content": "x"}))
             await asyncio.sleep(0)
-            assert cli._starting == 1
-            await _close_over_a_cancelled_spawn(cli, task, finish)
+            assert cli._unsettled == 1
+            closing = await _close_over_a_cancelled_spawn(cli, task, finish)
 
-        guard_killpg.assert_called_once_with(process.pid, signal.SIGKILL)
-        assert settled_by_the_collecting is False
+            async with asyncio.timeout(5):
+                await dying.wait()
+            guard_killpg.assert_called_once_with(process.pid, signal.SIGKILL)
+            assert not closing.done()
+
+            dead.set()
+            async with asyncio.timeout(5):
+                await closing
+
         assert cli._running == set()
-        assert cli._starting == 0
+        assert cli._unsettled == 0
 
     @pytest.mark.parametrize(
         "ending",
@@ -253,10 +261,12 @@ class TestClose:
         with patch("asyncio.create_subprocess_exec", spawn):
             task = asyncio.create_task(cli._execute("append", params={"content": "x"}))
             await asyncio.sleep(0)
-            await _close_over_a_cancelled_spawn(cli, task, finish)
+            closing = await _close_over_a_cancelled_spawn(cli, task, finish)
+            async with asyncio.timeout(5):
+                await closing
 
         guard_killpg.assert_not_called()
-        assert cli._starting == 0
+        assert cli._unsettled == 0
 
     async def test_an_external_kill_is_not_blamed_on_the_close(self):
         # Signal death plus a closed client is not proof that the close
@@ -430,7 +440,7 @@ class TestCloseKillsRealProcesses:
         task = asyncio.create_task(cli._execute("append", params={"content": "x"}))
         await asyncio.sleep(0)
         assert cli._running == set()
-        assert cli._starting == 1
+        assert cli._unsettled == 1
 
         await cli.aclose()
 
@@ -438,7 +448,7 @@ class TestCloseKillsRealProcesses:
         # before the shell reaches the `echo`, and an empty marker
         # cannot tell that apart from a fork that has not reported yet.
         # What pins the behaviour is that the counter has drained.
-        assert cli._starting == 0
+        assert cli._unsettled == 0
         assert cli._running == set()
         async with asyncio.timeout(5):
             with pytest.raises(RuntimeError, match="closed"):
@@ -456,7 +466,7 @@ class TestCloseKillsRealProcesses:
         cli = ObsidianCLI("TestVault", binary=str(binary))
         task = asyncio.create_task(cli._execute("append", params={"content": "x"}))
         await asyncio.sleep(0)
-        assert cli._starting == 1
+        assert cli._unsettled == 1
 
         closing = asyncio.create_task(cli.aclose())
         await asyncio.sleep(0)
@@ -469,7 +479,7 @@ class TestCloseKillsRealProcesses:
             with pytest.raises(RuntimeError, match="closed"):
                 await task
         assert cli._running == set()
-        assert cli._starting == 0
+        assert cli._unsettled == 0
 
     async def test_execute_cancelled_mid_spawn_kills_the_child_it_started(
         self, tmp_path
