@@ -7,10 +7,10 @@ from aiobsidian.models.publish import PublishChange, PublishSite
 
 from .helpers import drop_field
 
-# Obsidian prints the custom domain only for a site that has one, and
-# keeps it as the bare host it matches a visitor's address against.
+# Obsidian prints the custom URL only for a site that has one, and keeps
+# it as typed, which is what it matches a visitor's address against.
 SITE_INFO = (
-    "slug\tmysite\nurl\thttps://publish.obsidian.md/mysite\ncustom\tnotes.example.com\n"
+    "slug\tmysite\nurl\thttps://publish.obsidian.md/mysite\ncustom\tmysite.com/notes\n"
 )
 
 PUBLISHED_FILES = "about.md\nindex.md\n"
@@ -41,17 +41,17 @@ async def test_site(cli):
     assert result == PublishSite(
         slug="mysite",
         url="https://publish.obsidian.md/mysite",
-        custom_domain="notes.example.com",
+        custom_url="mysite.com/notes",
     )
     cli._execute.assert_awaited_once_with("publish:site")
 
 
-async def test_site_without_a_custom_domain(cli):
+async def test_site_without_a_custom_url(cli):
     cli._execute.return_value = (
         "slug\tmysite\nurl\thttps://publish.obsidian.md/mysite\n"
     )
     result = await cli.publish.site()
-    assert result.custom_domain is None
+    assert result.custom_url is None
 
 
 @pytest.mark.parametrize("field", ["slug", "url"])
