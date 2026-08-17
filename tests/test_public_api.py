@@ -35,8 +35,10 @@ def _defined_names(package, base):
     """Collect the public classes a package defines across its modules.
 
     Args:
-        package: Package to walk, subpackages included. Anything with
-            an underscore-prefixed component is private and is skipped.
+        package: Package to walk, subpackages included. A module or a
+            class whose name is underscore-prefixed is private and is
+            skipped, which is what lets a module hold a base class that
+            only its own classes inherit from.
         base: Base class the collected classes inherit from.
 
     Returns:
@@ -53,6 +55,7 @@ def _defined_names(package, base):
             if isinstance(obj, type)
             and issubclass(obj, base)
             and obj.__module__ == module.__name__
+            and not obj.__name__.startswith("_")
         }
     return names
 
