@@ -88,6 +88,14 @@ async def test_info_without_a_description(cli):
     assert result.version == "5.1.0"
 
 
+async def test_info_without_an_author(cli):
+    # Obsidian empties the field itself for a manifest that names nobody,
+    # and for one that credits Obsidian.
+    cli._execute.return_value = COMMUNITY_INFO.replace("Adam Coddington", "")
+    result = await cli.plugins.info("obsidian-local-rest-api")
+    assert result.author is None
+
+
 async def test_info_with_a_stray_line(cli):
     cli._execute.return_value = CORE_INFO + "and one more thing\n"
     with pytest.raises(CLIParseError):

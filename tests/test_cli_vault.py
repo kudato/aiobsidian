@@ -338,14 +338,20 @@ async def test_file_info_reads_a_small_timestamp_as_milliseconds_too(
 
 
 @pytest.mark.parametrize("field", ["created", "modified"])
-@pytest.mark.parametrize(
-    "printed", ["just now", "1.5", "2026-08-15T23:26:39Z", "9" * 20]
-)
+@pytest.mark.parametrize("printed", ["just now", "9" * 20])
 async def test_file_info_without_a_timestamp_in_milliseconds(cli, field, printed):
     cli._execute.return_value = drop_field(FILE_INFO, field) + f"{field}\t{printed}\n"
     with pytest.raises(CLIParseError) as exc_info:
         await cli.vault.file_info("note.md")
     assert exc_info.value.command == "file"
+
+
+async def test_file_info_reads_back_the_json_it_writes(cli):
+    # Only a plain number is read as milliseconds, so the timestamps the
+    # model prints are timestamps it can be built from again.
+    cli._execute.return_value = FILE_INFO
+    result = await cli.vault.file_info("note.md")
+    assert FileInfo.model_validate_json(result.model_dump_json()) == result
 
 
 @pytest.mark.parametrize(

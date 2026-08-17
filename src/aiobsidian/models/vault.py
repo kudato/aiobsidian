@@ -125,17 +125,21 @@ class FileInfo(BaseModel):
         unit: a timestamp small enough to be a plausible number of
         seconds is still milliseconds.
 
+        Only a plain number is read that way, so the model still reads
+        back the timestamp it writes out itself.
+
         Args:
             value: Timestamp field as the CLI prints it.
 
         Returns:
             The moment those milliseconds name, in UTC, or the value
-            untouched if it is not a string, which no CLI output is.
+            untouched when it does not spell a number — a moment the
+            field knows how to read for itself, or one it will refuse.
 
         Raises:
-            ValueError: If the value does not name such a moment.
+            ValueError: If the number names no moment at all.
         """
-        if not isinstance(value, str):
+        if not isinstance(value, str) or not value.lstrip("-").isdecimal():
             return value
         try:
             return datetime.fromtimestamp(int(value) / _MILLISECONDS, tz=UTC)

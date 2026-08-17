@@ -51,7 +51,10 @@ class PluginInfo(BaseModel):
             names itself nothing is named by its identifier instead.
         enabled: Whether the plugin is turned on.
         version: Version from the manifest, or `None` for a core plugin.
-        author: Author from the manifest, or `None` for a core plugin.
+        author: Author from the manifest, or `None` for a core plugin
+            and for a community plugin whose manifest names none.
+            Obsidian blanks the field for a manifest that credits
+            Obsidian itself, so those read as unauthored too.
         description: Description from the manifest, or `None` for a core
             plugin and for a community plugin that leaves it empty.
     """
@@ -62,3 +65,22 @@ class PluginInfo(BaseModel):
     version: str | None = None
     author: str | None = None
     description: str | None = None
+
+    @field_validator("author", mode="before")
+    @classmethod
+    def _blank_is_unauthored(cls, value: Any) -> Any:
+        """Read the empty author field as no author at all.
+
+        Obsidian empties it itself when the manifest names nobody, so
+        the field arrives blank rather than missing and would otherwise
+        be the one absent value spelled `""`.
+
+        Args:
+            value: Author field as the CLI prints it.
+
+        Returns:
+            `None` for the empty string, otherwise the value untouched —
+            including any other type, which is left for the field to
+            refuse.
+        """
+        return (value or None) if isinstance(value, str) else value

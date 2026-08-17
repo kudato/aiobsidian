@@ -10,9 +10,9 @@ class CLISyncResource(BaseCLIResource):
     Only `set_paused` and `status` work whatever Sync is doing. The rest
     want it set up for the vault and running, and answer `Error: Sync is
     not set up for this vault.` or, once it is set up, a sentence naming
-    the state — paused, disconnected or in error — that stops them. Both
-    surface as a `CommandError`, so pausing Sync closes its history to
-    you until you resume it.
+    the state — paused, or in error — that stops them. Both surface as a
+    `CommandError`, so pausing Sync closes its history to you until you
+    resume it.
 
     Attributes:
         _cli: Reference to the parent ``ObsidianCLI`` instance.
@@ -37,8 +37,8 @@ class CLISyncResource(BaseCLIResource):
     async def status(self) -> SyncStatus:
         """Get sync status information.
 
-        This is the one Sync command a vault without Sync answers: it
-        reports the status alone rather than failing.
+        A vault without Sync is answered rather than refused: the status
+        arrives on its own and every other field is `None`.
 
         Returns:
             What Sync is doing, and what it knows about this vault.

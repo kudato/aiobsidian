@@ -239,7 +239,8 @@ class BaseCLIResource:
         rather than a table, and print text: `file` reports a size as
         `"55"` and a timestamp as the milliseconds behind it. The model
         names the fields and hands the values back with the types they
-        had, and leaves out the ones the CLI omits. Values come back as
+        had, and says for itself what a field the CLI leaves out is
+        worth without it. Values come back as
         printed, save at the two ends of the output, where the blank
         space around the whole of it goes before the lines are counted.
 
