@@ -5,6 +5,7 @@ import json
 PLUGINS = [
     {"id": "backlink"},
     {"id": "dataview"},
+    {"id": "templater"},
 ]
 
 # Core plugins ship with the app and report no version; only community
@@ -12,8 +13,10 @@ PLUGINS = [
 PLUGINS_WITH_VERSIONS = [
     {"id": "backlink", "version": ""},
     {"id": "dataview", "version": "0.5.68"},
+    {"id": "templater", "version": "2.4.1"},
 ]
 
+# `templater` is installed but switched off.
 ENABLED_PLUGINS = [
     {"id": "backlink"},
     {"id": "dataview"},
