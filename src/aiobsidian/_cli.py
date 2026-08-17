@@ -94,6 +94,7 @@ class ObsidianCLI:
         self._binary = self._resolve_binary(binary)
         self._running: set[asyncio.subprocess.Process] = set()
         self._killed_by_close: set[asyncio.subprocess.Process] = set()
+        self._collecting: set[asyncio.Task[None]] = set()
         self._starting = 0
         self._settled = asyncio.Event()
         self._settled.set()
@@ -200,8 +201,11 @@ class ObsidianCLI:
         arriving during the spawn is answered the other way round: the
         command has no pid to signal yet and starts regardless, so the
         cancellation propagates at once and the command is killed as soon as
-        it exists — which `aclose()` waits for. The command gets no stdin, so
-        one waiting for input fails instead of hanging.
+        it exists — which `aclose()` waits for. A loop that stops inside that
+        same window is the one thing beyond reach: it cancels the spawn along
+        with everything else, and asyncio kills the command without reaching a
+        child of its own. The command gets no stdin, so one waiting for input
+        fails instead of hanging.
 
         Args:
             command: CLI command name (e.g. `"read"`, `"daily:path"`).
@@ -384,23 +388,44 @@ class ObsidianCLI:
         """Kill a command nobody is waiting for any more.
 
         Hung off the spawn rather than run as a task of its own, because
-        a callback cannot be cancelled: the command dies the moment its
-        pid exists, even if what cancelled the call was the loop being
-        torn down. Signalling is the whole of it — the group is dead
-        before this returns, and asyncio collects the corpse.
+        a callback cannot be cancelled: whatever became of the call that
+        started the command, the signal goes out the moment its pid
+        exists.
 
-        A spawn that failed or was cancelled with the loop leaves no pid
-        to aim at, and nothing that could still start. Either way this is
-        where the command stops being counted, because either way there
-        is nothing left for `aclose()` to wait for.
+        A spawn that failed, or that a stopping loop cancelled along with
+        everything else, hands back no pid at all. There is nothing to
+        aim at and nothing still coming, so the command simply stops
+        being counted.
 
         Args:
             spawn: The finished subprocess creation the cancellation left
                 behind.
         """
+        if spawn.cancelled() or spawn.exception() is not None:
+            self._one_fewer_starting()
+            return
+        process = spawn.result()
+        self._signal(process)
+        # Counted until the corpse is collected rather than until the
+        # signal is sent: a signalled command is not a stopped one until
+        # the OS says so, and stopped is what aclose() promises.
+        collecting = asyncio.create_task(self._collect(process))
+        self._collecting.add(collecting)
+        collecting.add_done_callback(self._collecting.discard)
+
+    async def _collect(self, process: asyncio.subprocess.Process) -> None:
+        """Wait for a reclaimed command to die, then stop counting it.
+
+        Cancelling this gives up the waiting and not the killing: the
+        signal went out before this was ever scheduled. Only a loop
+        shutting down can cancel it, and then there is nobody left for
+        the count to be true for.
+
+        Args:
+            process: The signalled process to wait for.
+        """
         try:
-            if not spawn.cancelled() and spawn.exception() is None:
-                self._signal(spawn.result())
+            await self._reap(process)
         finally:
             self._one_fewer_starting()
 

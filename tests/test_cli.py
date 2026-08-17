@@ -191,13 +191,26 @@ class TestClose:
     ):
         # The spawn is held open so the cancel lands inside it, where the
         # command exists for nobody. What aclose() has to show is that it
-        # was not abandoned there: the group is signalled by the time the
-        # close returns, and the command is gone from the client.
+        # was not abandoned there: by the time the close returns the
+        # group has been signalled and the command collected, which is
+        # the difference between a command told to stop and a stopped
+        # one.
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
         finish = asyncio.Event()
         process = _mock_process(returncode=None)
         process.pid = 4242
         process.kill = MagicMock()
+        settled_by_the_collecting = None
+
+        async def wait():
+            # Read where the collecting starts, not where it ends: after
+            # it the count has drained whatever order the two happened
+            # in, and the order is the claim.
+            nonlocal settled_by_the_collecting
+            settled_by_the_collecting = cli._settled.is_set()
+            return -9
+
+        process.wait = wait
 
         async def spawn(*args, **kwargs):
             await finish.wait()
@@ -210,6 +223,7 @@ class TestClose:
             await _close_over_a_cancelled_spawn(cli, task, finish)
 
         guard_killpg.assert_called_once_with(process.pid, signal.SIGKILL)
+        assert settled_by_the_collecting is False
         assert cli._running == set()
         assert cli._starting == 0
 
@@ -222,9 +236,13 @@ class TestClose:
         self, guard_killpg, ending
     ):
         # Two ways for a spawn nobody is waiting for any more to end
-        # without a pid. Neither leaves a command to kill, and neither
-        # may leave aclose() waiting for one that is never coming — the
-        # count has to drain on the way out either way.
+        # without a pid: the binary could not be executed, or a stopping
+        # loop cancelled the spawn along with everything else. Neither
+        # hands back a command to kill — the second one leaves that to
+        # asyncio, which reaches the command and not its children — so
+        # what is pinned here is the counting. Whichever way it ends,
+        # aclose() must not be left waiting for a command that is never
+        # coming.
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
         finish = asyncio.Event()
 
