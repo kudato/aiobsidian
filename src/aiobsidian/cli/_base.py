@@ -169,7 +169,7 @@ class BaseCLIResource:
             raise CLIParseError(command, output) from exc
 
     @staticmethod
-    def _parse_either(command: str, output: str, *, true: str, false: str) -> bool:
+    def _parse_yes_or_no(command: str, output: str, *, yes: str, no: str) -> bool:
         """Parse output that answers with one of two known sentences.
 
         The on/off commands answer in prose. Asked how things stand they
@@ -181,8 +181,8 @@ class BaseCLIResource:
         Args:
             command: CLI command name, used for error reporting.
             output: Raw output of the command.
-            true: The sentence that means `True`.
-            false: The sentence that means `False`.
+            yes: The sentence that means `True`.
+            no: The sentence that means `False`.
 
         Returns:
             `True` or `False`, after whichever sentence was printed.
@@ -191,9 +191,9 @@ class BaseCLIResource:
             CLIParseError: If the output is neither sentence.
         """
         answer = output.strip()
-        if answer == true:
+        if answer == yes:
             return True
-        if answer == false:
+        if answer == no:
             return False
         raise CLIParseError(command, output)
 

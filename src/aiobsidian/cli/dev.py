@@ -169,11 +169,11 @@ class CLIDevResource(BaseCLIResource):
         flags = ["on"] if value else ["off"]
         state = "enabled" if value else "disabled"
         output = await self._cli._execute("dev:mobile", flags=flags)
-        return self._parse_either(
+        return self._parse_yes_or_no(
             "dev:mobile",
             output,
-            true=f"Mobile emulation {state}. Reloading...",
-            false=f"Mobile emulation is already {state}.",
+            yes=f"Mobile emulation {state}. Reloading...",
+            no=f"Mobile emulation is already {state}.",
         )
 
     async def is_attached(self) -> bool:
@@ -187,11 +187,11 @@ class CLIDevResource(BaseCLIResource):
             CLIParseError: If the output has an unexpected shape.
         """
         output = await self._cli._execute("dev:debug")
-        return self._parse_either(
+        return self._parse_yes_or_no(
             "dev:debug",
             output,
-            true="Debugger is attached.",
-            false="Debugger is detached.",
+            yes="Debugger is attached.",
+            no="Debugger is detached.",
         )
 
     async def set_debugger(self, value: bool) -> bool:
@@ -219,15 +219,15 @@ class CLIDevResource(BaseCLIResource):
         """
         flags = ["on"] if value else ["off"]
         output = await self._cli._execute("dev:debug", flags=flags)
-        return self._parse_either(
+        return self._parse_yes_or_no(
             "dev:debug",
             output,
-            true=(
+            yes=(
                 "Debugger attached. Console capture started."
                 if value
                 else "Debugger detached. Console capture stopped."
             ),
-            false=(
+            no=(
                 "Debugger is already attached."
                 if value
                 else "Debugger is not attached."

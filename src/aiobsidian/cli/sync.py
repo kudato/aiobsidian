@@ -8,12 +8,11 @@ class CLISyncResource(BaseCLIResource):
     """CLI resource for Obsidian Sync operations.
 
     Only `is_paused`, `set_paused` and `status` work whatever Sync is
-    doing. The rest
-    want it set up for the vault and running, and answer `Error: Sync is
-    not set up for this vault.` or, once it is set up, a sentence naming
-    the state — paused, or in error — that stops them. Both surface as a
-    `CommandError`, so pausing Sync closes its history to you until you
-    resume it.
+    doing. The rest want it set up for the vault and running, and answer
+    `Error: Sync is not set up for this vault.` or, once it is set up, a
+    sentence naming the state — paused, or in error — that stops them.
+    Both surface as a `CommandError`, so pausing Sync closes its history
+    to you until you resume it.
 
     Attributes:
         _cli: Reference to the parent ``ObsidianCLI`` instance.
@@ -31,8 +30,8 @@ class CLISyncResource(BaseCLIResource):
             CLIParseError: If the output has an unexpected shape.
         """
         output = await self._cli._execute("sync")
-        return self._parse_either(
-            "sync", output, true="Sync is paused.", false="Sync is running."
+        return self._parse_yes_or_no(
+            "sync", output, yes="Sync is paused.", no="Sync is running."
         )
 
     async def set_paused(self, value: bool) -> bool:
@@ -51,11 +50,11 @@ class CLISyncResource(BaseCLIResource):
         # Inverted on purpose: the CLI names the flags after the state
         # it puts sync into, so `on` resumes and `off` pauses.
         output = await self._cli._execute("sync", flags=["off" if value else "on"])
-        return self._parse_either(
+        return self._parse_yes_or_no(
             "sync",
             output,
-            true="Sync paused." if value else "Sync resumed.",
-            false="Sync is already paused." if value else "Sync is already running.",
+            yes="Sync paused." if value else "Sync resumed.",
+            no="Sync is already paused." if value else "Sync is already running.",
         )
 
     async def open(self) -> None:

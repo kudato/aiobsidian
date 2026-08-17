@@ -40,7 +40,7 @@ class CLIPluginsResource(BaseCLIResource):
             CLIParseError: If the output has an unexpected shape.
         """
         output = await self._cli._execute("plugins:restrict")
-        return self._parse_either("plugins:restrict", output, true="on", false="off")
+        return self._parse_yes_or_no("plugins:restrict", output, yes="on", no="off")
 
     async def set_restricted(self, value: bool) -> bool:
         """Turn restricted mode on or off.
@@ -65,11 +65,11 @@ class CLIPluginsResource(BaseCLIResource):
         flags = ["on"] if value else ["off"]
         state = "enabled" if value else "disabled"
         output = await self._cli._execute("plugins:restrict", flags=flags)
-        return self._parse_either(
+        return self._parse_yes_or_no(
             "plugins:restrict",
             output,
-            true=f"Restricted mode {state}. Reloading...",
-            false=f"Restricted mode is already {state}.",
+            yes=f"Restricted mode {state}. Reloading...",
+            no=f"Restricted mode is already {state}.",
         )
 
     async def enabled(self) -> list[str]:
