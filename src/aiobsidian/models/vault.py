@@ -119,8 +119,11 @@ class FileInfo(BaseModel):
     Attributes:
         path: Path to the file relative to the vault root.
         name: File name without its extension.
-        extension: Extension without the leading dot, as in `"md"`, and
-            empty for a file whose name carries none.
+        extension: Extension without the leading dot, in lower case, so
+            `README.MD` reports `"md"`. Empty when the name holds no
+            dot, or its last dot opens or closes it, as in `.gitignore`
+            and `note.`. `name` keeps the case it was written in, so
+            the two need not spell the file name back.
         size: File size in bytes.
         created: When the file was created, in UTC. A file system that
             records no creation time reports the epoch instead.
