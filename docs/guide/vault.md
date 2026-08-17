@@ -37,7 +37,7 @@ print(note.content)      # Markdown body
 print(note.frontmatter)  # {"title": "Hello", "tags": ["greeting"]}
 print(note.tags)          # ["greeting"]
 print(note.path)          # "Notes/hello.md"
-print(note.stat.mtime)   # Last modification timestamp
+print(note.stat.modified)  # datetime(2026, 8, 16, 23, 26, 39, 339000, tzinfo=UTC)
 ```
 
 ### Document map

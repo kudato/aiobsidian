@@ -1,5 +1,10 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from aiobsidian._exceptions import AuthenticationError, NotFoundError
 from aiobsidian._types import ContentType, PatchOperation, TargetType
@@ -10,7 +15,9 @@ NOTE_JSON = {
     "frontmatter": {"title": "Hello"},
     "tags": ["greeting"],
     "path": "notes/hello.md",
-    "stat": {"ctime": 1700000000, "mtime": 1700000100, "size": 42},
+    # The plugin passes Obsidian's own record on untouched, and Obsidian
+    # keeps the two moments as whole milliseconds since the epoch.
+    "stat": {"ctime": 1786836399339, "mtime": 1786922799339, "size": 42},
 }
 
 DOC_MAP_JSON = {
@@ -36,6 +43,29 @@ async def test_read_note_json(mock_api, client):
     assert isinstance(result, NoteJson)
     assert result.path == "notes/hello.md"
     assert result.stat.size == 42
+    assert result.stat.created == datetime(2026, 8, 15, 23, 26, 39, 339000, tzinfo=UTC)
+    assert result.stat.modified == datetime(2026, 8, 16, 23, 26, 39, 339000, tzinfo=UTC)
+
+
+async def test_read_note_json_with_a_fraction_of_a_millisecond(mock_api, client):
+    # Obsidian rounds the file system record before the plugin ever sees
+    # it, so a fraction is not a moment it keeps.
+    stat = {**NOTE_JSON["stat"], "ctime": 1786836399339.5}
+    mock_api.get("/vault/hello.md").respond(200, json={**NOTE_JSON, "stat": stat})
+
+    with pytest.raises(ValidationError):
+        await client.vault.read("hello.md", content_type=ContentType.NOTE_JSON)
+
+
+async def test_read_note_json_with_a_moment_that_names_no_zone(mock_api, client):
+    # The rule the CLI's record is held to, which this one shares: a
+    # moment written without a zone leaves no telling which one it was
+    # written in, so it is refused rather than read as UTC.
+    stat = {**NOTE_JSON["stat"], "ctime": "2026-08-15T23:26:39"}
+    mock_api.get("/vault/hello.md").respond(200, json={**NOTE_JSON, "stat": stat})
+
+    with pytest.raises(ValidationError):
+        await client.vault.read("hello.md", content_type=ContentType.NOTE_JSON)
 
 
 async def test_read_document_map(mock_api, client):
