@@ -34,3 +34,29 @@ class Plugin(BaseModel):
             type, which is left for the field to refuse.
         """
         return (value or None) if isinstance(value, str) else value
+
+
+class PluginInfo(BaseModel):
+    """Everything the CLI knows about one plugin.
+
+    A core plugin ships with Obsidian and is described by its name and
+    its state alone; the three remaining fields come from a community
+    plugin's manifest.
+
+    Attributes:
+        type: Where the plugin comes from: `"core"` or `"community"`.
+        name: Display name of the plugin. A core plugin's is translated,
+            so it reads in whatever language Obsidian runs in.
+        enabled: Whether the plugin is turned on.
+        version: Version from the manifest, or `None` for a core plugin.
+        author: Author from the manifest, or `None` for a core plugin.
+        description: Description from the manifest, or `None` for a core
+            plugin and for a community plugin that leaves it empty.
+    """
+
+    type: str
+    name: str
+    enabled: bool
+    version: str | None = None
+    author: str | None = None
+    description: str | None = None

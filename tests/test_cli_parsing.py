@@ -9,6 +9,8 @@ from aiobsidian.cli._base import BaseCLIResource
 from aiobsidian.models.bases import BaseView
 from aiobsidian.models.history import FileVersion
 from aiobsidian.models.links import Backlink
+from aiobsidian.models.sync import SyncStatus
+from aiobsidian.models.vault import FolderInfo, WordCount
 
 
 class TestIsEmptyResult:
@@ -275,6 +277,50 @@ class TestParseFields:
         assert BaseCLIResource._parse_fields("vault", output) == {
             "path": "/Users/me/My\tVault"
         }
+
+
+class TestParseFieldsAs:
+    def test_fields(self):
+        output = "path\tnotes\nfiles\t3\nfolders\t0\nsize\t305\n"
+        result = BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
+        assert result == FolderInfo(path="notes", files=3, folders=0, size=305)
+
+    def test_custom_separator(self):
+        output = "words: 10\ncharacters: 84\n"
+        result = BaseCLIResource._parse_fields_as(
+            "wordcount", output, WordCount, separator=":"
+        )
+        assert result == WordCount(words=10, characters=84)
+
+    def test_skips_a_sentence_when_not_strict(self):
+        output = "status: disconnected\nSync is not set up for this vault.\n"
+        result = BaseCLIResource._parse_fields_as(
+            "sync:status", output, SyncStatus, separator=":", strict=False
+        )
+        assert result == SyncStatus(status="disconnected")
+
+    def test_missing_separator(self):
+        with pytest.raises(CLIParseError) as exc_info:
+            BaseCLIResource._parse_fields_as(
+                "folder", "no separator here\n", FolderInfo
+            )
+        assert exc_info.value.command == "folder"
+
+    def test_missing_field(self):
+        output = "path\tnotes\nfiles\t3\nfolders\t0\n"
+        with pytest.raises(CLIParseError) as exc_info:
+            BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
+        assert exc_info.value.command == "folder"
+
+    def test_value_of_the_wrong_type(self):
+        output = "path\tnotes\nfiles\tthree\nfolders\t0\nsize\t305\n"
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
+
+    def test_ignores_a_field_the_model_does_not_name(self):
+        output = "path\tnotes\nfiles\t3\nfolders\t0\nsize\t305\nowner\tme\n"
+        result = BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
+        assert result == FolderInfo(path="notes", files=3, folders=0, size=305)
 
 
 class TestSplitContent:

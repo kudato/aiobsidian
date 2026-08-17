@@ -219,6 +219,46 @@ class BaseCLIResource:
             fields[key.strip()] = value.strip()
         return fields
 
+    @classmethod
+    def _parse_fields_as[ModelT: BaseModel](
+        cls,
+        command: str,
+        output: str,
+        model: type[ModelT],
+        *,
+        separator: str = "\t",
+        strict: bool = True,
+    ) -> ModelT:
+        """Parse `key<separator>value` output into a model.
+
+        The commands that describe one thing print a field per line
+        rather than a table, and print text: `file` reports a size as
+        `"55"` and a timestamp as the milliseconds behind it. The model
+        names the fields and hands the values back with the types they
+        had, and leaves out the ones the CLI omits.
+
+        Args:
+            command: CLI command name, used for error reporting.
+            output: Raw output of the command.
+            model: Model to validate the fields against.
+            separator: Separator between key and value.
+            strict: If `False`, skip lines without the separator instead
+                of refusing to parse. Some commands mix a plain sentence
+                into the field list.
+
+        Returns:
+            The model built from the fields the CLI printed.
+
+        Raises:
+            CLIParseError: If `strict` and a line does not contain the
+                separator, or the fields do not fit the model.
+        """
+        fields = cls._parse_fields(command, output, separator=separator, strict=strict)
+        try:
+            return model.model_validate(fields)
+        except ValidationError as exc:
+            raise CLIParseError(command, output) from exc
+
     @staticmethod
     def _strip_content_header(output: str) -> str:
         """Drop the header the CLI prints before a stored file version.
