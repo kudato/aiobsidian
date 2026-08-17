@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
+
+_CORE = "core"
+_COMMUNITY = "community"
+_MANIFEST_FIELDS = ("version", "author", "description")
 
 
 class Plugin(BaseModel):
@@ -41,7 +45,11 @@ class PluginInfo(BaseModel):
 
     A core plugin ships with Obsidian and is described by its name and
     its state alone; the three remaining fields come from a community
-    plugin's manifest.
+    plugin's manifest. The two records do not overlap, and one that
+    mixes them is refused: a core plugin has no manifest to carry a
+    version, and a community plugin is read out of one that always names
+    a version. A type Obsidian does not print today is taken as it comes
+    rather than refused, so a third kind would arrive as data.
 
     Attributes:
         type: Where the plugin comes from: `"core"` or `"community"`.
@@ -89,3 +97,26 @@ class PluginInfo(BaseModel):
             refuse.
         """
         return (value or None) if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def _the_manifest_fields_follow_the_type(self) -> PluginInfo:
+        """Hold the manifest fields to the record the type names.
+
+        Returns:
+            The record, when its fields fit its type.
+
+        Raises:
+            ValueError: If a core plugin carries a manifest field, or a
+                community plugin names no version.
+        """
+        if self.type == _CORE:
+            named = [
+                field for field in _MANIFEST_FIELDS if getattr(self, field) is not None
+            ]
+            if named:
+                raise ValueError(
+                    f"a core plugin has no manifest to name: {', '.join(named)}"
+                )
+        elif self.type == _COMMUNITY and self.version is None:
+            raise ValueError("a community plugin names the version its manifest gives")
+        return self

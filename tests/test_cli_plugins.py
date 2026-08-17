@@ -116,6 +116,22 @@ async def test_info_with_a_description_that_names_a_field_again(cli):
         await cli.plugins.info("obsidian-local-rest-api")
 
 
+async def test_info_of_a_core_plugin_that_names_a_version(cli):
+    # A core plugin has no manifest to take one from, so the two records
+    # Obsidian prints do not overlap.
+    cli._execute.return_value = CORE_INFO + "version\t1.0.0\n"
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.plugins.info("daily-notes")
+    assert exc_info.value.command == "plugin"
+
+
+async def test_info_of_a_community_plugin_without_a_version(cli):
+    # The manifest gives one and Obsidian prints it unconditionally.
+    cli._execute.return_value = drop_field(COMMUNITY_INFO, "version")
+    with pytest.raises(CLIParseError):
+        await cli.plugins.info("obsidian-local-rest-api")
+
+
 async def test_info_with_a_stray_line(cli):
     cli._execute.return_value = CORE_INFO + "and one more thing\n"
     with pytest.raises(CLIParseError):
