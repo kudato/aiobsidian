@@ -338,6 +338,51 @@ class TestParseFieldsAs:
         result = BaseCLIResource._parse_fields_as("plugin", output, PluginInfo)
         assert result.description == " "
 
+    def test_only_a_newline_ends_a_field(self):
+        # Obsidian joins the fields with a newline and no other character
+        # ends one, so a line separator a manifest writes into its
+        # description stays inside the value.
+        output = (
+            "type\tcommunity\nname\tDataview\nversion\t0.5.64\n"
+            "author\tMichael Brenan\nenabled\ttrue\ndescription\tone\u2028two\n"
+        )
+        result = BaseCLIResource._parse_fields_as("plugin", output, PluginInfo)
+        assert result.description == "one\u2028two"
+
+    def test_a_key_printed_twice(self):
+        # A description of its own carrying `enabled\tfalse` would
+        # otherwise answer for the field Obsidian printed itself.
+        output = (
+            "type\tcommunity\nname\tDataview\nversion\t0.5.64\n"
+            "author\tMichael Brenan\nenabled\ttrue\ndescription\tfirst\n"
+            "enabled\tfalse\n"
+        )
+        with pytest.raises(CLIParseError) as exc_info:
+            BaseCLIResource._parse_fields_as("plugin", output, PluginInfo)
+        assert exc_info.value.command == "plugin"
+
+    def test_a_key_printed_twice_even_when_not_strict(self):
+        output = "status: connected\nstatus: paused\n"
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_fields_as(
+                "sync:status", output, SyncStatus, separator=": ", strict=False
+            )
+
+    @pytest.mark.parametrize(
+        "output",
+        [
+            "path\tnotes\nfiles\t3\nfolders\t0\nsize\t305\n\n",
+            "\npath\tnotes\nfiles\t3\nfolders\t0\nsize\t305\n",
+            "path\tnotes\nfiles\t3\n\nfolders\t0\nsize\t305\n",
+        ],
+    )
+    def test_a_blank_line(self, output):
+        # Only the one newline the output ends with is the CLI's own, so
+        # a blank line is a field it did not print — a description that
+        # ends in a newline of its own, among other things.
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
+
 
 class TestSplitContent:
     def test_plain_content_is_one_part(self):

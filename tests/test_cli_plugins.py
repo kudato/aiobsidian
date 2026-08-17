@@ -106,6 +106,16 @@ async def test_info_with_a_description_that_ends_in_a_space(cli):
     assert result.description.endswith("vault.  ")
 
 
+async def test_info_with_a_description_that_names_a_field_again(cli):
+    # A newline in the description is where Obsidian would start another
+    # field, so a manifest could otherwise answer for `enabled` itself.
+    cli._execute.return_value = COMMUNITY_INFO.replace(
+        "vault.\n", "vault.\nenabled\tfalse\n"
+    )
+    with pytest.raises(CLIParseError):
+        await cli.plugins.info("obsidian-local-rest-api")
+
+
 async def test_info_with_a_stray_line(cli):
     cli._execute.return_value = CORE_INFO + "and one more thing\n"
     with pytest.raises(CLIParseError):

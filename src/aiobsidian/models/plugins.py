@@ -58,9 +58,10 @@ class PluginInfo(BaseModel):
         description: Description from the manifest, or `None` for a core
             plugin and for a community plugin that leaves it empty. It
             is printed last and untrimmed, so it keeps whatever blank
-            space the manifest gave it; a manifest that puts a newline
-            in it makes the record unreadable, since a second line is
-            how the CLI writes a second field.
+            space the manifest gave it. A newline is where the CLI
+            would start another field, so a description a manifest
+            writes one into is read short or refused outright, never
+            whole.
     """
 
     type: str

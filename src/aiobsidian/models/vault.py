@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import re
+from datetime import UTC, datetime, timedelta
+from numbers import Number
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-_MILLISECONDS = 1000
+_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+_WHOLE_NUMBER = re.compile(r"[+-]?[0-9]+")
 
 
 def _spells_a_number(printed: str) -> bool:
@@ -116,6 +119,10 @@ class FolderInfo(BaseModel):
 class FileInfo(BaseModel):
     """A file in the vault.
 
+    The two moments are moments in UTC, and a moment handed to the model
+    without a time zone is refused rather than taken for one: there
+    would be no telling which zone it was written in.
+
     Attributes:
         path: Path to the file relative to the vault root.
         name: File name without its extension.
@@ -148,10 +155,11 @@ class FileInfo(BaseModel):
         where they are the whole milliseconds since the epoch. Every
         number is read in that unit, however small — a timestamp that
         would pass for a plausible number of seconds is still
-        milliseconds — and one written with a fraction is refused rather
-        than read in some other unit. A number written as one reads the same
-        as a number printed as text, so the answer does not turn on how
-        the model was handed it.
+        milliseconds — and one that is not whole is refused rather than
+        read in some other unit, `1786836399.0` included. A number reads
+        the same however it is written, as text or as any of the types
+        Python counts with, so the answer does not turn on how the model
+        was handed it.
 
         A timestamp written out in full is left alone, so the model
         still reads back the one it prints out itself.
@@ -167,13 +175,35 @@ class FileInfo(BaseModel):
         Raises:
             ValueError: If the number names no moment in milliseconds.
         """
-        printed = str(value) if isinstance(value, int | float) else value
-        if not isinstance(printed, str) or not _spells_a_number(printed):
+        if not isinstance(value, str | Number):
             return value
-        try:
-            return datetime.fromtimestamp(int(printed) / _MILLISECONDS, tz=UTC)
-        except (ValueError, OverflowError, OSError) as exc:
-            raise ValueError(f"not a moment in milliseconds: {printed!r}") from exc
+        printed = value if isinstance(value, str) else str(value)
+        if _WHOLE_NUMBER.fullmatch(printed):
+            try:
+                return _EPOCH + timedelta(milliseconds=int(printed))
+            except OverflowError as exc:
+                raise ValueError(f"not a moment in milliseconds: {printed}") from exc
+        if isinstance(value, Number) or _spells_a_number(printed):
+            raise ValueError(f"not a whole number of milliseconds: {printed}")
+        return value
+
+    @field_validator("created", "modified", mode="after")
+    @classmethod
+    def _in_utc(cls, value: datetime) -> datetime:
+        """Hold the two moments to the zone they are documented in.
+
+        Args:
+            value: The moment the field was built from.
+
+        Returns:
+            The same moment in UTC, wherever it was written.
+
+        Raises:
+            ValueError: If the moment names no time zone at all.
+        """
+        if value.tzinfo is None:
+            raise ValueError(f"a moment without a time zone: {value.isoformat()}")
+        return value.astimezone(UTC)
 
 
 class WordCount(BaseModel):

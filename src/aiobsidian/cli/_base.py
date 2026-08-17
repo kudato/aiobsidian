@@ -200,10 +200,13 @@ class BaseCLIResource:
         `"55"` and a timestamp as the milliseconds behind it. The model
         names the fields and hands the values back with the types they
         had, and says for itself what a field the CLI leaves out is
-        worth without it. Values come back exactly as printed, blank
-        space included — only the newline the output ends with goes.
-        The last field of a plugin record is the description its
-        manifest gives, which nothing trims on the way here.
+        worth without it. A field ends where the newline the CLI joins
+        them with is and nowhere else, and values come back exactly as
+        printed, blank space included — only the single newline the
+        output ends with goes. The last field of a plugin record is the
+        description its manifest gives, which nothing trims on the way
+        here, so a description written with a newline of its own is
+        read short or refused, never whole.
 
         Args:
             command: CLI command name, used for error reporting.
@@ -223,17 +226,20 @@ class BaseCLIResource:
 
         Raises:
             CLIParseError: If `strict` and a line does not contain the
-                separator, or the fields do not fit the model.
+                separator, if a key is printed twice, or if the fields
+                do not fit the model. A key twice over is refused
+                whatever `strict` says, since one of its two values
+                would have to be dropped for the other.
         """
         fields: dict[str, str] = {}
-        for line in output.strip("\n").splitlines():
-            if not line:
-                continue
+        for line in output.removesuffix("\n").split("\n"):
             key, found, value = line.partition(separator)
             if not found:
                 if strict:
                     raise CLIParseError(command, output)
                 continue
+            if key in fields:
+                raise CLIParseError(command, output)
             fields[key] = value
         try:
             return model.model_validate(fields)
