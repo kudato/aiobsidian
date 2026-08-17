@@ -74,11 +74,13 @@ DIFF_LISTING = (
     "2   Sync  2026-08-15 21:04:57       402 B  [MacBook]\n"
 )
 
+# `---` names the version diffed from and `+++` the one diffed to, so
+# these follow the arguments `test_diff_all_params` sends.
 DIFF_OUTPUT = (
-    "--- notes/todo.md (Local #2, 2026-08-15 21:04:57)\n"
-    "+++ notes/todo.md (Local #1, 2026-08-16 02:38:11)\n"
-    "- old line\n"
-    "+ new line\n"
+    "--- notes/todo.md (Local #1, 2026-08-16 02:38:11)\n"
+    "+++ notes/todo.md (Local #2, 2026-08-15 21:04:57)\n"
+    "- new line\n"
+    "+ old line\n"
 )
 
 

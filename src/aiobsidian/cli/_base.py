@@ -294,7 +294,7 @@ class BaseCLIResource:
             lines = lines[1:]
         values: list[ModelT] = []
         for line in lines:
-            row = [column.strip() for column in line.split("\t")]
+            row = line.split("\t")
             if len(row) != len(columns):
                 raise CLIParseError(command, output)
             try:

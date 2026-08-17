@@ -74,6 +74,9 @@ class CLISearchResource(BaseCLIResource):
             matched on. The CLI reports the matching line itself, never
             the lines around it, and a file can match on none of them —
             when the query matched its name or its frontmatter.
+
+        Raises:
+            CLIParseError: If a match has an unexpected shape.
         """
         params: dict[str, str] = {"query": query}
         if path is not None:

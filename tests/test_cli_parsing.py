@@ -204,6 +204,18 @@ class TestParseRowsAs:
                 "base:views", "All\ttable\nActive\n", BaseView, columns=("name", "type")
             )
 
+    def test_values_arrive_verbatim(self):
+        # A view is named by whoever wrote the base file, so a name that
+        # ends in a space is theirs to keep.
+        output = "All\ttable\nActive \tcards\n"
+        result = BaseCLIResource._parse_rows_as(
+            "base:views", output, BaseView, columns=("name", "type")
+        )
+        assert result == [
+            BaseView(name="All", type="table"),
+            BaseView(name="Active ", type="cards"),
+        ]
+
     def test_value_of_the_wrong_type(self):
         output = "one\t2026-08-16 02:38\t431 B\n"
         with pytest.raises(CLIParseError):

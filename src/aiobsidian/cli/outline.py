@@ -25,6 +25,7 @@ class CLIOutlineResource(BaseCLIResource):
 
         Raises:
             CommandError: If the file is not a markdown file.
+            CLIParseError: If a heading has an unexpected shape.
         """
         output = await self._cli._execute(
             "outline", params={"path": path}, output_format="json"

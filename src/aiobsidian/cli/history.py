@@ -23,8 +23,8 @@ class CLIHistoryResource(BaseCLIResource):
 
         Returns:
             The versions kept for that file, newest first. Their numbers
-            are positions in this listing, so they hold only until the
-            note is saved again.
+            are positions in this listing rather than identifiers; see
+            `FileVersion.version` for how long one holds.
 
         Raises:
             CLIParseError: If a version row has an unexpected shape.

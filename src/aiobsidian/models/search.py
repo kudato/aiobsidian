@@ -34,8 +34,8 @@ class MatchedLine(BaseModel):
 
     Attributes:
         line: Line number within the note, counting from 1.
-        text: The line the match sits on, with its indentation trimmed
-            off.
+        text: The line the match sits on, trimmed at both ends — so it
+            keeps neither its indentation nor a trailing hard break.
     """
 
     line: int
