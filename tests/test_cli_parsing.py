@@ -58,19 +58,19 @@ class TestParseJson:
 
 class TestParseJsonColumn:
     def test_column(self):
-        output = '[{"id": "backlink"}, {"id": "dataview"}]'
+        output = '[{"id": "backlink"}, {"id": "bookmarks"}]'
         result = BaseCLIResource._parse_json_column("plugins:enabled", output, key="id")
-        assert result == ["backlink", "dataview"]
+        assert result == ["backlink", "bookmarks"]
 
     def test_sentinel(self):
         result = BaseCLIResource._parse_json_column(
-            "bookmarks", "No bookmarks found.\n", key="value"
+            "unresolved", "No unresolved links found.\n", key="link"
         )
         assert result == []
 
     def test_ignores_the_other_columns(self):
         output = '[{"id": "backlink", "version": ""}]'
-        result = BaseCLIResource._parse_json_column("plugins", output, key="id")
+        result = BaseCLIResource._parse_json_column("plugins:enabled", output, key="id")
         assert result == ["backlink"]
 
     def test_missing_key(self):
@@ -80,9 +80,10 @@ class TestParseJsonColumn:
             )
         assert exc_info.value.command == "unresolved"
 
-    def test_non_string_value(self):
+    @pytest.mark.parametrize("output", ['[{"link": 1}]', '[{"link": null}]'])
+    def test_non_string_value(self, output):
         with pytest.raises(CLIParseError):
-            BaseCLIResource._parse_json_column("tags", '[{"count": 15}]', key="count")
+            BaseCLIResource._parse_json_column("unresolved", output, key="link")
 
     def test_not_a_list(self):
         with pytest.raises(CLIParseError):

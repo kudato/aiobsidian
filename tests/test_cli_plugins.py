@@ -4,22 +4,22 @@ import json
 
 PLUGINS = [
     {"id": "backlink"},
-    {"id": "dataview"},
-    {"id": "templater"},
+    {"id": "bookmarks"},
+    {"id": "obsidian-local-rest-api"},
 ]
 
 # Core plugins ship with the app and report no version; only community
 # ones carry a number.
 PLUGINS_WITH_VERSIONS = [
     {"id": "backlink", "version": ""},
-    {"id": "dataview", "version": "0.5.68"},
-    {"id": "templater", "version": "2.4.1"},
+    {"id": "bookmarks", "version": ""},
+    {"id": "obsidian-local-rest-api", "version": "5.1.0"},
 ]
 
-# `templater` is installed but switched off.
+# The community plugin is installed but switched off.
 ENABLED_PLUGINS = [
     {"id": "backlink"},
-    {"id": "dataview"},
+    {"id": "bookmarks"},
 ]
 
 
@@ -61,7 +61,7 @@ async def test_list_with_versions(cli):
 async def test_enabled(cli):
     cli._execute.return_value = json.dumps(ENABLED_PLUGINS)
     result = await cli.plugins.enabled()
-    assert result == ["backlink", "dataview"]
+    assert result == ["backlink", "bookmarks"]
     cli._execute.assert_awaited_once_with("plugins:enabled", output_format="json")
 
 

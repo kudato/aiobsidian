@@ -2,15 +2,17 @@ from __future__ import annotations
 
 import json
 
+# The CLI sorts by tag name unless `sort=count` asks otherwise, and these
+# two happen to fall the same way under both orders.
 TAGS_LIST = [
-    {"tag": "#python"},
     {"tag": "#obsidian"},
+    {"tag": "#python"},
 ]
 
 # `counts` adds the column, and the CLI prints the number as a string.
 TAGS_WITH_COUNTS = [
-    {"tag": "#python", "count": "15"},
-    {"tag": "#obsidian", "count": "8"},
+    {"tag": "#obsidian", "count": "15"},
+    {"tag": "#python", "count": "8"},
 ]
 
 

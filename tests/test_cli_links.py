@@ -63,6 +63,12 @@ async def test_unresolved(cli):
     cli._execute.assert_awaited_once_with("unresolved", output_format="json")
 
 
+async def test_unresolved_without_broken_links(cli):
+    cli._execute.return_value = "No unresolved links found.\n"
+    result = await cli.links.unresolved()
+    assert result == []
+
+
 async def test_orphans(cli):
     cli._execute.return_value = "archive/old.md\nnotes/orphan.md\n"
     result = await cli.links.orphans()
