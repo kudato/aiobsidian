@@ -4,6 +4,8 @@ import json
 import re
 from typing import TYPE_CHECKING, Any
 
+from pydantic import BaseModel, ValidationError
+
 from .._exceptions import CLIParseError
 
 if TYPE_CHECKING:
@@ -133,6 +135,38 @@ class BaseCLIResource:
                 raise CLIParseError(command, output)
             values.append(value)
         return values
+
+    @classmethod
+    def _parse_json_rows[ModelT: BaseModel](
+        cls, command: str, output: str, model: type[ModelT]
+    ) -> list[ModelT]:
+        """Parse JSON output whose objects are the rows of a table.
+
+        Asked for `format=json`, the CLI still prints a table, and a
+        table holds text: `tasks` reports a line number as `"5"` and
+        `tags` a count as `"4"`. The model names the columns and hands
+        the values back with the types they had.
+
+        Args:
+            command: CLI command name, used for error reporting.
+            output: Raw output of the command.
+            model: Model to validate every row against.
+
+        Returns:
+            One model per row, in the order printed, or an empty list
+            for an empty result.
+
+        Raises:
+            CLIParseError: If the output is not valid JSON, is not a
+                list, or a row does not fit the model.
+        """
+        rows = cls._parse_json(command, output)
+        if not isinstance(rows, list):
+            raise CLIParseError(command, output)
+        try:
+            return [model.model_validate(row) for row in rows]
+        except ValidationError as exc:
+            raise CLIParseError(command, output) from exc
 
     @classmethod
     def _parse_lines(cls, output: str) -> list[str]:
