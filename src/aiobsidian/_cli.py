@@ -399,14 +399,14 @@ class ObsidianCLI:
 
     @cached_property
     def vault(self) -> CLIVaultResource:
-        """Access vault file operations (read, create, append, move, delete, list)."""
+        """Access vault file operations (read, write, append, move, delete, list)."""
         from .cli.vault import CLIVaultResource
 
         return CLIVaultResource(self)
 
     @cached_property
     def daily(self) -> CLIDailyResource:
-        """Access daily note operations (read, path, create, append, prepend)."""
+        """Access daily note operations (read, path, open, append, prepend)."""
         from .cli.daily import CLIDailyResource
 
         return CLIDailyResource(self)
@@ -441,7 +441,7 @@ class ObsidianCLI:
 
     @cached_property
     def tasks(self) -> CLITasksResource:
-        """Access task operations (list, create, complete)."""
+        """Access task operations (list, toggle, complete, reopen)."""
         from .cli.tasks import CLITasksResource
 
         return CLITasksResource(self)
