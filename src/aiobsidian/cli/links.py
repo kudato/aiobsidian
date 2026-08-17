@@ -32,8 +32,8 @@ class CLILinksResource(BaseCLIResource):
             path: Path to the note relative to the vault root.
 
         Returns:
-            The notes linking to this one, each with how many of its
-            links point here.
+            The notes linking to this one, sorted by path, each with how
+            many of its links point here.
         """
         output = await self._cli._execute(
             "backlinks", params={"path": path}, flags=["counts"], output_format="json"

@@ -4,9 +4,10 @@ import json
 
 from aiobsidian.models.tasks import Task
 
-# `text` is the task's line as the note writes it, marker included, and
-# the line number arrives as a string. The status is whatever stands
-# between the brackets, so a theme's custom status shows up as itself.
+# `text` is the task's line with its indentation trimmed off and its
+# marker kept, and the line number arrives as a string. The status is
+# whatever stands between the brackets, so a theme's custom status shows
+# up as itself.
 TASKS = [
     {"status": " ", "text": "- [ ] Buy milk", "file": "todo.md", "line": "3"},
     {"status": "x", "text": "- [x] Write docs", "file": "todo.md", "line": "4"},

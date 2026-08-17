@@ -61,6 +61,12 @@ async def test_list_without_the_version_column(cli):
     assert exc_info.value.command == "plugins"
 
 
+async def test_list_without_a_string_version(cli):
+    cli._execute.return_value = json.dumps([{"id": "backlink", "version": 0}])
+    with pytest.raises(CLIParseError):
+        await cli.plugins.list()
+
+
 async def test_enabled(cli):
     cli._execute.return_value = json.dumps(ENABLED_PLUGINS)
     result = await cli.plugins.enabled()

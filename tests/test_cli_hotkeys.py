@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
+from aiobsidian._exceptions import CLIParseError
 from aiobsidian.models.hotkeys import Hotkey
 
 # The listing covers every command, bound or not, sorted by id. `verbose`
@@ -33,6 +36,13 @@ async def test_list(cli):
     cli._execute.assert_awaited_once_with(
         "hotkeys", flags=["verbose"], output_format="json"
     )
+
+
+async def test_list_without_a_string_hotkey(cli):
+    row = [{"id": "app:go-back", "hotkey": 0, "custom": "default"}]
+    cli._execute.return_value = json.dumps(row)
+    with pytest.raises(CLIParseError):
+        await cli.hotkeys.list()
 
 
 async def test_get(cli):
