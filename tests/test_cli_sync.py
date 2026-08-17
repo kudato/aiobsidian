@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
+
+from aiobsidian._exceptions import CLIParseError
+from aiobsidian.models.sync import SyncStatus
+
+# Obsidian rounds every size to two decimals, groups a thousand of a
+# unit with a comma, and prints a size below a kilobyte whole.
 STATUS = (
     "status: synced\n"
     "vault: MyVault\n"
     "device: MacBook\n"
-    "vault size: 3.2 MB\n"
-    "account usage: 3.2 MB / 10 GB\n"
+    "vault size: 3.20 MB\n"
+    "account usage: 3.20 MB / 10.00 GB\n"
 )
 
 STATUS_NOT_SET_UP = "status: disconnected\nSync is not set up for this vault.\n"
@@ -45,20 +53,88 @@ async def test_open(cli):
 async def test_status(cli):
     cli._execute.return_value = STATUS
     result = await cli.sync.status()
-    assert result == {
-        "status": "synced",
-        "vault": "MyVault",
-        "device": "MacBook",
-        "vault size": "3.2 MB",
-        "account usage": "3.2 MB / 10 GB",
-    }
+    assert result == SyncStatus(
+        status="synced",
+        vault="MyVault",
+        device="MacBook",
+        vault_size="3.20 MB",
+        account_used="3.20 MB",
+        account_limit="10.00 GB",
+    )
     cli._execute.assert_awaited_once_with("sync:status")
 
 
 async def test_status_without_sync(cli):
     cli._execute.return_value = STATUS_NOT_SET_UP
     result = await cli.sync.status()
-    assert result == {"status": "disconnected"}
+    assert result == SyncStatus(status="disconnected")
+    assert result.vault is None
+    assert result.vault_size is None
+    assert result.account_used is None
+    assert result.account_limit is None
+
+
+async def test_status_without_the_quota(cli):
+    # Obsidian asks its server for the quota and prints the vault and
+    # the account sizes only once it answers.
+    cli._execute.return_value = "status: syncing\nvault: MyVault\ndevice: MacBook\n"
+    result = await cli.sync.status()
+    assert result == SyncStatus(status="syncing", vault="MyVault", device="MacBook")
+
+
+async def test_status_with_a_comma_in_the_sizes(cli):
+    # An account holding this vault alone reports the same size twice.
+    cli._execute.return_value = STATUS.replace("3.20 MB", "1,023.44 KB")
+    result = await cli.sync.status()
+    assert result.vault_size == "1,023.44 KB"
+    assert result.account_used == "1,023.44 KB"
+    assert result.account_limit == "10.00 GB"
+
+
+async def test_status_with_a_colon_in_the_device_name(cli):
+    cli._execute.return_value = STATUS.replace("MacBook", "MacBook: work")
+    result = await cli.sync.status()
+    assert result.device == "MacBook: work"
+
+
+async def test_status_with_one_size_in_the_usage_line(cli):
+    cli._execute.return_value = STATUS.replace(" / 10.00 GB", "")
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.sync.status()
+    assert exc_info.value.command == "sync:status"
+
+
+async def test_status_with_the_vault_size_alone(cli):
+    # One test on the size Sync fetched gates both lines, so this is a
+    # record Obsidian cannot print, and the parse says so rather than
+    # handing back a quota that reports itself by halves.
+    cli._execute.return_value = STATUS.replace(
+        "account usage: 3.20 MB / 10.00 GB\n", ""
+    )
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.sync.status()
+    assert exc_info.value.command == "sync:status"
+
+
+@pytest.mark.parametrize(
+    "sizes",
+    [
+        {"vault_size": "3.20 MB"},
+        {"account_used": "3.20 MB", "account_limit": "10.00 GB"},
+        {"vault_size": "3.20 MB", "account_used": "3.20 MB"},
+    ],
+)
+def test_status_refuses_a_quota_reported_by_halves(sizes):
+    # The same rule the public model holds a caller to, whichever of the
+    # three sizes they leave out.
+    with pytest.raises(ValidationError):
+        SyncStatus.model_validate({"status": "synced", **sizes})
+
+
+async def test_status_without_the_status_field(cli):
+    cli._execute.return_value = "vault: MyVault\ndevice: MacBook\n"
+    with pytest.raises(CLIParseError):
+        await cli.sync.status()
 
 
 async def test_history(cli):

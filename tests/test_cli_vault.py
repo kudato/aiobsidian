@@ -1,10 +1,40 @@
 from __future__ import annotations
 
+from datetime import UTC, date, datetime, timedelta, timezone
+from decimal import Decimal
+from fractions import Fraction
 from unittest.mock import call
 
 import pytest
+from pydantic import ValidationError
 
 from aiobsidian._exceptions import CLIParseError
+from aiobsidian.models.vault import FileInfo, FolderInfo, VaultInfo, WordCount
+
+from .helpers import drop_field
+
+# The counts are of the whole tree, at any depth.
+VAULT_INFO = (
+    "name\tTestVault\npath\t/vaults/TestVault\nfiles\t47\nfolders\t14\nsize\t2825\n"
+)
+
+FOLDER_INFO = "path\tnotes\nfiles\t3\nfolders\t0\nsize\t305\n"
+
+# `created` and `modified` come straight from the file system record,
+# where Obsidian keeps them as milliseconds since the epoch.
+FILE_INFO = (
+    "path\tnote.md\nname\tnote\nextension\tmd\nsize\t137\n"
+    "created\t1786836399339\nmodified\t1786836399341\n"
+)
+
+# The same file described to the model directly, which is public and
+# takes a caller's own values rather than the CLI's printed ones. The
+# two moments are what each test varies, so they are not in here.
+FILE_FIELDS = {"path": "note.md", "name": "note", "extension": "md", "size": 137}
+
+# `wordcount` separates with a colon and a space, where every other
+# record command separates with a tab.
+WORD_COUNT = "words: 500\ncharacters: 2800\n"
 
 
 async def test_open(cli):
@@ -246,48 +276,206 @@ async def test_list_empty_vault(cli):
 
 
 async def test_info(cli):
-    cli._execute.return_value = (
-        "name\tTestVault\npath\t/vaults/TestVault\nfiles\t47\nfolders\t14\nsize\t2825\n"
-    )
+    cli._execute.return_value = VAULT_INFO
     result = await cli.vault.info()
-    assert result == {
-        "name": "TestVault",
-        "path": "/vaults/TestVault",
-        "files": "47",
-        "folders": "14",
-        "size": "2825",
-    }
+    assert result == VaultInfo(
+        name="TestVault",
+        path="/vaults/TestVault",
+        files=47,
+        folders=14,
+        size=2825,
+    )
     cli._execute.assert_awaited_once_with("vault")
+
+
+async def test_info_counts_are_numbers(cli):
+    cli._execute.return_value = VAULT_INFO
+    result = await cli.vault.info()
+    assert isinstance(result.files, int)
+    assert isinstance(result.folders, int)
+    assert isinstance(result.size, int)
 
 
 async def test_info_unexpected_output(cli):
     cli._execute.return_value = "not a field list\n"
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.vault.info()
+    assert exc_info.value.command == "vault"
+
+
+@pytest.mark.parametrize("field", ["name", "path", "files", "folders", "size"])
+async def test_info_without_a_required_field(cli, field):
+    cli._execute.return_value = drop_field(VAULT_INFO, field)
     with pytest.raises(CLIParseError):
         await cli.vault.info()
 
 
 async def test_file_info(cli):
-    cli._execute.return_value = (
-        "path\tnote.md\nname\tnote\nextension\tmd\nsize\t137\n"
-        "created\t1786836399339\nmodified\t1786836399341\n"
-    )
+    cli._execute.return_value = FILE_INFO
     result = await cli.vault.file_info("note.md")
-    assert result == {
-        "path": "note.md",
-        "name": "note",
-        "extension": "md",
-        "size": "137",
-        "created": "1786836399339",
-        "modified": "1786836399341",
-    }
+    assert result == FileInfo(
+        path="note.md",
+        name="note",
+        extension="md",
+        size=137,
+        created=datetime(2026, 8, 15, 23, 26, 39, 339000, tzinfo=UTC),
+        modified=datetime(2026, 8, 15, 23, 26, 39, 341000, tzinfo=UTC),
+    )
     cli._execute.assert_awaited_once_with("file", params={"path": "note.md"})
 
 
+async def test_file_info_reads_the_timestamps_as_milliseconds(cli):
+    cli._execute.return_value = FILE_INFO
+    result = await cli.vault.file_info("note.md")
+    assert result.created.timestamp() * 1000 == 1786836399339
+    assert result.modified.timestamp() * 1000 == 1786836399341
+    assert isinstance(result.size, int)
+
+
+@pytest.mark.parametrize(
+    ("field", "printed"), [("created", "1786836399339"), ("modified", "1786836399341")]
+)
+async def test_file_info_reads_a_small_timestamp_as_milliseconds_too(
+    cli, field, printed
+):
+    # The CLI prints milliseconds whatever the number is, so the unit is
+    # not for pydantic to guess: it reads a small number as seconds,
+    # which would date a file from days after the epoch to 2001.
+    cli._execute.return_value = FILE_INFO.replace(printed, "1000000000")
+    result = await cli.vault.file_info("note.md")
+    assert getattr(result, field) == datetime(1970, 1, 12, 13, 46, 40, tzinfo=UTC)
+
+
+async def test_file_info_reads_a_timestamp_from_before_the_epoch(cli):
+    # A file older than 1970 records a negative number of milliseconds.
+    cli._execute.return_value = FILE_INFO.replace("1786836399339", "-315619200000")
+    result = await cli.vault.file_info("note.md")
+    assert result.created == datetime(1960, 1, 1, tzinfo=UTC)
+
+
+async def test_file_info_without_an_extension(cli):
+    # A file whose name carries no extension prints the field empty
+    # rather than leaving it out.
+    cli._execute.return_value = (
+        "path\tnotes/note\nname\tnote\nextension\t\nsize\t18\n"
+        "created\t1786848833424\nmodified\t1786848833424\n"
+    )
+    result = await cli.vault.file_info("notes/note")
+    assert result.extension == ""
+    assert result.name == "note"
+
+
+@pytest.mark.parametrize("field", ["created", "modified"])
+@pytest.mark.parametrize("printed", ["just now", "1.5", "1786836399.0", "9" * 20])
+async def test_file_info_without_a_timestamp_in_milliseconds(cli, field, printed):
+    cli._execute.return_value = drop_field(FILE_INFO, field) + f"{field}\t{printed}\n"
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.vault.file_info("note.md")
+    assert exc_info.value.command == "file"
+
+
+async def test_file_info_reads_back_the_json_it_writes(cli):
+    # Only a plain number is read as milliseconds, so the timestamps the
+    # model prints are timestamps it can be built from again.
+    cli._execute.return_value = FILE_INFO
+    result = await cli.vault.file_info("note.md")
+    assert FileInfo.model_validate_json(result.model_dump_json()) == result
+
+
+def test_file_info_reads_a_number_and_its_text_alike():
+    # The CLI hands over text, but the model is public and takes what a
+    # caller writes, and 1000 milliseconds is one second either way.
+    printed = FileInfo.model_validate(
+        {**FILE_FIELDS, "created": "1000", "modified": "1000"}
+    )
+    written = FileInfo.model_validate(
+        {**FILE_FIELDS, "created": 1000, "modified": 1000}
+    )
+    assert printed == written
+    assert printed.created == datetime(1970, 1, 1, 0, 0, 1, tzinfo=UTC)
+
+
+def test_file_info_refuses_a_number_that_is_not_whole_milliseconds():
+    # A number and its text are refused alike, and one written with a
+    # point goes with them however round it is: Obsidian prints no
+    # point, so `1786836399.0` is a number of seconds by another hand,
+    # and reading it as milliseconds would date the file to 1970.
+    for value in ("1.5", 1.5, Decimal("1.5"), Fraction(3, 2), "3/2", 1000.0, "1000.0"):
+        with pytest.raises(ValidationError):
+            FileInfo.model_validate(
+                {**FILE_FIELDS, "created": value, "modified": value}
+            )
+
+
+@pytest.mark.parametrize("value", [1000, "1000", Decimal("1000"), Fraction(1000)])
+def test_file_info_counts_milliseconds_however_they_are_written(value):
+    # A caller reaches for whichever number type is at hand, and a
+    # thousand milliseconds is one second in every one of them.
+    result = FileInfo.model_validate(
+        {**FILE_FIELDS, "created": value, "modified": value}
+    )
+    assert result.created == datetime(1970, 1, 1, 0, 0, 1, tzinfo=UTC)
+
+
+def test_file_info_keeps_the_millisecond_it_was_given():
+    # A millisecond is too fine for a float of that size to hold, so the
+    # count is added to the epoch rather than divided into seconds.
+    result = FileInfo.model_validate(
+        {**FILE_FIELDS, "created": "9214646400339", "modified": "9214646400339"}
+    )
+    assert result.created == datetime(2262, 1, 1, 0, 0, 0, 339000, tzinfo=UTC)
+
+
+def test_file_info_refuses_a_moment_without_a_time_zone():
+    # `created` and `modified` are documented in UTC, and a moment
+    # written without a zone names no one moment to hold them to.
+    for value in (datetime(2026, 8, 15), "2026-08-15T23:26:39", date(2026, 8, 15)):
+        with pytest.raises(ValidationError):
+            FileInfo.model_validate(
+                {**FILE_FIELDS, "created": value, "modified": value}
+            )
+
+
+def test_file_info_reads_a_moment_from_elsewhere_into_utc():
+    moment = datetime(2026, 8, 16, 2, 26, 39, tzinfo=timezone(timedelta(hours=3)))
+    result = FileInfo.model_validate(
+        {**FILE_FIELDS, "created": moment, "modified": moment}
+    )
+    assert result.created == datetime(2026, 8, 15, 23, 26, 39, tzinfo=UTC)
+    assert result.created.tzinfo is UTC
+
+
+@pytest.mark.parametrize(
+    "field", ["path", "name", "extension", "size", "created", "modified"]
+)
+async def test_file_info_without_a_required_field(cli, field):
+    cli._execute.return_value = drop_field(FILE_INFO, field)
+    with pytest.raises(CLIParseError):
+        await cli.vault.file_info("note.md")
+
+
 async def test_folder_info(cli):
-    cli._execute.return_value = "path\tnotes\nfiles\t3\nfolders\t0\nsize\t305\n"
+    cli._execute.return_value = FOLDER_INFO
     result = await cli.vault.folder_info("notes")
-    assert result == {"path": "notes", "files": "3", "folders": "0", "size": "305"}
+    assert result == FolderInfo(path="notes", files=3, folders=0, size=305)
+    assert isinstance(result.files, int)
+    assert isinstance(result.folders, int)
+    assert isinstance(result.size, int)
     cli._execute.assert_awaited_once_with("folder", params={"path": "notes"})
+
+
+async def test_folder_info_unexpected_output(cli):
+    cli._execute.return_value = FOLDER_INFO.replace("files\t3", "files\tthree")
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.vault.folder_info("notes")
+    assert exc_info.value.command == "folder"
+
+
+@pytest.mark.parametrize("field", ["path", "files", "folders", "size"])
+async def test_folder_info_without_a_required_field(cli, field):
+    cli._execute.return_value = drop_field(FOLDER_INFO, field)
+    with pytest.raises(CLIParseError):
+        await cli.vault.folder_info("notes")
 
 
 async def test_folders(cli):
@@ -305,13 +493,49 @@ async def test_folders_with_parent(cli):
 
 
 async def test_wordcount(cli):
-    cli._execute.return_value = "words: 500\ncharacters: 2800\n"
+    cli._execute.return_value = WORD_COUNT
     result = await cli.vault.wordcount("note.md")
-    assert result == {"words": 500, "characters": 2800}
+    assert result == WordCount(words=500, characters=2800)
+    assert isinstance(result.words, int)
+    assert isinstance(result.characters, int)
     cli._execute.assert_awaited_once_with("wordcount", params={"path": "note.md"})
 
 
 async def test_wordcount_non_numeric(cli):
-    cli._execute.return_value = "words: many\n"
+    cli._execute.return_value = "words: many\ncharacters: 2800\n"
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.vault.wordcount("note.md")
+    assert exc_info.value.command == "wordcount"
+
+
+@pytest.mark.parametrize("field", ["words", "characters"])
+async def test_wordcount_without_a_required_field(cli, field):
+    cli._execute.return_value = drop_field(WORD_COUNT, field, separator=": ")
+    with pytest.raises(CLIParseError):
+        await cli.vault.wordcount("note.md")
+
+
+# Only `sync:status` mixes a sentence into its fields. For the rest an
+# extra line is output this library does not understand.
+async def test_info_with_a_stray_line(cli):
+    cli._execute.return_value = VAULT_INFO + "and one more thing\n"
+    with pytest.raises(CLIParseError):
+        await cli.vault.info()
+
+
+async def test_folder_info_with_a_stray_line(cli):
+    cli._execute.return_value = FOLDER_INFO + "and one more thing\n"
+    with pytest.raises(CLIParseError):
+        await cli.vault.folder_info("notes")
+
+
+async def test_file_info_with_a_stray_line(cli):
+    cli._execute.return_value = FILE_INFO + "and one more thing\n"
+    with pytest.raises(CLIParseError):
+        await cli.vault.file_info("note.md")
+
+
+async def test_wordcount_with_a_stray_line(cli):
+    cli._execute.return_value = WORD_COUNT + "and one more thing\n"
     with pytest.raises(CLIParseError):
         await cli.vault.wordcount("note.md")

@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+from ..models import SyncStatus
 from ._base import BaseCLIResource
 
 
 class CLISyncResource(BaseCLIResource):
     """CLI resource for Obsidian Sync operations.
 
-    Every command except `set_paused` needs Sync to be set up for the
-    vault and answers `Error: Sync is not set up for this vault.`
-    otherwise, which surfaces as a `CommandError`.
+    Only `set_paused` and `status` work whatever Sync is doing. The rest
+    want it set up for the vault and running, and answer `Error: Sync is
+    not set up for this vault.` or, once it is set up, a sentence naming
+    the state — paused, or in error — that stops them. Both surface as a
+    `CommandError`, so pausing Sync closes its history to you until you
+    resume it.
 
     Attributes:
         _cli: Reference to the parent ``ObsidianCLI`` instance.
@@ -30,18 +34,23 @@ class CLISyncResource(BaseCLIResource):
         """Open the Sync history UI."""
         await self._cli._execute("sync:open")
 
-    async def status(self) -> dict[str, str]:
+    async def status(self) -> SyncStatus:
         """Get sync status information.
 
+        A vault without Sync is answered rather than refused: the status
+        arrives on its own and every other field is `None`.
+
         Returns:
-            Status keyed by field name: ``status``, and, once the vault is
-            set up, ``vault``, ``device``, ``vault size`` and
-            ``account usage``. A vault without Sync answers with the
-            ``status`` field alone.
+            What Sync is doing, and what it knows about this vault.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
         """
         output = await self._cli._execute("sync:status")
         # A vault without Sync adds a plain sentence after the status line.
-        return self._parse_fields("sync:status", output, separator=":", strict=False)
+        return self._parse_fields_as(
+            "sync:status", output, SyncStatus, separator=": ", strict=False
+        )
 
     async def history(self, path: str) -> list[str]:
         """List sync version history for a file.

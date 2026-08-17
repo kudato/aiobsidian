@@ -9,6 +9,9 @@ from aiobsidian.cli._base import BaseCLIResource
 from aiobsidian.models.bases import BaseView
 from aiobsidian.models.history import FileVersion
 from aiobsidian.models.links import Backlink
+from aiobsidian.models.plugins import PluginInfo
+from aiobsidian.models.sync import SyncStatus
+from aiobsidian.models.vault import FolderInfo, WordCount
 
 
 class TestIsEmptyResult:
@@ -253,28 +256,132 @@ class TestParseLines:
         assert BaseCLIResource._parse_lines("No snippets found.\n") == []
 
 
-class TestParseFields:
-    def test_tab_separated(self):
-        output = "name\tMyVault\nfiles\t47\n"
-        assert BaseCLIResource._parse_fields("vault", output) == {
-            "name": "MyVault",
-            "files": "47",
-        }
+class TestParseFieldsAs:
+    def test_fields(self):
+        output = "path\tnotes\nfiles\t3\nfolders\t0\nsize\t305\n"
+        result = BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
+        assert result == FolderInfo(path="notes", files=3, folders=0, size=305)
 
     def test_custom_separator(self):
         output = "words: 10\ncharacters: 84\n"
-        result = BaseCLIResource._parse_fields("wordcount", output, separator=":")
-        assert result == {"words": "10", "characters": "84"}
+        result = BaseCLIResource._parse_fields_as(
+            "wordcount", output, WordCount, separator=": "
+        )
+        assert result == WordCount(words=10, characters=84)
+
+    def test_skips_a_sentence_when_not_strict(self):
+        output = "status: disconnected\nSync is not set up for this vault.\n"
+        result = BaseCLIResource._parse_fields_as(
+            "sync:status", output, SyncStatus, separator=": ", strict=False
+        )
+        assert result == SyncStatus(status="disconnected")
+
+    def test_refuses_that_same_sentence_when_strict(self):
+        # The whole record is there, so only `strict` decides.
+        output = "status: disconnected\nSync is not set up for this vault.\n"
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_fields_as(
+                "sync:status", output, SyncStatus, separator=": "
+            )
 
     def test_missing_separator(self):
-        with pytest.raises(CLIParseError):
-            BaseCLIResource._parse_fields("vault", "no separator here\n")
+        with pytest.raises(CLIParseError) as exc_info:
+            BaseCLIResource._parse_fields_as(
+                "folder", "no separator here\n", FolderInfo
+            )
+        assert exc_info.value.command == "folder"
 
-    def test_value_may_contain_separator(self):
-        output = "path\t/Users/me/My\tVault\n"
-        assert BaseCLIResource._parse_fields("vault", output) == {
-            "path": "/Users/me/My\tVault"
-        }
+    def test_missing_field(self):
+        output = "path\tnotes\nfiles\t3\nfolders\t0\n"
+        with pytest.raises(CLIParseError) as exc_info:
+            BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
+        assert exc_info.value.command == "folder"
+
+    def test_value_of_the_wrong_type(self):
+        output = "path\tnotes\nfiles\tthree\nfolders\t0\nsize\t305\n"
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
+
+    def test_ignores_a_field_the_model_does_not_name(self):
+        output = "path\tnotes\nfiles\t3\nfolders\t0\nsize\t305\nowner\tme\n"
+        result = BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
+        assert result == FolderInfo(path="notes", files=3, folders=0, size=305)
+
+    def test_value_may_contain_the_separator(self):
+        output = "path\tnotes/My\tFolder\nfiles\t3\nfolders\t0\nsize\t305\n"
+        result = BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
+        assert result.path == "notes/My\tFolder"
+
+    def test_values_arrive_verbatim(self):
+        # A folder is named by whoever made it, so a name that ends in a
+        # space is theirs to keep.
+        output = "path\tnotes/drafts \nfiles\t3\nfolders\t0\nsize\t305\n"
+        result = BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
+        assert result.path == "notes/drafts "
+
+    def test_the_last_value_keeps_the_blank_space_it_ends_with(self):
+        # `plugin` prints the description last, straight from a manifest
+        # nothing trims, so the end of the output is a place a value can
+        # legitimately end in a space.
+        output = (
+            "type\tcommunity\nname\tDataview\nversion\t0.5.64\n"
+            "author\tMichael Brenan\nenabled\ttrue\ndescription\tComplex queries.  \n"
+        )
+        result = BaseCLIResource._parse_fields_as("plugin", output, PluginInfo)
+        assert result.description == "Complex queries.  "
+
+    def test_a_value_of_blank_space_keeps_its_separator(self):
+        output = (
+            "type\tcommunity\nname\tDataview\nversion\t0.5.64\n"
+            "author\tMichael Brenan\nenabled\ttrue\ndescription\t \n"
+        )
+        result = BaseCLIResource._parse_fields_as("plugin", output, PluginInfo)
+        assert result.description == " "
+
+    def test_only_a_newline_ends_a_field(self):
+        # Obsidian joins the fields with a newline and no other character
+        # ends one, so a line separator a manifest writes into its
+        # description stays inside the value.
+        output = (
+            "type\tcommunity\nname\tDataview\nversion\t0.5.64\n"
+            "author\tMichael Brenan\nenabled\ttrue\ndescription\tone\u2028two\n"
+        )
+        result = BaseCLIResource._parse_fields_as("plugin", output, PluginInfo)
+        assert result.description == "one\u2028two"
+
+    def test_a_key_printed_twice(self):
+        # A description of its own carrying `enabled\tfalse` would
+        # otherwise answer for the field Obsidian printed itself.
+        output = (
+            "type\tcommunity\nname\tDataview\nversion\t0.5.64\n"
+            "author\tMichael Brenan\nenabled\ttrue\ndescription\tfirst\n"
+            "enabled\tfalse\n"
+        )
+        with pytest.raises(CLIParseError) as exc_info:
+            BaseCLIResource._parse_fields_as("plugin", output, PluginInfo)
+        assert exc_info.value.command == "plugin"
+
+    def test_a_key_printed_twice_even_when_not_strict(self):
+        output = "status: connected\nstatus: paused\n"
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_fields_as(
+                "sync:status", output, SyncStatus, separator=": ", strict=False
+            )
+
+    @pytest.mark.parametrize(
+        "output",
+        [
+            "path\tnotes\nfiles\t3\nfolders\t0\nsize\t305\n\n",
+            "\npath\tnotes\nfiles\t3\nfolders\t0\nsize\t305\n",
+            "path\tnotes\nfiles\t3\n\nfolders\t0\nsize\t305\n",
+        ],
+    )
+    def test_a_blank_line(self, output):
+        # Obsidian ends the output with a newline only when the last
+        # field did not end with one itself, so a blank line anywhere is
+        # a field the CLI never printed.
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
 
 
 class TestSplitContent:

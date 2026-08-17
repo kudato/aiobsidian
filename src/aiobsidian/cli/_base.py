@@ -184,40 +184,67 @@ class BaseCLIResource:
         return [line for line in stripped.splitlines() if line.strip()]
 
     @classmethod
-    def _parse_fields(
+    def _parse_fields_as[ModelT: BaseModel](
         cls,
         command: str,
         output: str,
+        model: type[ModelT],
         *,
         separator: str = "\t",
         strict: bool = True,
-    ) -> dict[str, str]:
-        """Parse `key<separator>value` output into a dictionary.
+    ) -> ModelT:
+        """Parse `key<separator>value` output into a model.
+
+        The commands that describe one thing print a field per line
+        rather than a table, and print text: `file` reports a size as
+        `"55"` and a timestamp as the milliseconds behind it. The model
+        names the fields and hands the values back with the types they
+        had, and says for itself what a field the CLI leaves out is
+        worth without it. A field ends where the newline the CLI joins
+        them with is and nowhere else, and values come back exactly as
+        printed, blank space included — only the single newline the
+        output ends with goes. The last field of a plugin record is the
+        description its manifest gives, which nothing trims on the way
+        here, so a description written with a newline of its own is
+        read short or refused, never whole.
 
         Args:
             command: CLI command name, used for error reporting.
             output: Raw output of the command.
-            separator: Separator between key and value.
-            strict: If `False`, skip lines without the separator instead of
-                refusing to parse. Some commands mix a plain sentence into
-                the field list.
+            model: Model to validate the fields against.
+            separator: Separator between key and value, blank space
+                included. The commands that separate with a colon write
+                a space after it, and passing `": "` keeps that space
+                out of the value rather than trimming it back off, which
+                would take a value's own with it.
+            strict: If `False`, skip lines without the separator instead
+                of refusing to parse. Some commands mix a plain sentence
+                into the field list.
 
         Returns:
-            Mapping of keys to values, in the order printed by the CLI.
+            The model built from the fields the CLI printed.
 
         Raises:
             CLIParseError: If `strict` and a line does not contain the
-                separator.
+                separator, if a key is printed twice, or if the fields
+                do not fit the model. A key twice over is refused
+                whatever `strict` says, since one of its two values
+                would have to be dropped for the other.
         """
         fields: dict[str, str] = {}
-        for line in cls._parse_lines(output):
+        for line in output.removesuffix("\n").split("\n"):
             key, found, value = line.partition(separator)
             if not found:
                 if strict:
                     raise CLIParseError(command, output)
                 continue
-            fields[key.strip()] = value.strip()
-        return fields
+            if key in fields:
+                raise CLIParseError(command, output)
+            fields[key] = value
+        try:
+            return model.model_validate(fields)
+        except ValidationError as exc:
+            raise CLIParseError(command, output) from exc
 
     @staticmethod
     def _strip_content_header(output: str) -> str:

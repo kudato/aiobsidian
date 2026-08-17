@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..models import Plugin
+from ..models import Plugin, PluginInfo
 from ._base import BaseCLIResource
 
 
@@ -13,18 +13,21 @@ class CLIPluginsResource(BaseCLIResource):
 
     __slots__ = ()
 
-    async def info(self, plugin_id: str) -> dict[str, str]:
+    async def info(self, plugin_id: str) -> PluginInfo:
         """Get details about a plugin.
 
         Args:
             plugin_id: Plugin identifier.
 
         Returns:
-            Plugin details keyed by field name (e.g. ``type``, ``name``,
-            ``enabled``).
+            What the plugin is and whether it is turned on. A community
+            plugin also carries its version, author and description.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
         """
         output = await self._cli._execute("plugin", params={"id": plugin_id})
-        return self._parse_fields("plugin", output)
+        return self._parse_fields_as("plugin", output, PluginInfo)
 
     async def set_restricted(self, value: bool) -> None:
         """Turn restricted mode on or off.

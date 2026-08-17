@@ -3,9 +3,15 @@ from __future__ import annotations
 import pytest
 
 from aiobsidian._exceptions import CLIParseError
-from aiobsidian.models.publish import PublishChange
+from aiobsidian.models.publish import PublishChange, PublishSite
 
-SITE_INFO = "slug\tmysite\nurl\thttps://publish.obsidian.md/mysite\ncustom\thttps://notes.example.com\n"
+from .helpers import drop_field
+
+# Obsidian prints the custom URL only for a site that has one, and keeps
+# it as typed, which is what it matches a visitor's address against.
+SITE_INFO = (
+    "slug\tmysite\nurl\thttps://publish.obsidian.md/mysite\ncustom\tmysite.com/notes\n"
+)
 
 PUBLISHED_FILES = "about.md\nindex.md\n"
 
@@ -32,12 +38,34 @@ async def test_open_active_file(cli):
 async def test_site(cli):
     cli._execute.return_value = SITE_INFO
     result = await cli.publish.site()
-    assert result == {
-        "slug": "mysite",
-        "url": "https://publish.obsidian.md/mysite",
-        "custom": "https://notes.example.com",
-    }
+    assert result == PublishSite(
+        slug="mysite",
+        url="https://publish.obsidian.md/mysite",
+        custom_url="mysite.com/notes",
+    )
     cli._execute.assert_awaited_once_with("publish:site")
+
+
+async def test_site_without_a_custom_url(cli):
+    cli._execute.return_value = (
+        "slug\tmysite\nurl\thttps://publish.obsidian.md/mysite\n"
+    )
+    result = await cli.publish.site()
+    assert result.custom_url is None
+
+
+@pytest.mark.parametrize("field", ["slug", "url"])
+async def test_site_without_a_required_field(cli, field):
+    cli._execute.return_value = drop_field(SITE_INFO, field)
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.publish.site()
+    assert exc_info.value.command == "publish:site"
+
+
+async def test_site_with_a_stray_line(cli):
+    cli._execute.return_value = SITE_INFO + "and one more thing\n"
+    with pytest.raises(CLIParseError):
+        await cli.publish.site()
 
 
 async def test_list(cli):

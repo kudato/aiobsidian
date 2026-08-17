@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..models import PublishChange
+from ..models import PublishChange, PublishSite
 from ._base import BaseCLIResource
 
 
@@ -32,15 +32,17 @@ class CLIPublishResource(BaseCLIResource):
         output = await self._cli._execute("publish:open", params=params)
         return output.strip()
 
-    async def site(self) -> dict[str, str]:
+    async def site(self) -> PublishSite:
         """Get Publish site information.
 
         Returns:
-            Site details keyed by field name: ``slug``, ``url`` and, when
-            one is set, ``custom`` for the custom domain.
+            Where the site lives and under what name.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
         """
         output = await self._cli._execute("publish:site")
-        return self._parse_fields("publish:site", output)
+        return self._parse_fields_as("publish:site", output, PublishSite)
 
     async def status(self) -> list[PublishChange]:
         """List the changes waiting to be published.

@@ -143,7 +143,7 @@ class ObsidianCLI:
         of each command's output; this returns the raw text.
 
         ```python
-        raw = await cli.run("wordcount", params={"path": "note.md"})
+        raw = await cli.run("vault", params={"info": "size"})
         ```
 
         Failure detection is the same as everywhere else, so a command

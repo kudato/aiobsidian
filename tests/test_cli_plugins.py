@@ -5,7 +5,9 @@ import json
 import pytest
 
 from aiobsidian._exceptions import CLIParseError
-from aiobsidian.models.plugins import Plugin
+from aiobsidian.models.plugins import Plugin, PluginInfo
+
+from .helpers import drop_field
 
 # `plugins` lists everything installed. Core plugins ship with the app and
 # report no version; only community ones carry a number.
@@ -21,12 +23,119 @@ ENABLED_PLUGINS = [
     {"id": "bookmarks"},
 ]
 
+# A community plugin is described from its manifest, so it names an author
+# and a version. Obsidian keeps the description last and leaves it out when
+# the manifest has none.
+COMMUNITY_INFO = (
+    "type\tcommunity\n"
+    "name\tLocal REST API with MCP\n"
+    "version\t5.1.0\n"
+    "author\tAdam Coddington\n"
+    "enabled\ttrue\n"
+    "description\tA secure REST API and Model Context Protocol (MCP) server "
+    "for your vault.\n"
+)
+
+# A core plugin has no manifest, and its name is translated.
+CORE_INFO = "type\tcore\nname\tЕжедневные заметки\nenabled\ttrue\n"
+
 
 async def test_info(cli):
-    cli._execute.return_value = "type\tcommunity\nname\tDataview\nenabled\ttrue\n"
-    result = await cli.plugins.info("dataview")
-    assert result == {"type": "community", "name": "Dataview", "enabled": "true"}
-    cli._execute.assert_awaited_once_with("plugin", params={"id": "dataview"})
+    cli._execute.return_value = COMMUNITY_INFO
+    result = await cli.plugins.info("obsidian-local-rest-api")
+    assert result == PluginInfo(
+        type="community",
+        name="Local REST API with MCP",
+        version="5.1.0",
+        author="Adam Coddington",
+        enabled=True,
+        description=(
+            "A secure REST API and Model Context Protocol (MCP) server for your vault."
+        ),
+    )
+    cli._execute.assert_awaited_once_with(
+        "plugin", params={"id": "obsidian-local-rest-api"}
+    )
+
+
+async def test_info_of_a_core_plugin(cli):
+    cli._execute.return_value = CORE_INFO
+    result = await cli.plugins.info("daily-notes")
+    assert result == PluginInfo(type="core", name="Ежедневные заметки", enabled=True)
+    assert result.version is None
+    assert result.author is None
+    assert result.description is None
+
+
+async def test_info_of_a_disabled_plugin(cli):
+    cli._execute.return_value = CORE_INFO.replace("true", "false")
+    result = await cli.plugins.info("daily-notes")
+    assert result.enabled is False
+
+
+@pytest.mark.parametrize("field", ["type", "name", "enabled"])
+async def test_info_without_a_required_field(cli, field):
+    cli._execute.return_value = drop_field(CORE_INFO, field)
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.plugins.info("daily-notes")
+    assert exc_info.value.command == "plugin"
+
+
+async def test_info_without_a_description(cli):
+    cli._execute.return_value = drop_field(COMMUNITY_INFO, "description")
+    result = await cli.plugins.info("obsidian-local-rest-api")
+    assert result.description is None
+    assert result.version == "5.1.0"
+
+
+async def test_info_without_an_author(cli):
+    # Obsidian empties the field itself for a manifest that names nobody,
+    # and for one that credits Obsidian.
+    cli._execute.return_value = COMMUNITY_INFO.replace("Adam Coddington", "")
+    result = await cli.plugins.info("obsidian-local-rest-api")
+    assert result.author is None
+
+
+async def test_info_with_a_description_that_ends_in_a_space(cli):
+    # Obsidian prints the description last and takes it from the manifest
+    # untrimmed, so the blank space a manifest ends with is the last thing
+    # in the output.
+    cli._execute.return_value = COMMUNITY_INFO.replace("vault.\n", "vault.  \n")
+    result = await cli.plugins.info("obsidian-local-rest-api")
+    assert result.description is not None
+    assert result.description.endswith("vault.  ")
+
+
+async def test_info_with_a_description_that_names_a_field_again(cli):
+    # A newline in the description is where Obsidian would start another
+    # field, so a manifest could otherwise answer for `enabled` itself.
+    cli._execute.return_value = COMMUNITY_INFO.replace(
+        "vault.\n", "vault.\nenabled\tfalse\n"
+    )
+    with pytest.raises(CLIParseError):
+        await cli.plugins.info("obsidian-local-rest-api")
+
+
+async def test_info_of_a_core_plugin_that_names_a_version(cli):
+    # A core plugin has no manifest to take one from, so the two records
+    # Obsidian prints do not overlap.
+    cli._execute.return_value = CORE_INFO + "version\t1.0.0\n"
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.plugins.info("daily-notes")
+    assert exc_info.value.command == "plugin"
+
+
+async def test_info_of_a_community_plugin_without_a_version(cli):
+    # The manifest gives one and Obsidian prints it unconditionally.
+    cli._execute.return_value = drop_field(COMMUNITY_INFO, "version")
+    with pytest.raises(CLIParseError):
+        await cli.plugins.info("obsidian-local-rest-api")
+
+
+async def test_info_with_a_stray_line(cli):
+    cli._execute.return_value = CORE_INFO + "and one more thing\n"
+    with pytest.raises(CLIParseError):
+        await cli.plugins.info("daily-notes")
 
 
 async def test_set_restricted_true(cli):
