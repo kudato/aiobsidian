@@ -2,6 +2,14 @@
 
 ## Vault Models
 
+::: aiobsidian.models.VaultInfo
+
+::: aiobsidian.models.FolderInfo
+
+::: aiobsidian.models.FileInfo
+
+::: aiobsidian.models.WordCount
+
 ::: aiobsidian.models.FileStat
 
 ::: aiobsidian.models.NoteJson
@@ -54,6 +62,8 @@
 
 ::: aiobsidian.models.Plugin
 
+::: aiobsidian.models.PluginInfo
+
 ## Outline Models
 
 ::: aiobsidian.models.Heading
@@ -69,3 +79,9 @@
 ## Publish Models
 
 ::: aiobsidian.models.PublishChange
+
+::: aiobsidian.models.PublishSite
+
+## Sync Models
+
+::: aiobsidian.models.SyncStatus

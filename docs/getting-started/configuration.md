@@ -49,11 +49,12 @@ the vault.
 without parsing:
 
 ```python
-raw = await cli.run("wordcount", params={"path": "note.md"})
-# 'words: 3\ncharacters: 24\n'
-
 raw = await cli.run("tags", flags=["total"])
 # '8\n'
+
+# `vault` can answer with one field, which no method exposes
+raw = await cli.run("vault", params={"info": "size"})
+# '4063\n'
 
 # `tasks` can filter by status character, which no method exposes
 raw = await cli.run("tasks", params={"status": "/"}, output_format="json")
