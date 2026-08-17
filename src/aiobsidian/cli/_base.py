@@ -184,46 +184,6 @@ class BaseCLIResource:
         return [line for line in stripped.splitlines() if line.strip()]
 
     @classmethod
-    def _parse_fields(
-        cls,
-        command: str,
-        output: str,
-        *,
-        separator: str = "\t",
-        strict: bool = True,
-    ) -> dict[str, str]:
-        """Parse `key<separator>value` output into a dictionary.
-
-        Args:
-            command: CLI command name, used for error reporting.
-            output: Raw output of the command.
-            separator: Separator between key and value, blank space
-                included. The commands that separate with a colon write
-                a space after it, and passing `": "` keeps that space
-                out of the value rather than trimming it back off, which
-                would take a value's own with it.
-            strict: If `False`, skip lines without the separator instead of
-                refusing to parse. Some commands mix a plain sentence into
-                the field list.
-
-        Returns:
-            Mapping of keys to values, in the order printed by the CLI.
-
-        Raises:
-            CLIParseError: If `strict` and a line does not contain the
-                separator.
-        """
-        fields: dict[str, str] = {}
-        for line in cls._parse_lines(output):
-            key, found, value = line.partition(separator)
-            if not found:
-                if strict:
-                    raise CLIParseError(command, output)
-                continue
-            fields[key] = value
-        return fields
-
-    @classmethod
     def _parse_fields_as[ModelT: BaseModel](
         cls,
         command: str,
@@ -240,16 +200,19 @@ class BaseCLIResource:
         `"55"` and a timestamp as the milliseconds behind it. The model
         names the fields and hands the values back with the types they
         had, and says for itself what a field the CLI leaves out is
-        worth without it. Values come back as
-        printed, save at the two ends of the output, where the blank
-        space around the whole of it goes before the lines are counted.
+        worth without it. Values come back as printed, save at the two
+        ends of the output, where the blank space around the whole of it
+        goes before the lines are counted.
 
         Args:
             command: CLI command name, used for error reporting.
             output: Raw output of the command.
             model: Model to validate the fields against.
             separator: Separator between key and value, blank space
-                included.
+                included. The commands that separate with a colon write
+                a space after it, and passing `": "` keeps that space
+                out of the value rather than trimming it back off, which
+                would take a value's own with it.
             strict: If `False`, skip lines without the separator instead
                 of refusing to parse. Some commands mix a plain sentence
                 into the field list.
@@ -261,7 +224,14 @@ class BaseCLIResource:
             CLIParseError: If `strict` and a line does not contain the
                 separator, or the fields do not fit the model.
         """
-        fields = cls._parse_fields(command, output, separator=separator, strict=strict)
+        fields: dict[str, str] = {}
+        for line in cls._parse_lines(output):
+            key, found, value = line.partition(separator)
+            if not found:
+                if strict:
+                    raise CLIParseError(command, output)
+                continue
+            fields[key] = value
         try:
             return model.model_validate(fields)
         except ValidationError as exc:

@@ -255,49 +255,6 @@ class TestParseLines:
         assert BaseCLIResource._parse_lines("No snippets found.\n") == []
 
 
-class TestParseFields:
-    def test_tab_separated(self):
-        output = "name\tMyVault\nfiles\t47\n"
-        assert BaseCLIResource._parse_fields("vault", output) == {
-            "name": "MyVault",
-            "files": "47",
-        }
-
-    def test_custom_separator(self):
-        output = "words: 10\ncharacters: 84\n"
-        result = BaseCLIResource._parse_fields("wordcount", output, separator=": ")
-        assert result == {"words": "10", "characters": "84"}
-
-    def test_missing_separator(self):
-        with pytest.raises(CLIParseError):
-            BaseCLIResource._parse_fields("vault", "no separator here\n")
-
-    def test_value_may_contain_separator(self):
-        output = "path\t/Users/me/My\tVault\n"
-        assert BaseCLIResource._parse_fields("vault", output) == {
-            "path": "/Users/me/My\tVault"
-        }
-
-    def test_values_arrive_verbatim(self):
-        # A file is named by whoever wrote it, so a name that ends in a
-        # space is theirs to keep.
-        output = "path\tnotes/draft .md\nname\tdraft \nextension\tmd\n"
-        assert BaseCLIResource._parse_fields("file", output) == {
-            "path": "notes/draft .md",
-            "name": "draft ",
-            "extension": "md",
-        }
-
-    def test_the_ends_of_the_output_are_still_trimmed(self):
-        # `_parse_lines()` strips the blank space around the whole
-        # output before counting lines, which no command puts there.
-        output = " name\tMyVault\nfiles\t47 \n"
-        assert BaseCLIResource._parse_fields("vault", output) == {
-            "name": "MyVault",
-            "files": "47",
-        }
-
-
 class TestParseFieldsAs:
     def test_fields(self):
         output = "path\tnotes\nfiles\t3\nfolders\t0\nsize\t305\n"
@@ -346,6 +303,25 @@ class TestParseFieldsAs:
 
     def test_ignores_a_field_the_model_does_not_name(self):
         output = "path\tnotes\nfiles\t3\nfolders\t0\nsize\t305\nowner\tme\n"
+        result = BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
+        assert result == FolderInfo(path="notes", files=3, folders=0, size=305)
+
+    def test_value_may_contain_the_separator(self):
+        output = "path\tnotes/My\tFolder\nfiles\t3\nfolders\t0\nsize\t305\n"
+        result = BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
+        assert result.path == "notes/My\tFolder"
+
+    def test_values_arrive_verbatim(self):
+        # A folder is named by whoever made it, so a name that ends in a
+        # space is theirs to keep.
+        output = "path\tnotes/drafts \nfiles\t3\nfolders\t0\nsize\t305\n"
+        result = BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
+        assert result.path == "notes/drafts "
+
+    def test_the_ends_of_the_output_are_still_trimmed(self):
+        # `_parse_lines()` strips the blank space around the whole
+        # output before counting lines, which no command puts there.
+        output = " path\tnotes\nfiles\t3\nfolders\t0\nsize\t305 \n"
         result = BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
         assert result == FolderInfo(path="notes", files=3, folders=0, size=305)
 

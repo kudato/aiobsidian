@@ -337,8 +337,27 @@ async def test_file_info_reads_a_small_timestamp_as_milliseconds_too(
     assert getattr(result, field) == datetime(1970, 1, 12, 13, 46, 40, tzinfo=UTC)
 
 
+async def test_file_info_reads_a_timestamp_from_before_the_epoch(cli):
+    # A file older than 1970 records a negative number of milliseconds.
+    cli._execute.return_value = FILE_INFO.replace("1786836399339", "-315619200000")
+    result = await cli.vault.file_info("note.md")
+    assert result.created == datetime(1960, 1, 1, tzinfo=UTC)
+
+
+async def test_file_info_without_an_extension(cli):
+    # A file whose name carries no extension prints the field empty
+    # rather than leaving it out.
+    cli._execute.return_value = (
+        "path\tnotes/note\nname\tnote\nextension\t\nsize\t18\n"
+        "created\t1786848833424\nmodified\t1786848833424\n"
+    )
+    result = await cli.vault.file_info("notes/note")
+    assert result.extension == ""
+    assert result.name == "note"
+
+
 @pytest.mark.parametrize("field", ["created", "modified"])
-@pytest.mark.parametrize("printed", ["just now", "9" * 20])
+@pytest.mark.parametrize("printed", ["just now", "1.5", "1786836399.0", "9" * 20])
 async def test_file_info_without_a_timestamp_in_milliseconds(cli, field, printed):
     cli._execute.return_value = drop_field(FILE_INFO, field) + f"{field}\t{printed}\n"
     with pytest.raises(CLIParseError) as exc_info:
@@ -424,22 +443,27 @@ async def test_wordcount_without_a_required_field(cli, field):
         await cli.vault.wordcount("note.md")
 
 
-@pytest.mark.parametrize(
-    ("method", "argument", "output"),
-    [
-        ("info", None, VAULT_INFO),
-        ("folder_info", "notes", FOLDER_INFO),
-        ("file_info", "note.md", FILE_INFO),
-        ("wordcount", "note.md", WORD_COUNT),
-    ],
-)
-async def test_a_stray_line_beside_a_whole_record(cli, method, argument, output):
-    # Only `sync:status` mixes a sentence into its fields; here an extra
-    # line is output this library does not understand.
-    cli._execute.return_value = output + "and one more thing\n"
+# Only `sync:status` mixes a sentence into its fields. For the rest an
+# extra line is output this library does not understand.
+async def test_info_with_a_stray_line(cli):
+    cli._execute.return_value = VAULT_INFO + "and one more thing\n"
     with pytest.raises(CLIParseError):
-        await (
-            getattr(cli.vault, method)()
-            if argument is None
-            else getattr(cli.vault, method)(argument)
-        )
+        await cli.vault.info()
+
+
+async def test_folder_info_with_a_stray_line(cli):
+    cli._execute.return_value = FOLDER_INFO + "and one more thing\n"
+    with pytest.raises(CLIParseError):
+        await cli.vault.folder_info("notes")
+
+
+async def test_file_info_with_a_stray_line(cli):
+    cli._execute.return_value = FILE_INFO + "and one more thing\n"
+    with pytest.raises(CLIParseError):
+        await cli.vault.file_info("note.md")
+
+
+async def test_wordcount_with_a_stray_line(cli):
+    cli._execute.return_value = WORD_COUNT + "and one more thing\n"
+    with pytest.raises(CLIParseError):
+        await cli.vault.wordcount("note.md")

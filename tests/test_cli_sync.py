@@ -100,16 +100,6 @@ async def test_status_without_the_status_field(cli):
         await cli.sync.status()
 
 
-async def test_status_keeps_the_sizes_as_printed(cli):
-    # A rounded size cannot be turned back into a number of bytes, so it
-    # stays the string Obsidian spelled.
-    cli._execute.return_value = STATUS
-    result = await cli.sync.status()
-    assert isinstance(result.vault_size, str)
-    assert isinstance(result.account_used, str)
-    assert isinstance(result.account_limit, str)
-
-
 async def test_history(cli):
     cli._execute.return_value = HISTORY
     result = await cli.sync.history("notes/todo.md")

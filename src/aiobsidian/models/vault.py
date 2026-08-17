@@ -8,6 +8,22 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 _MILLISECONDS = 1000
 
 
+def _spells_a_number(printed: str) -> bool:
+    """Tell a printed number from a timestamp written out in full.
+
+    Args:
+        printed: Timestamp field as the CLI prints it.
+
+    Returns:
+        `True` if Python can read the whole of it as a number.
+    """
+    try:
+        float(printed)
+    except ValueError:
+        return False
+    return True
+
+
 class FileStat(BaseModel):
     """File system metadata for a vault file.
 
@@ -66,7 +82,9 @@ class VaultInfo(BaseModel):
 
     Attributes:
         name: Name of the vault, the one `ObsidianCLI(vault=)` takes.
-        path: Absolute path of the vault folder on this machine.
+        path: Absolute path of the vault folder on this machine. Only a
+            vault kept in a file system has one, which every vault the
+            CLI can reach is, since it talks to the desktop app.
         files: How many files the vault holds, at any depth.
         folders: How many folders it holds, at any depth.
         size: Total size of every file in bytes.
@@ -101,9 +119,11 @@ class FileInfo(BaseModel):
     Attributes:
         path: Path to the file relative to the vault root.
         name: File name without its extension.
-        extension: Extension without the leading dot, as in `"md"`.
+        extension: Extension without the leading dot, as in `"md"`, and
+            empty for a file whose name carries none.
         size: File size in bytes.
-        created: When the file was created, in UTC.
+        created: When the file was created, in UTC. A file system that
+            records no creation time reports the epoch instead.
         modified: When the file was last modified, in UTC.
     """
 
@@ -120,26 +140,27 @@ class FileInfo(BaseModel):
         """Read the timestamp in the unit Obsidian keeps it in.
 
         The CLI prints these two straight from the file system record,
-        where they are the whole milliseconds since the epoch. Reading
-        them here rather than leaving them to the field settles the
-        unit: a timestamp small enough to be a plausible number of
-        seconds is still milliseconds.
+        where they are the whole milliseconds since the epoch. Every
+        number is read in that unit, however small — a timestamp that
+        would pass for a plausible number of seconds is still
+        milliseconds — and one that is not whole is refused rather than
+        read in some other unit.
 
-        Only a plain number is read that way, so the model still reads
-        back the timestamp it writes out itself.
+        A timestamp written out in full is left alone, so the model
+        still reads back the one it prints out itself.
 
         Args:
             value: Timestamp field as the CLI prints it.
 
         Returns:
             The moment those milliseconds name, in UTC, or the value
-            untouched when it does not spell a number — a moment the
-            field knows how to read for itself, or one it will refuse.
+            untouched when it spells no number at all — which the field
+            knows how to read for itself, or will refuse.
 
         Raises:
-            ValueError: If the number names no moment at all.
+            ValueError: If the number names no moment in milliseconds.
         """
-        if not isinstance(value, str) or not value.lstrip("-").isdecimal():
+        if not isinstance(value, str) or not _spells_a_number(value):
             return value
         try:
             return datetime.fromtimestamp(int(value) / _MILLISECONDS, tz=UTC)
