@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 _USAGE_KEY = "account usage"
 _USAGE_SEPARATOR = " / "
+_SIZES = ("vault_size", "account_used", "account_limit")
 
 
 class SyncStatus(BaseModel):
@@ -15,7 +16,9 @@ class SyncStatus(BaseModel):
     answers with that field alone; the vault and the device are named
     once Sync knows them; and the three sizes arrive together or not at
     all, because they all come of the account quota, which Obsidian asks
-    its server for and does without when the request fails.
+    its server for and does without when the request fails. A record
+    holding some of the three and not the rest is refused, since it is
+    one Sync cannot report.
 
     Attributes:
         status: What Sync is doing: `"uninitialized"` before it starts
@@ -74,3 +77,25 @@ class SyncStatus(BaseModel):
         if not found:
             raise ValueError(f"account usage names one size, not two: {printed!r}")
         return {**fields, "account_used": used, "account_limit": limit}
+
+    @model_validator(mode="after")
+    def _sizes_arrive_together(self) -> SyncStatus:
+        """Refuse a record that reports the quota by halves.
+
+        One test on the size Sync fetched decides all three: either
+        Obsidian prints the vault size and the usage line both, or it
+        prints neither and reports what it does know.
+
+        Returns:
+            The record, when it reports every size or none.
+
+        Raises:
+            ValueError: If it reports some of the three and not the rest.
+        """
+        reported = [name for name in _SIZES if getattr(self, name) is not None]
+        if reported and len(reported) != len(_SIZES):
+            raise ValueError(
+                "the quota is reported whole or not at all, "
+                f"and this reports {', '.join(reported)} alone"
+            )
+        return self

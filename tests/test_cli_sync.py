@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from aiobsidian._exceptions import CLIParseError
 from aiobsidian.models.sync import SyncStatus
@@ -101,6 +102,30 @@ async def test_status_with_one_size_in_the_usage_line(cli):
     with pytest.raises(CLIParseError) as exc_info:
         await cli.sync.status()
     assert exc_info.value.command == "sync:status"
+
+
+async def test_status_with_the_vault_size_alone(cli):
+    # One test on the size Sync fetched gates both lines, so this is a
+    # record Obsidian cannot print, and the parse says so rather than
+    # handing back a quota that reports itself by halves.
+    cli._execute.return_value = STATUS.replace(
+        "account usage: 3.20 MB / 10.00 GB\n", ""
+    )
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.sync.status()
+    assert exc_info.value.command == "sync:status"
+
+
+def test_sync_status_refuses_a_quota_reported_by_halves():
+    # The same rule the public model holds a caller to, whichever of the
+    # three sizes they leave out.
+    for sizes in (
+        {"vault_size": "3.20 MB"},
+        {"account_used": "3.20 MB", "account_limit": "10.00 GB"},
+        {"vault_size": "3.20 MB", "account_used": "3.20 MB"},
+    ):
+        with pytest.raises(ValidationError):
+            SyncStatus(status="synced", **sizes)
 
 
 async def test_status_without_the_status_field(cli):
