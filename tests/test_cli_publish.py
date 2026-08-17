@@ -5,7 +5,7 @@ import pytest
 from aiobsidian._exceptions import CLIParseError
 from aiobsidian.models.publish import PublishChange, PublishSite
 
-from .conftest import drop_field
+from .helpers import drop_field
 
 # Obsidian prints the custom domain only for a site that has one, and
 # keeps it as the bare host it matches a visitor's address against.
@@ -60,6 +60,12 @@ async def test_site_without_a_required_field(cli, field):
     with pytest.raises(CLIParseError) as exc_info:
         await cli.publish.site()
     assert exc_info.value.command == "publish:site"
+
+
+async def test_site_with_a_stray_line(cli):
+    cli._execute.return_value = SITE_INFO + "and one more thing\n"
+    with pytest.raises(CLIParseError):
+        await cli.publish.site()
 
 
 async def test_list(cli):

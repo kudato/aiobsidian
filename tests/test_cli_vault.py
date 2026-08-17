@@ -8,7 +8,7 @@ import pytest
 from aiobsidian._exceptions import CLIParseError
 from aiobsidian.models.vault import FileInfo, FolderInfo, VaultInfo, WordCount
 
-from .conftest import drop_field
+from .helpers import drop_field
 
 # The counts are of the whole tree, at any depth.
 VAULT_INFO = (
@@ -23,6 +23,10 @@ FILE_INFO = (
     "path\tnote.md\nname\tnote\nextension\tmd\nsize\t137\n"
     "created\t1786836399339\nmodified\t1786836399341\n"
 )
+
+# `wordcount` separates with a colon and a space, where every other
+# record command separates with a tab.
+WORD_COUNT = "words: 500\ncharacters: 2800\n"
 
 
 async def test_open(cli):
@@ -320,17 +324,25 @@ async def test_file_info_reads_the_timestamps_as_milliseconds(cli):
     assert isinstance(result.size, int)
 
 
-async def test_file_info_reads_a_small_timestamp_as_milliseconds_too(cli):
+@pytest.mark.parametrize(
+    ("field", "printed"), [("created", "1786836399339"), ("modified", "1786836399341")]
+)
+async def test_file_info_reads_a_small_timestamp_as_milliseconds_too(
+    cli, field, printed
+):
     # A file system that records no birth time reports one just past the
     # epoch, which is a plausible number of seconds and is not one.
-    cli._execute.return_value = FILE_INFO.replace("1786836399339", "1000000000")
+    cli._execute.return_value = FILE_INFO.replace(printed, "1000000000")
     result = await cli.vault.file_info("note.md")
-    assert result.created == datetime(1970, 1, 12, 13, 46, 40, tzinfo=UTC)
+    assert getattr(result, field) == datetime(1970, 1, 12, 13, 46, 40, tzinfo=UTC)
 
 
-@pytest.mark.parametrize("printed", ["just now", "2026-08-15T23:26:39Z", "9" * 20])
-async def test_file_info_without_a_timestamp_in_milliseconds(cli, printed):
-    cli._execute.return_value = FILE_INFO.replace("1786836399339", printed)
+@pytest.mark.parametrize("field", ["created", "modified"])
+@pytest.mark.parametrize(
+    "printed", ["just now", "1.5", "2026-08-15T23:26:39Z", "9" * 20]
+)
+async def test_file_info_without_a_timestamp_in_milliseconds(cli, field, printed):
+    cli._execute.return_value = drop_field(FILE_INFO, field) + f"{field}\t{printed}\n"
     with pytest.raises(CLIParseError) as exc_info:
         await cli.vault.file_info("note.md")
     assert exc_info.value.command == "file"
@@ -349,6 +361,9 @@ async def test_folder_info(cli):
     cli._execute.return_value = FOLDER_INFO
     result = await cli.vault.folder_info("notes")
     assert result == FolderInfo(path="notes", files=3, folders=0, size=305)
+    assert isinstance(result.files, int)
+    assert isinstance(result.folders, int)
+    assert isinstance(result.size, int)
     cli._execute.assert_awaited_once_with("folder", params={"path": "notes"})
 
 
@@ -381,10 +396,11 @@ async def test_folders_with_parent(cli):
 
 
 async def test_wordcount(cli):
-    cli._execute.return_value = "words: 500\ncharacters: 2800\n"
+    cli._execute.return_value = WORD_COUNT
     result = await cli.vault.wordcount("note.md")
     assert result == WordCount(words=500, characters=2800)
     assert isinstance(result.words, int)
+    assert isinstance(result.characters, int)
     cli._execute.assert_awaited_once_with("wordcount", params={"path": "note.md"})
 
 
@@ -397,8 +413,27 @@ async def test_wordcount_non_numeric(cli):
 
 @pytest.mark.parametrize("field", ["words", "characters"])
 async def test_wordcount_without_a_required_field(cli, field):
-    cli._execute.return_value = drop_field(
-        "words: 500\ncharacters: 2800\n", field, separator=":"
-    )
+    cli._execute.return_value = drop_field(WORD_COUNT, field, separator=": ")
     with pytest.raises(CLIParseError):
         await cli.vault.wordcount("note.md")
+
+
+@pytest.mark.parametrize(
+    ("method", "argument", "output"),
+    [
+        ("info", None, VAULT_INFO),
+        ("folder_info", "notes", FOLDER_INFO),
+        ("file_info", "note.md", FILE_INFO),
+        ("wordcount", "note.md", WORD_COUNT),
+    ],
+)
+async def test_a_stray_line_beside_a_whole_record(cli, method, argument, output):
+    # Only `sync:status` mixes a sentence into its fields; here an extra
+    # line is output this library does not understand.
+    cli._execute.return_value = output + "and one more thing\n"
+    with pytest.raises(CLIParseError):
+        await (
+            getattr(cli.vault, method)()
+            if argument is None
+            else getattr(cli.vault, method)(argument)
+        )

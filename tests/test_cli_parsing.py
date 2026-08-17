@@ -265,7 +265,7 @@ class TestParseFields:
 
     def test_custom_separator(self):
         output = "words: 10\ncharacters: 84\n"
-        result = BaseCLIResource._parse_fields("wordcount", output, separator=":")
+        result = BaseCLIResource._parse_fields("wordcount", output, separator=": ")
         assert result == {"words": "10", "characters": "84"}
 
     def test_missing_separator(self):
@@ -278,6 +278,25 @@ class TestParseFields:
             "path": "/Users/me/My\tVault"
         }
 
+    def test_values_arrive_verbatim(self):
+        # A file is named by whoever wrote it, so a name that ends in a
+        # space is theirs to keep.
+        output = "path\tnotes/draft .md\nname\tdraft \nextension\tmd\n"
+        assert BaseCLIResource._parse_fields("file", output) == {
+            "path": "notes/draft .md",
+            "name": "draft ",
+            "extension": "md",
+        }
+
+    def test_the_ends_of_the_output_are_still_trimmed(self):
+        # `_parse_lines()` strips the blank space around the whole
+        # output before counting lines, which no command puts there.
+        output = " name\tMyVault\nfiles\t47 \n"
+        assert BaseCLIResource._parse_fields("vault", output) == {
+            "name": "MyVault",
+            "files": "47",
+        }
+
 
 class TestParseFieldsAs:
     def test_fields(self):
@@ -288,14 +307,14 @@ class TestParseFieldsAs:
     def test_custom_separator(self):
         output = "words: 10\ncharacters: 84\n"
         result = BaseCLIResource._parse_fields_as(
-            "wordcount", output, WordCount, separator=":"
+            "wordcount", output, WordCount, separator=": "
         )
         assert result == WordCount(words=10, characters=84)
 
     def test_skips_a_sentence_when_not_strict(self):
         output = "status: disconnected\nSync is not set up for this vault.\n"
         result = BaseCLIResource._parse_fields_as(
-            "sync:status", output, SyncStatus, separator=":", strict=False
+            "sync:status", output, SyncStatus, separator=": ", strict=False
         )
         assert result == SyncStatus(status="disconnected")
 
@@ -304,7 +323,7 @@ class TestParseFieldsAs:
         output = "status: disconnected\nSync is not set up for this vault.\n"
         with pytest.raises(CLIParseError):
             BaseCLIResource._parse_fields_as(
-                "sync:status", output, SyncStatus, separator=":"
+                "sync:status", output, SyncStatus, separator=": "
             )
 
     def test_missing_separator(self):

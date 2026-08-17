@@ -197,7 +197,11 @@ class BaseCLIResource:
         Args:
             command: CLI command name, used for error reporting.
             output: Raw output of the command.
-            separator: Separator between key and value.
+            separator: Separator between key and value, blank space
+                included. The commands that separate with a colon write
+                a space after it, and passing `": "` keeps that space
+                out of the value rather than trimming it back off, which
+                would take a value's own with it.
             strict: If `False`, skip lines without the separator instead of
                 refusing to parse. Some commands mix a plain sentence into
                 the field list.
@@ -216,7 +220,7 @@ class BaseCLIResource:
                 if strict:
                     raise CLIParseError(command, output)
                 continue
-            fields[key.strip()] = value.strip()
+            fields[key] = value
         return fields
 
     @classmethod
@@ -235,15 +239,16 @@ class BaseCLIResource:
         rather than a table, and print text: `file` reports a size as
         `"55"` and a timestamp as the milliseconds behind it. The model
         names the fields and hands the values back with the types they
-        had, and leaves out the ones the CLI omits. Each value is
-        trimmed, which the fields need — `sync:status` writes a space
-        after its separator — and no value the CLI prints minds.
+        had, and leaves out the ones the CLI omits. Values come back as
+        printed, save at the two ends of the output, where the blank
+        space around the whole of it goes before the lines are counted.
 
         Args:
             command: CLI command name, used for error reporting.
             output: Raw output of the command.
             model: Model to validate the fields against.
-            separator: Separator between key and value.
+            separator: Separator between key and value, blank space
+                included.
             strict: If `False`, skip lines without the separator instead
                 of refusing to parse. Some commands mix a plain sentence
                 into the field list.

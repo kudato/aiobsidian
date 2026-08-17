@@ -45,9 +45,10 @@ class PluginInfo(BaseModel):
 
     Attributes:
         type: Where the plugin comes from: `"core"` or `"community"`.
-        name: Display name of the plugin. A core plugin's is translated,
-            so it reads in whatever language Obsidian runs in, and one
-            that names itself nothing is named by its identifier.
+        name: Display name of the plugin. A community plugin's is the
+            one its manifest gives. A core plugin's is translated, so it
+            reads in whatever language Obsidian runs in, and one that
+            names itself nothing is named by its identifier instead.
         enabled: Whether the plugin is turned on.
         version: Version from the manifest, or `None` for a core plugin.
         author: Author from the manifest, or `None` for a core plugin.

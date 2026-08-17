@@ -7,9 +7,12 @@ from ._base import BaseCLIResource
 class CLISyncResource(BaseCLIResource):
     """CLI resource for Obsidian Sync operations.
 
-    Every command except `set_paused` and `status` needs Sync to be set
-    up for the vault and answers `Error: Sync is not set up for this
-    vault.` otherwise, which surfaces as a `CommandError`.
+    Only `set_paused` and `status` work whatever Sync is doing. The rest
+    want it set up for the vault and running, and answer `Error: Sync is
+    not set up for this vault.` or, once it is set up, a sentence naming
+    the state — paused, disconnected or in error — that stops them. Both
+    surface as a `CommandError`, so pausing Sync closes its history to
+    you until you resume it.
 
     Attributes:
         _cli: Reference to the parent ``ObsidianCLI`` instance.
@@ -46,7 +49,7 @@ class CLISyncResource(BaseCLIResource):
         output = await self._cli._execute("sync:status")
         # A vault without Sync adds a plain sentence after the status line.
         return self._parse_fields_as(
-            "sync:status", output, SyncStatus, separator=":", strict=False
+            "sync:status", output, SyncStatus, separator=": ", strict=False
         )
 
     async def history(self, path: str) -> list[str]:

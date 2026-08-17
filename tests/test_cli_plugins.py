@@ -7,7 +7,7 @@ import pytest
 from aiobsidian._exceptions import CLIParseError
 from aiobsidian.models.plugins import Plugin, PluginInfo
 
-from .conftest import drop_field
+from .helpers import drop_field
 
 # `plugins` lists everything installed. Core plugins ship with the app and
 # report no version; only community ones carry a number.
@@ -86,6 +86,12 @@ async def test_info_without_a_description(cli):
     result = await cli.plugins.info("obsidian-local-rest-api")
     assert result.description is None
     assert result.version == "5.1.0"
+
+
+async def test_info_with_a_stray_line(cli):
+    cli._execute.return_value = CORE_INFO + "and one more thing\n"
+    with pytest.raises(CLIParseError):
+        await cli.plugins.info("daily-notes")
 
 
 async def test_set_restricted_true(cli):

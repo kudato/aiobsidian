@@ -231,7 +231,7 @@ class CLIVaultResource(BaseCLIResource):
             CLIParseError: If the output has an unexpected shape.
         """
         output = await self._cli._execute("wordcount", params={"path": path})
-        return self._parse_fields_as("wordcount", output, WordCount, separator=":")
+        return self._parse_fields_as("wordcount", output, WordCount, separator=": ")
 
     async def list(self, folder: str = "", *, ext: str | None = None) -> list[str]:
         """List files in the vault.
