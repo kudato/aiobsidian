@@ -8,9 +8,14 @@ import pytest
 from aiobsidian._exceptions import CLIParseError
 from aiobsidian.models.vault import FileInfo, FolderInfo, VaultInfo, WordCount
 
+from .conftest import drop_field
+
+# The counts are of the whole tree, at any depth.
 VAULT_INFO = (
     "name\tTestVault\npath\t/vaults/TestVault\nfiles\t47\nfolders\t14\nsize\t2825\n"
 )
+
+FOLDER_INFO = "path\tnotes\nfiles\t3\nfolders\t0\nsize\t305\n"
 
 # `created` and `modified` come straight from the file system record,
 # where Obsidian keeps them as milliseconds since the epoch.
@@ -286,8 +291,9 @@ async def test_info_unexpected_output(cli):
     assert exc_info.value.command == "vault"
 
 
-async def test_info_without_the_path_field(cli):
-    cli._execute.return_value = "name\tTestVault\nfiles\t47\nfolders\t14\nsize\t2825\n"
+@pytest.mark.parametrize("field", ["name", "path", "files", "folders", "size"])
+async def test_info_without_a_required_field(cli, field):
+    cli._execute.return_value = drop_field(VAULT_INFO, field)
     with pytest.raises(CLIParseError):
         await cli.vault.info()
 
@@ -311,27 +317,53 @@ async def test_file_info_reads_the_timestamps_as_milliseconds(cli):
     result = await cli.vault.file_info("note.md")
     assert result.created.timestamp() * 1000 == 1786836399339
     assert result.modified.timestamp() * 1000 == 1786836399341
+    assert isinstance(result.size, int)
 
 
-async def test_file_info_without_a_numeric_timestamp(cli):
-    cli._execute.return_value = FILE_INFO.replace("1786836399339", "just now")
+async def test_file_info_reads_a_small_timestamp_as_milliseconds_too(cli):
+    # A file system that records no birth time reports one just past the
+    # epoch, which is a plausible number of seconds and is not one.
+    cli._execute.return_value = FILE_INFO.replace("1786836399339", "1000000000")
+    result = await cli.vault.file_info("note.md")
+    assert result.created == datetime(1970, 1, 12, 13, 46, 40, tzinfo=UTC)
+
+
+@pytest.mark.parametrize("printed", ["just now", "2026-08-15T23:26:39Z", "9" * 20])
+async def test_file_info_without_a_timestamp_in_milliseconds(cli, printed):
+    cli._execute.return_value = FILE_INFO.replace("1786836399339", printed)
     with pytest.raises(CLIParseError) as exc_info:
         await cli.vault.file_info("note.md")
     assert exc_info.value.command == "file"
 
 
+@pytest.mark.parametrize(
+    "field", ["path", "name", "extension", "size", "created", "modified"]
+)
+async def test_file_info_without_a_required_field(cli, field):
+    cli._execute.return_value = drop_field(FILE_INFO, field)
+    with pytest.raises(CLIParseError):
+        await cli.vault.file_info("note.md")
+
+
 async def test_folder_info(cli):
-    cli._execute.return_value = "path\tnotes\nfiles\t3\nfolders\t0\nsize\t305\n"
+    cli._execute.return_value = FOLDER_INFO
     result = await cli.vault.folder_info("notes")
     assert result == FolderInfo(path="notes", files=3, folders=0, size=305)
     cli._execute.assert_awaited_once_with("folder", params={"path": "notes"})
 
 
 async def test_folder_info_unexpected_output(cli):
-    cli._execute.return_value = "path\tnotes\nfiles\tthree\nfolders\t0\nsize\t305\n"
+    cli._execute.return_value = FOLDER_INFO.replace("files\t3", "files\tthree")
     with pytest.raises(CLIParseError) as exc_info:
         await cli.vault.folder_info("notes")
     assert exc_info.value.command == "folder"
+
+
+@pytest.mark.parametrize("field", ["path", "files", "folders", "size"])
+async def test_folder_info_without_a_required_field(cli, field):
+    cli._execute.return_value = drop_field(FOLDER_INFO, field)
+    with pytest.raises(CLIParseError):
+        await cli.vault.folder_info("notes")
 
 
 async def test_folders(cli):
@@ -363,7 +395,10 @@ async def test_wordcount_non_numeric(cli):
     assert exc_info.value.command == "wordcount"
 
 
-async def test_wordcount_without_the_character_count(cli):
-    cli._execute.return_value = "words: 500\n"
+@pytest.mark.parametrize("field", ["words", "characters"])
+async def test_wordcount_without_a_required_field(cli, field):
+    cli._execute.return_value = drop_field(
+        "words: 500\ncharacters: 2800\n", field, separator=":"
+    )
     with pytest.raises(CLIParseError):
         await cli.vault.wordcount("note.md")

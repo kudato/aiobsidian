@@ -299,6 +299,14 @@ class TestParseFieldsAs:
         )
         assert result == SyncStatus(status="disconnected")
 
+    def test_refuses_that_same_sentence_when_strict(self):
+        # The whole record is there, so only `strict` decides.
+        output = "status: disconnected\nSync is not set up for this vault.\n"
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_fields_as(
+                "sync:status", output, SyncStatus, separator=":"
+            )
+
     def test_missing_separator(self):
         with pytest.raises(CLIParseError) as exc_info:
             BaseCLIResource._parse_fields_as(

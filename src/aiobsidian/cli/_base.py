@@ -235,7 +235,9 @@ class BaseCLIResource:
         rather than a table, and print text: `file` reports a size as
         `"55"` and a timestamp as the milliseconds behind it. The model
         names the fields and hands the values back with the types they
-        had, and leaves out the ones the CLI omits.
+        had, and leaves out the ones the CLI omits. Each value is
+        trimmed, which the fields need — `sync:status` writes a space
+        after its separator — and no value the CLI prints minds.
 
         Args:
             command: CLI command name, used for error reporting.

@@ -5,11 +5,12 @@ import pytest
 from aiobsidian._exceptions import CLIParseError
 from aiobsidian.models.publish import PublishChange, PublishSite
 
-# Obsidian prints the custom domain only for a site that has one.
+from .conftest import drop_field
+
+# Obsidian prints the custom domain only for a site that has one, and
+# keeps it as the bare host it matches a visitor's address against.
 SITE_INFO = (
-    "slug\tmysite\n"
-    "url\thttps://publish.obsidian.md/mysite\n"
-    "custom\thttps://notes.example.com\n"
+    "slug\tmysite\nurl\thttps://publish.obsidian.md/mysite\ncustom\tnotes.example.com\n"
 )
 
 PUBLISHED_FILES = "about.md\nindex.md\n"
@@ -40,7 +41,7 @@ async def test_site(cli):
     assert result == PublishSite(
         slug="mysite",
         url="https://publish.obsidian.md/mysite",
-        custom_domain="https://notes.example.com",
+        custom_domain="notes.example.com",
     )
     cli._execute.assert_awaited_once_with("publish:site")
 
@@ -53,8 +54,9 @@ async def test_site_without_a_custom_domain(cli):
     assert result.custom_domain is None
 
 
-async def test_site_without_the_url_field(cli):
-    cli._execute.return_value = "slug\tmysite\n"
+@pytest.mark.parametrize("field", ["slug", "url"])
+async def test_site_without_a_required_field(cli, field):
+    cli._execute.return_value = drop_field(SITE_INFO, field)
     with pytest.raises(CLIParseError) as exc_info:
         await cli.publish.site()
     assert exc_info.value.command == "publish:site"

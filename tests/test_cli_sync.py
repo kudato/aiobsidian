@@ -5,12 +5,14 @@ import pytest
 from aiobsidian._exceptions import CLIParseError
 from aiobsidian.models.sync import SyncStatus
 
+# Obsidian rounds every size to two decimals, and prints a size below a
+# kilobyte whole.
 STATUS = (
     "status: synced\n"
     "vault: MyVault\n"
     "device: MacBook\n"
-    "vault size: 3.2 MB\n"
-    "account usage: 3.2 MB / 10 GB\n"
+    "vault size: 3.20 MB\n"
+    "account usage: 3.20 MB / 10.00 GB\n"
 )
 
 STATUS_NOT_SET_UP = "status: disconnected\nSync is not set up for this vault.\n"
@@ -54,9 +56,9 @@ async def test_status(cli):
         status="synced",
         vault="MyVault",
         device="MacBook",
-        vault_size="3.2 MB",
-        account_used="3.2 MB",
-        account_limit="10 GB",
+        vault_size="3.20 MB",
+        account_used="3.20 MB",
+        account_limit="10.00 GB",
     )
     cli._execute.assert_awaited_once_with("sync:status")
 
@@ -86,7 +88,7 @@ async def test_status_with_a_colon_in_the_device_name(cli):
 
 
 async def test_status_with_one_size_in_the_usage_line(cli):
-    cli._execute.return_value = STATUS.replace(" / 10 GB", "")
+    cli._execute.return_value = STATUS.replace(" / 10.00 GB", "")
     with pytest.raises(CLIParseError) as exc_info:
         await cli.sync.status()
     assert exc_info.value.command == "sync:status"
@@ -96,6 +98,16 @@ async def test_status_without_the_status_field(cli):
     cli._execute.return_value = "vault: MyVault\ndevice: MacBook\n"
     with pytest.raises(CLIParseError):
         await cli.sync.status()
+
+
+async def test_status_keeps_the_sizes_as_printed(cli):
+    # A rounded size cannot be turned back into a number of bytes, so it
+    # stays the string Obsidian spelled.
+    cli._execute.return_value = STATUS
+    result = await cli.sync.status()
+    assert isinstance(result.vault_size, str)
+    assert isinstance(result.account_used, str)
+    assert isinstance(result.account_limit, str)
 
 
 async def test_history(cli):

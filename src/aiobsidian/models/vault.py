@@ -117,26 +117,30 @@ class FileInfo(BaseModel):
     @field_validator("created", "modified", mode="before")
     @classmethod
     def _from_milliseconds(cls, value: Any) -> Any:
-        """Read the timestamp Obsidian keeps it in.
+        """Read the timestamp in the unit Obsidian keeps it in.
 
         The CLI prints these two straight from the file system record,
-        where they are the milliseconds since the epoch.
+        where they are the whole milliseconds since the epoch. Reading
+        them here rather than leaving them to the field settles the
+        unit: a timestamp small enough to be a plausible number of
+        seconds is still milliseconds.
 
         Args:
             value: Timestamp field as the CLI prints it.
 
         Returns:
             The moment those milliseconds name, in UTC, or the value
-            untouched if it does not spell a whole number — which is
-            left for the field to refuse.
+            untouched if it is not a string, which no CLI output is.
+
+        Raises:
+            ValueError: If the value does not name such a moment.
         """
         if not isinstance(value, str):
             return value
         try:
-            milliseconds = int(value)
-        except ValueError:
-            return value
-        return datetime.fromtimestamp(milliseconds / _MILLISECONDS, tz=UTC)
+            return datetime.fromtimestamp(int(value) / _MILLISECONDS, tz=UTC)
+        except (ValueError, OverflowError, OSError) as exc:
+            raise ValueError(f"not a moment in milliseconds: {value!r}") from exc
 
 
 class WordCount(BaseModel):

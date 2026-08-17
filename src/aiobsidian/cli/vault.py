@@ -227,6 +227,7 @@ class CLIVaultResource(BaseCLIResource):
             How much text the note holds.
 
         Raises:
+            CommandError: If the file is not a markdown file.
             CLIParseError: If the output has an unexpected shape.
         """
         output = await self._cli._execute("wordcount", params={"path": path})

@@ -12,9 +12,10 @@ class SyncStatus(BaseModel):
     """What Obsidian Sync is doing with this vault.
 
     Only `status` is always there. A vault Sync was never set up for
-    answers with that field alone, and the two sizes need the account
-    quota, which Obsidian asks its server for and does without when the
-    request fails.
+    answers with that field alone; the vault and the device are named
+    once Sync knows them; and the three sizes arrive together or not at
+    all, because they all come of the account quota, which Obsidian asks
+    its server for and does without when the request fails.
 
     Attributes:
         status: What Sync is doing: `"uninitialized"` before it starts
@@ -25,8 +26,9 @@ class SyncStatus(BaseModel):
             the folder it lives in.
         device: Name this device is known by on Sync.
         vault_size: How much of the quota this vault takes up, as the
-            CLI prints it — rounded and carrying its unit, as in
-            `"4.06 KB"`.
+            CLI prints it — rounded to two decimals and carrying its
+            unit, as in `"4.06 KB"`. Only a size below a kilobyte is
+            printed whole, as in `"431 B"`.
         account_used: How much of the quota the whole account takes up,
             in the same rounded form.
         account_limit: How much the account is allowed, in the same
@@ -49,8 +51,8 @@ class SyncStatus(BaseModel):
 
         The CLI prints what the account uses and what it is allowed on
         one line, joined by ` / `. The join is safe to undo: each side
-        is a rounded size, so it is a number, a space and a unit, and
-        neither can hold a slash.
+        is a size Obsidian rounds and spells out itself, and no size it
+        spells can hold a slash.
 
         Args:
             data: Fields as the CLI printed them.

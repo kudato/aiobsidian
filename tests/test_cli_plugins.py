@@ -7,6 +7,8 @@ import pytest
 from aiobsidian._exceptions import CLIParseError
 from aiobsidian.models.plugins import Plugin, PluginInfo
 
+from .conftest import drop_field
+
 # `plugins` lists everything installed. Core plugins ship with the app and
 # report no version; only community ones carry a number.
 PLUGINS = [
@@ -71,11 +73,19 @@ async def test_info_of_a_disabled_plugin(cli):
     assert result.enabled is False
 
 
-async def test_info_without_the_enabled_field(cli):
-    cli._execute.return_value = "type\tcore\nname\tBacklinks\n"
+@pytest.mark.parametrize("field", ["type", "name", "enabled"])
+async def test_info_without_a_required_field(cli, field):
+    cli._execute.return_value = drop_field(CORE_INFO, field)
     with pytest.raises(CLIParseError) as exc_info:
-        await cli.plugins.info("backlink")
+        await cli.plugins.info("daily-notes")
     assert exc_info.value.command == "plugin"
+
+
+async def test_info_without_a_description(cli):
+    cli._execute.return_value = drop_field(COMMUNITY_INFO, "description")
+    result = await cli.plugins.info("obsidian-local-rest-api")
+    assert result.description is None
+    assert result.version == "5.1.0"
 
 
 async def test_set_restricted_true(cli):
