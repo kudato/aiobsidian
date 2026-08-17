@@ -34,6 +34,7 @@ return.
 - **Breaking**: CLI resources address notes by exact path. They sent `file=`, which resolves like a wikilink, so a name matching two notes picked one at random and a path that did not exist still resolved. `bookmarks.add()` and `tabs.open()` keep `file=`, where the CLI takes it as one of several alternatives to `folder=`, `url=` or `view=`
 - **Breaking**: CLI resources send the parameter names the CLI requires — `name=` rather than `property=` or `new-name=`
 - **Breaking**: `properties.read()` returns `PropertyValue` parsed from the CLI's text output, and `properties.set()` takes any `JsonValue` and sends the value's type
+- **Breaking**: `plugins.enabled()`, `links.unresolved()` and `bookmarks.list()` return `list[str]`. The CLI printed each answer as a list of one-key objects — `[{"id": "dataview"}]` — which is how it labels a column, not information anyone asked for, so every call site ended in a comprehension over `p["id"]`
 - **Breaking**: `search.query()` returns `list[str]` of paths; the CLI reports no match counts
 - **Breaking**: `tasks.complete()` takes the note and the line, not a task id the CLI has no notion of
 - **Breaking**: every on/off switch is spelled `set_<thing>(value)`, so `sync.toggle(on=)`, `plugins.restrict(on=)`, `dev.mobile(on=)` and `dev.debug(on=)` are `sync.set_paused()`, `plugins.set_restricted()`, `dev.set_mobile()` and `dev.set_debugger()`. `toggle` is left to mean what it says, as in `tasks.toggle()`. Mind that `set_paused(True)` pauses, where `toggle(on=True)` resumed

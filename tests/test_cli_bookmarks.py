@@ -11,7 +11,7 @@ BOOKMARKS_LIST = [
 async def test_list(cli):
     cli._execute.return_value = json.dumps(BOOKMARKS_LIST)
     result = await cli.bookmarks.list()
-    assert result == BOOKMARKS_LIST
+    assert result == ["notes/important.md", "projects/"]
     cli._execute.assert_awaited_once_with("bookmarks", output_format="json")
 
 

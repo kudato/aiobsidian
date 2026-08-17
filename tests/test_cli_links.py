@@ -54,7 +54,7 @@ async def test_incoming_without_backlinks(cli):
 async def test_unresolved(cli):
     cli._execute.return_value = json.dumps(UNRESOLVED)
     result = await cli.links.unresolved()
-    assert result == UNRESOLVED
+    assert result == ["missing-note"]
     cli._execute.assert_awaited_once_with("unresolved", output_format="json")
 
 

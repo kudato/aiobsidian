@@ -101,6 +101,38 @@ class BaseCLIResource:
             raise CLIParseError(command, output) from exc
 
     @classmethod
+    def _parse_json_column(cls, command: str, output: str, key: str) -> list[str]:
+        """Parse JSON output whose objects hold a single named value.
+
+        Some commands answer with a list of one-key objects —
+        `plugins:enabled` prints `[{"id": "dataview"}]` — because JSON has
+        no other way to label a column. The label is fixed and known here,
+        so the values come back on their own.
+
+        Args:
+            command: CLI command name, used for error reporting.
+            output: Raw output of the command.
+            key: Name of the key holding the value.
+
+        Returns:
+            The value of `key` from every object, in the order printed, or
+            an empty list for an empty result.
+
+        Raises:
+            CLIParseError: If the output is not valid JSON, is not a list
+                of objects, or an object does not carry `key`.
+        """
+        rows = cls._parse_json(command, output)
+        if not isinstance(rows, list):
+            raise CLIParseError(command, output)
+        values: list[str] = []
+        for row in rows:
+            if not isinstance(row, dict) or key not in row:
+                raise CLIParseError(command, output)
+            values.append(str(row[key]))
+        return values
+
+    @classmethod
     def _parse_lines(cls, output: str) -> list[str]:
         """Parse output that lists one item per line.
 

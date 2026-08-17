@@ -8,6 +8,7 @@ PLUGINS = [
 ]
 
 ENABLED_PLUGINS = [
+    {"id": "backlink"},
     {"id": "dataview"},
 ]
 
@@ -50,7 +51,7 @@ async def test_list_with_versions(cli):
 async def test_enabled(cli):
     cli._execute.return_value = json.dumps(ENABLED_PLUGINS)
     result = await cli.plugins.enabled()
-    assert result == ENABLED_PLUGINS
+    assert result == ["backlink", "dataview"]
     cli._execute.assert_awaited_once_with("plugins:enabled", output_format="json")
 
 

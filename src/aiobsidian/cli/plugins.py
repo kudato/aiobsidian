@@ -42,15 +42,15 @@ class CLIPluginsResource(BaseCLIResource):
         flags = ["on"] if value else ["off"]
         await self._cli._execute("plugins:restrict", flags=flags)
 
-    async def enabled(self) -> list[dict[str, Any]]:
+    async def enabled(self) -> list[str]:
         """List enabled plugins.
 
         Returns:
-            List of enabled plugin objects.
+            Identifiers of the plugins that are turned on, core and
+            community alike.
         """
         output = await self._cli._execute("plugins:enabled", output_format="json")
-        result: list[dict[str, Any]] = self._parse_json("plugins:enabled", output)
-        return result
+        return self._parse_json_column("plugins:enabled", output, "id")
 
     async def enable(self, plugin_id: str) -> None:
         """Enable a plugin.

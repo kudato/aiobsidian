@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from ._base import BaseCLIResource
 
 
@@ -53,12 +51,12 @@ class CLIBookmarksResource(BaseCLIResource):
             params["subpath"] = subpath
         await self._cli._execute("bookmark", params=params or None)
 
-    async def list(self) -> list[dict[str, Any]]:
+    async def list(self) -> list[str]:
         """List all bookmarks.
 
         Returns:
-            List of bookmark objects.
+            What each bookmark points at: a file or folder path, a URL or
+            a search query, whichever it was added with.
         """
         output = await self._cli._execute("bookmarks", output_format="json")
-        result: list[dict[str, Any]] = self._parse_json("bookmarks", output)
-        return result
+        return self._parse_json_column("bookmarks", output, "value")

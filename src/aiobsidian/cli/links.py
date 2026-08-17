@@ -45,15 +45,15 @@ class CLILinksResource(BaseCLIResource):
         result: list[dict[str, Any]] = self._parse_json("backlinks", output)
         return result
 
-    async def unresolved(self) -> list[dict[str, Any]]:
+    async def unresolved(self) -> list[str]:
         """Get all unresolved (broken) links in the vault.
 
         Returns:
-            List of unresolved link objects.
+            The link targets nothing in the vault answers to, as written
+            in the notes.
         """
         output = await self._cli._execute("unresolved", output_format="json")
-        result: list[dict[str, Any]] = self._parse_json("unresolved", output)
-        return result
+        return self._parse_json_column("unresolved", output, "link")
 
     async def orphans(self) -> list[str]:
         """Get orphan notes (notes with no incoming links).
