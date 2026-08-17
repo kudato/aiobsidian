@@ -2,22 +2,49 @@ from __future__ import annotations
 
 import json
 
+from aiobsidian.models.tasks import Task
+
+# `text` is the task's line as the note writes it, marker included, and
+# the line number arrives as a string. The status is whatever stands
+# between the brackets, so a theme's custom status shows up as itself.
 TASKS = [
     {"status": " ", "text": "- [ ] Buy milk", "file": "todo.md", "line": "3"},
     {"status": "x", "text": "- [x] Write docs", "file": "todo.md", "line": "4"},
+    {"status": "/", "text": "- [/] Read the RFC", "file": "todo.md", "line": "5"},
 ]
 
 DONE_TASKS = [TASKS[1]]
 TODO_TASKS = [TASKS[0]]
 
+PARSED_TASKS = [
+    Task(status=" ", text="- [ ] Buy milk", file="todo.md", line=3),
+    Task(status="x", text="- [x] Write docs", file="todo.md", line=4),
+    Task(status="/", text="- [/] Read the RFC", file="todo.md", line=5),
+]
+
 
 async def test_list(cli):
     cli._execute.return_value = json.dumps(TASKS)
     result = await cli.tasks.list()
-    assert result == TASKS
+    assert result == PARSED_TASKS
     cli._execute.assert_awaited_once_with(
         "tasks", params=None, flags=None, output_format="json"
     )
+
+
+async def test_list_reports_the_line_as_a_number(cli):
+    cli._execute.return_value = json.dumps(TASKS)
+    result = await cli.tasks.list()
+    await cli.tasks.complete(result[0].file, result[0].line)
+    cli._execute.assert_awaited_with(
+        "task", params={"path": "todo.md", "line": "3"}, flags=["done"]
+    )
+
+
+async def test_list_tells_an_open_task_from_any_other(cli):
+    cli._execute.return_value = json.dumps(TASKS)
+    result = await cli.tasks.list()
+    assert [task.done for task in result] == [False, True, True]
 
 
 async def test_list_no_tasks(cli):
@@ -29,7 +56,7 @@ async def test_list_no_tasks(cli):
 async def test_list_with_path(cli):
     cli._execute.return_value = json.dumps(TASKS)
     result = await cli.tasks.list(path="notes")
-    assert result == TASKS
+    assert result == PARSED_TASKS
     cli._execute.assert_awaited_once_with(
         "tasks", params={"path": "notes"}, flags=None, output_format="json"
     )
@@ -38,7 +65,7 @@ async def test_list_with_path(cli):
 async def test_list_daily(cli):
     cli._execute.return_value = json.dumps(TASKS)
     result = await cli.tasks.list(daily=True)
-    assert result == TASKS
+    assert result == PARSED_TASKS
     cli._execute.assert_awaited_once_with(
         "tasks", params=None, flags=["daily"], output_format="json"
     )
@@ -47,7 +74,7 @@ async def test_list_daily(cli):
 async def test_list_done_returns_completed_only(cli):
     cli._execute.return_value = json.dumps(DONE_TASKS)
     result = await cli.tasks.list(done=True)
-    assert result == DONE_TASKS
+    assert result == [PARSED_TASKS[1]]
     cli._execute.assert_awaited_once_with(
         "tasks", params=None, flags=["done"], output_format="json"
     )
@@ -56,7 +83,7 @@ async def test_list_done_returns_completed_only(cli):
 async def test_list_todo(cli):
     cli._execute.return_value = json.dumps(TODO_TASKS)
     result = await cli.tasks.list(todo=True)
-    assert result == TODO_TASKS
+    assert result == [PARSED_TASKS[0]]
     cli._execute.assert_awaited_once_with(
         "tasks", params=None, flags=["todo"], output_format="json"
     )
@@ -65,7 +92,7 @@ async def test_list_todo(cli):
 async def test_list_all_flags(cli):
     cli._execute.return_value = json.dumps(DONE_TASKS)
     result = await cli.tasks.list(path="notes", daily=True, done=True)
-    assert result == DONE_TASKS
+    assert result == [PARSED_TASKS[1]]
     cli._execute.assert_awaited_once_with(
         "tasks",
         params={"path": "notes"},

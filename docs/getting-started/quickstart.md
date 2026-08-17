@@ -67,11 +67,12 @@ await cli.vault.append("notes/hello.md", "\n## New section")
 ### Working with tags
 
 ```python
-# List all tags
+# List all tags, most used first
 tags = await cli.tags.list(sort="count")
+print(tags[0].name, tags[0].count)
 
 # Get notes with a specific tag
-notes = await cli.tags.get("python")
+notes = await cli.tags.get(tags[0].name)
 ```
 
 ### Working with links
@@ -99,8 +100,11 @@ tasks = await cli.tasks.list()
 # List only the ones still open
 open_tasks = await cli.tasks.list(todo=True)
 
-# A task is addressed by its file and line number
-await cli.tasks.complete("notes/todo.md", 3)
+# A task is addressed by its file and line number, which is what a
+# listed task carries
+for task in open_tasks:
+    await cli.tasks.complete(task.file, task.line)
+
 await cli.tasks.reopen("notes/todo.md", 3)
 await cli.tasks.toggle("notes/todo.md", 3)
 

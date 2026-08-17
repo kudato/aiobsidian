@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
-
+from ..models import Bookmark
 from ._base import BaseCLIResource
 
 
@@ -53,12 +52,16 @@ class CLIBookmarksResource(BaseCLIResource):
             params["subpath"] = subpath
         await self._cli._execute("bookmark", params=params or None)
 
-    async def list(self) -> list[dict[str, Any]]:
+    async def list(self) -> list[Bookmark]:
         """List all bookmarks.
 
         Returns:
-            List of bookmark objects.
+            Every bookmark with what it points at and how it is titled.
+            The listing is flat: a group is one entry, the bookmarks
+            inside it are entries of their own, and nothing says which
+            group they came from.
         """
-        output = await self._cli._execute("bookmarks", output_format="json")
-        result: list[dict[str, Any]] = self._parse_json("bookmarks", output)
-        return result
+        output = await self._cli._execute(
+            "bookmarks", flags=["verbose"], output_format="json"
+        )
+        return self._parse_json_rows("bookmarks", output, Bookmark)

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
-
+from ..models import Backlink
 from ._base import BaseCLIResource
 
 
@@ -26,24 +25,20 @@ class CLILinksResource(BaseCLIResource):
         output = await self._cli._execute("links", params={"path": path})
         return self._parse_lines(output)
 
-    async def incoming(
-        self, path: str, *, counts: bool = False
-    ) -> list[dict[str, Any]]:
+    async def incoming(self, path: str) -> list[Backlink]:
         """Get backlinks (incoming links) to a note.
 
         Args:
             path: Path to the note relative to the vault root.
-            counts: If ``True``, include reference counts.
 
         Returns:
-            List of backlink objects.
+            The notes linking to this one, each with how many of its
+            links point here.
         """
-        flags = ["counts"] if counts else None
         output = await self._cli._execute(
-            "backlinks", params={"path": path}, flags=flags, output_format="json"
+            "backlinks", params={"path": path}, flags=["counts"], output_format="json"
         )
-        result: list[dict[str, Any]] = self._parse_json("backlinks", output)
-        return result
+        return self._parse_json_rows("backlinks", output, Backlink)
 
     async def unresolved(self) -> list[str]:
         """Get all unresolved (broken) links in the vault.

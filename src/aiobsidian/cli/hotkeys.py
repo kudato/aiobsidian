@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
-
+from ..models import Hotkey
 from ._base import BaseCLIResource
 
 
@@ -32,12 +31,14 @@ class CLIHotkeysResource(BaseCLIResource):
         )
         return output.strip()
 
-    async def list(self) -> list[dict[str, Any]]:
-        """List all hotkey bindings.
+    async def list(self) -> list[Hotkey]:
+        """List the hotkeys of every command.
 
         Returns:
-            List of hotkey binding objects.
+            One entry per command the app knows, sorted by identifier,
+            including the commands nothing is bound to.
         """
-        output = await self._cli._execute("hotkeys", output_format="json")
-        result: list[dict[str, Any]] = self._parse_json("hotkeys", output)
-        return result
+        output = await self._cli._execute(
+            "hotkeys", flags=["verbose"], output_format="json"
+        )
+        return self._parse_json_rows("hotkeys", output, Hotkey)

@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import json
 
-INCOMING = [
-    {"file": "projects/main.md"},
-]
+from aiobsidian.models.links import Backlink
 
 # `counts` adds how many times that note links here, as a string.
-INCOMING_WITH_COUNTS = [
+INCOMING = [
     {"file": "projects/main.md", "count": "2"},
+    {"file": "notes/setup.md", "count": "1"},
 ]
 
 UNRESOLVED = [
@@ -32,16 +31,10 @@ async def test_outgoing_without_links(cli):
 async def test_incoming(cli):
     cli._execute.return_value = json.dumps(INCOMING)
     result = await cli.links.incoming("note.md")
-    assert result == INCOMING
-    cli._execute.assert_awaited_once_with(
-        "backlinks", params={"path": "note.md"}, flags=None, output_format="json"
-    )
-
-
-async def test_incoming_with_counts(cli):
-    cli._execute.return_value = json.dumps(INCOMING_WITH_COUNTS)
-    result = await cli.links.incoming("note.md", counts=True)
-    assert result == INCOMING_WITH_COUNTS
+    assert result == [
+        Backlink(file="projects/main.md", count=2),
+        Backlink(file="notes/setup.md", count=1),
+    ]
     cli._execute.assert_awaited_once_with(
         "backlinks",
         params={"path": "note.md"},

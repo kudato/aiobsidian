@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
-
+from ..models import Task
 from ._base import BaseCLIResource
 
 
@@ -25,7 +24,7 @@ class CLITasksResource(BaseCLIResource):
         daily: bool = False,
         done: bool = False,
         todo: bool = False,
-    ) -> list[dict[str, Any]]:
+    ) -> list[Task]:
         """List tasks across the vault.
 
         Args:
@@ -36,8 +35,8 @@ class CLITasksResource(BaseCLIResource):
             todo: If ``True``, list only tasks with a blank status box.
 
         Returns:
-            List of task objects, each with ``status``, ``text``, ``file``
-            and ``line``.
+            The tasks, sorted by file and then by line. Each carries the
+            line number the other methods of this resource take.
         """
         params = {"path": path} if path is not None else None
         flags: list[str] = []
@@ -50,8 +49,7 @@ class CLITasksResource(BaseCLIResource):
         output = await self._cli._execute(
             "tasks", params=params, flags=flags or None, output_format="json"
         )
-        result: list[dict[str, Any]] = self._parse_json("tasks", output)
-        return result
+        return self._parse_json_rows("tasks", output, Task)
 
     async def toggle(self, path: str, line: int) -> None:
         """Toggle a task's completion status.

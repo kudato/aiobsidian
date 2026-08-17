@@ -2,17 +2,38 @@ from __future__ import annotations
 
 import json
 
-BOOKMARKS_LIST = [
-    {"value": "notes/important.md"},
-    {"value": "projects/"},
+from aiobsidian.models.bookmarks import Bookmark
+
+# `verbose` prints the type and the title beside the value. A file
+# bookmark carries its subpath in the value, a search bookmark falls back
+# to its query for a title, a url bookmark left untitled has none, and a
+# group points at nothing at all.
+BOOKMARKS = [
+    {"type": "file", "value": "notes/important.md", "title": "important"},
+    {"type": "file", "value": "notes/important.md#Setup", "title": "important#Setup"},
+    {"type": "folder", "value": "projects", "title": "projects"},
+    {"type": "search", "value": "tag:#todo", "title": "tag:#todo"},
+    {"type": "url", "value": "https://obsidian.md", "title": ""},
+    {"type": "group", "value": "", "title": "Reading"},
 ]
 
 
 async def test_list(cli):
-    cli._execute.return_value = json.dumps(BOOKMARKS_LIST)
+    cli._execute.return_value = json.dumps(BOOKMARKS)
     result = await cli.bookmarks.list()
-    assert result == BOOKMARKS_LIST
-    cli._execute.assert_awaited_once_with("bookmarks", output_format="json")
+    assert result == [
+        Bookmark(type="file", value="notes/important.md", title="important"),
+        Bookmark(
+            type="file", value="notes/important.md#Setup", title="important#Setup"
+        ),
+        Bookmark(type="folder", value="projects", title="projects"),
+        Bookmark(type="search", value="tag:#todo", title="tag:#todo"),
+        Bookmark(type="url", value="https://obsidian.md", title=""),
+        Bookmark(type="group", value="", title="Reading"),
+    ]
+    cli._execute.assert_awaited_once_with(
+        "bookmarks", flags=["verbose"], output_format="json"
+    )
 
 
 async def test_list_empty(cli):

@@ -52,7 +52,8 @@ without parsing:
 raw = await cli.run("wordcount", params={"path": "note.md"})
 # 'words: 3\ncharacters: 24\n'
 
-raw = await cli.run("tags", flags=["counts"], output_format="json")
+raw = await cli.run("tags", flags=["total"])
+# '8\n'
 ```
 
 Prefer the resource methods where they exist — they know the shape of

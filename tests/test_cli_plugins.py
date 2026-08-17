@@ -2,15 +2,11 @@ from __future__ import annotations
 
 import json
 
-PLUGINS = [
-    {"id": "backlink"},
-    {"id": "bookmarks"},
-    {"id": "obsidian-local-rest-api"},
-]
+from aiobsidian.models.plugins import Plugin
 
-# Core plugins ship with the app and report no version; only community
-# ones carry a number.
-PLUGINS_WITH_VERSIONS = [
+# `plugins` lists everything installed. Core plugins ship with the app and
+# report no version; only community ones carry a number.
+PLUGINS = [
     {"id": "backlink", "version": ""},
     {"id": "bookmarks", "version": ""},
     {"id": "obsidian-local-rest-api", "version": "5.1.0"},
@@ -45,14 +41,11 @@ async def test_set_restricted_false(cli):
 async def test_list(cli):
     cli._execute.return_value = json.dumps(PLUGINS)
     result = await cli.plugins.list()
-    assert result == PLUGINS
-    cli._execute.assert_awaited_once_with("plugins", flags=None, output_format="json")
-
-
-async def test_list_with_versions(cli):
-    cli._execute.return_value = json.dumps(PLUGINS_WITH_VERSIONS)
-    result = await cli.plugins.list(versions=True)
-    assert result == PLUGINS_WITH_VERSIONS
+    assert result == [
+        Plugin(id="backlink", version=None),
+        Plugin(id="bookmarks", version=None),
+        Plugin(id="obsidian-local-rest-api", version="5.1.0"),
+    ]
     cli._execute.assert_awaited_once_with(
         "plugins", flags=["versions"], output_format="json"
     )
