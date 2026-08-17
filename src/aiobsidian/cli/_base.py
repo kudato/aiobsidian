@@ -200,9 +200,10 @@ class BaseCLIResource:
         `"55"` and a timestamp as the milliseconds behind it. The model
         names the fields and hands the values back with the types they
         had, and says for itself what a field the CLI leaves out is
-        worth without it. Values come back as printed, save at the two
-        ends of the output, where the blank space around the whole of it
-        goes before the lines are counted.
+        worth without it. Values come back exactly as printed, blank
+        space included — only the newline the output ends with goes.
+        The last field of a plugin record is the description its
+        manifest gives, which nothing trims on the way here.
 
         Args:
             command: CLI command name, used for error reporting.
@@ -225,7 +226,9 @@ class BaseCLIResource:
                 separator, or the fields do not fit the model.
         """
         fields: dict[str, str] = {}
-        for line in cls._parse_lines(output):
+        for line in output.strip("\n").splitlines():
+            if not line:
+                continue
             key, found, value = line.partition(separator)
             if not found:
                 if strict:

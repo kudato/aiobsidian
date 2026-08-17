@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from unittest.mock import call
 
 import pytest
+from pydantic import ValidationError
 
 from aiobsidian._exceptions import CLIParseError
 from aiobsidian.models.vault import FileInfo, FolderInfo, VaultInfo, WordCount
@@ -372,6 +373,23 @@ async def test_file_info_reads_back_the_json_it_writes(cli):
     cli._execute.return_value = FILE_INFO
     result = await cli.vault.file_info("note.md")
     assert FileInfo.model_validate_json(result.model_dump_json()) == result
+
+
+def test_file_info_reads_a_number_and_its_text_alike():
+    # The CLI hands over text, but the model is public and takes what a
+    # caller writes, and 1000 milliseconds is one second either way.
+    fields = {"path": "note.md", "name": "note", "extension": "md", "size": 137}
+    printed = FileInfo.model_validate({**fields, "created": "1000", "modified": "1000"})
+    written = FileInfo.model_validate({**fields, "created": 1000, "modified": 1000})
+    assert printed == written
+    assert printed.created == datetime(1970, 1, 1, 0, 0, 1, tzinfo=UTC)
+
+
+def test_file_info_refuses_a_fractional_number_as_it_refuses_its_text():
+    fields = {"path": "note.md", "name": "note", "extension": "md", "size": 137}
+    for value in ("1.5", 1.5):
+        with pytest.raises(ValidationError):
+            FileInfo.model_validate({**fields, "created": value, "modified": value})
 
 
 @pytest.mark.parametrize(

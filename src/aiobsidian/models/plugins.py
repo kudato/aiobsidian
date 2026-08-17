@@ -56,7 +56,11 @@ class PluginInfo(BaseModel):
             Obsidian blanks the field for a manifest that credits
             Obsidian itself, so those read as unauthored too.
         description: Description from the manifest, or `None` for a core
-            plugin and for a community plugin that leaves it empty.
+            plugin and for a community plugin that leaves it empty. It
+            is printed last and untrimmed, so it keeps whatever blank
+            space the manifest gave it; a manifest that puts a newline
+            in it makes the record unreadable, since a second line is
+            how the CLI writes a second field.
     """
 
     type: str

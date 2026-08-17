@@ -148,8 +148,10 @@ class FileInfo(BaseModel):
         where they are the whole milliseconds since the epoch. Every
         number is read in that unit, however small — a timestamp that
         would pass for a plausible number of seconds is still
-        milliseconds — and one that is not whole is refused rather than
-        read in some other unit.
+        milliseconds — and one written with a fraction is refused rather
+        than read in some other unit. A number written as one reads the same
+        as a number printed as text, so the answer does not turn on how
+        the model was handed it.
 
         A timestamp written out in full is left alone, so the model
         still reads back the one it prints out itself.
@@ -165,26 +167,31 @@ class FileInfo(BaseModel):
         Raises:
             ValueError: If the number names no moment in milliseconds.
         """
-        if not isinstance(value, str) or not _spells_a_number(value):
+        printed = str(value) if isinstance(value, int | float) else value
+        if not isinstance(printed, str) or not _spells_a_number(printed):
             return value
         try:
-            return datetime.fromtimestamp(int(value) / _MILLISECONDS, tz=UTC)
+            return datetime.fromtimestamp(int(printed) / _MILLISECONDS, tz=UTC)
         except (ValueError, OverflowError, OSError) as exc:
-            raise ValueError(f"not a moment in milliseconds: {value!r}") from exc
+            raise ValueError(f"not a moment in milliseconds: {printed!r}") from exc
 
 
 class WordCount(BaseModel):
     """How much text a note holds.
 
-    Both counts are the ones Obsidian shows in its status bar, and both
-    are taken over the body alone — a note's frontmatter counts for
-    nothing.
+    Both counts are taken over the body alone — a note's frontmatter
+    counts for nothing.
 
     Attributes:
-        words: Number of words.
-        characters: Number of characters, whitespace included. Obsidian
-            counts them as JavaScript does, so a character outside the
-            Basic Multilingual Plane, an emoji among them, counts twice.
+        words: Number of words, which need not be the number the status
+            bar shows. Obsidian counts words twice over, by two
+            expressions that differ in one character: only the status
+            bar's reads a typographic apostrophe as part of the word
+            around it, so `don’t` is one word there and two here.
+        characters: Number of characters, whitespace included, and the
+            one the status bar shows. Obsidian counts them as
+            JavaScript does, so a character outside the Basic
+            Multilingual Plane, an emoji among them, counts twice.
     """
 
     words: int

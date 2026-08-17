@@ -9,6 +9,7 @@ from aiobsidian.cli._base import BaseCLIResource
 from aiobsidian.models.bases import BaseView
 from aiobsidian.models.history import FileVersion
 from aiobsidian.models.links import Backlink
+from aiobsidian.models.plugins import PluginInfo
 from aiobsidian.models.sync import SyncStatus
 from aiobsidian.models.vault import FolderInfo, WordCount
 
@@ -318,12 +319,24 @@ class TestParseFieldsAs:
         result = BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
         assert result.path == "notes/drafts "
 
-    def test_the_ends_of_the_output_are_still_trimmed(self):
-        # `_parse_lines()` strips the blank space around the whole
-        # output before counting lines, which no command puts there.
-        output = " path\tnotes\nfiles\t3\nfolders\t0\nsize\t305 \n"
-        result = BaseCLIResource._parse_fields_as("folder", output, FolderInfo)
-        assert result == FolderInfo(path="notes", files=3, folders=0, size=305)
+    def test_the_last_value_keeps_the_blank_space_it_ends_with(self):
+        # `plugin` prints the description last, straight from a manifest
+        # nothing trims, so the end of the output is a place a value can
+        # legitimately end in a space.
+        output = (
+            "type\tcommunity\nname\tDataview\nversion\t0.5.64\n"
+            "author\tMichael Brenan\nenabled\ttrue\ndescription\tComplex queries.  \n"
+        )
+        result = BaseCLIResource._parse_fields_as("plugin", output, PluginInfo)
+        assert result.description == "Complex queries.  "
+
+    def test_a_value_of_blank_space_keeps_its_separator(self):
+        output = (
+            "type\tcommunity\nname\tDataview\nversion\t0.5.64\n"
+            "author\tMichael Brenan\nenabled\ttrue\ndescription\t \n"
+        )
+        result = BaseCLIResource._parse_fields_as("plugin", output, PluginInfo)
+        assert result.description == " "
 
 
 class TestSplitContent:

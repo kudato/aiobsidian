@@ -96,6 +96,16 @@ async def test_info_without_an_author(cli):
     assert result.author is None
 
 
+async def test_info_with_a_description_that_ends_in_a_space(cli):
+    # Obsidian prints the description last and takes it from the manifest
+    # untrimmed, so the blank space a manifest ends with is the last thing
+    # in the output.
+    cli._execute.return_value = COMMUNITY_INFO.replace("vault.\n", "vault.  \n")
+    result = await cli.plugins.info("obsidian-local-rest-api")
+    assert result.description is not None
+    assert result.description.endswith("vault.  ")
+
+
 async def test_info_with_a_stray_line(cli):
     cli._execute.return_value = CORE_INFO + "and one more thing\n"
     with pytest.raises(CLIParseError):
