@@ -2,14 +2,31 @@ from __future__ import annotations
 
 import json
 
+from aiobsidian.models.search import MatchedFile, MatchedLine
+
 RESULTS = ["welcome.md", "notes/linked.md"]
 
+# `search:context` really serialises, so the line numbers arrive as
+# numbers. A file can match without any line matching, which is what the
+# CLI prints when the query hit the name or the frontmatter.
 CONTEXT_RESULTS = [
     {"file": "welcome.md", "matches": [{"line": 2, "text": "title: Welcome"}]},
     {
         "file": "notes/linked.md",
         "matches": [{"line": 7, "text": "Back to [[welcome]]."}],
     },
+    {"file": "notes/empty-match.md", "matches": []},
+]
+
+PARSED_CONTEXT = [
+    MatchedFile(
+        file="welcome.md", matches=[MatchedLine(line=2, text="title: Welcome")]
+    ),
+    MatchedFile(
+        file="notes/linked.md",
+        matches=[MatchedLine(line=7, text="Back to [[welcome]].")],
+    ),
+    MatchedFile(file="notes/empty-match.md", matches=[]),
 ]
 
 
@@ -82,7 +99,7 @@ async def test_query_all_params(cli):
 async def test_context(cli):
     cli._execute.return_value = json.dumps(CONTEXT_RESULTS)
     result = await cli.search.context("test query")
-    assert result == CONTEXT_RESULTS
+    assert result == PARSED_CONTEXT
     cli._execute.assert_awaited_once_with(
         "search:context",
         params={"query": "test query"},
@@ -100,7 +117,7 @@ async def test_context_no_matches(cli):
 async def test_context_with_path(cli):
     cli._execute.return_value = json.dumps(CONTEXT_RESULTS)
     result = await cli.search.context("test", path="notes")
-    assert result == CONTEXT_RESULTS
+    assert result == PARSED_CONTEXT
     cli._execute.assert_awaited_once_with(
         "search:context",
         params={"query": "test", "path": "notes"},
@@ -112,7 +129,7 @@ async def test_context_with_path(cli):
 async def test_context_with_limit(cli):
     cli._execute.return_value = json.dumps(CONTEXT_RESULTS)
     result = await cli.search.context("test", limit=5)
-    assert result == CONTEXT_RESULTS
+    assert result == PARSED_CONTEXT
     cli._execute.assert_awaited_once_with(
         "search:context",
         params={"query": "test", "limit": "5"},
@@ -124,7 +141,7 @@ async def test_context_with_limit(cli):
 async def test_context_case_sensitive(cli):
     cli._execute.return_value = json.dumps(CONTEXT_RESULTS)
     result = await cli.search.context("Test", case=True)
-    assert result == CONTEXT_RESULTS
+    assert result == PARSED_CONTEXT
     cli._execute.assert_awaited_once_with(
         "search:context",
         params={"query": "Test"},
@@ -136,7 +153,7 @@ async def test_context_case_sensitive(cli):
 async def test_context_all_params(cli):
     cli._execute.return_value = json.dumps(CONTEXT_RESULTS)
     result = await cli.search.context("test", path="notes", limit=10, case=True)
-    assert result == CONTEXT_RESULTS
+    assert result == PARSED_CONTEXT
     cli._execute.assert_awaited_once_with(
         "search:context",
         params={"query": "test", "path": "notes", "limit": "10"},

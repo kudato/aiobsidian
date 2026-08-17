@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import json
 
+from aiobsidian.models.outline import Heading
+
+# `outline` is one of the few commands that really serialises: asked for
+# JSON it prints the level and the line as numbers rather than as text.
 OUTLINE = [
     {"level": 1, "heading": "Introduction", "line": 1},
     {"level": 2, "heading": "Setup", "line": 12},
@@ -11,7 +15,10 @@ OUTLINE = [
 async def test_get(cli):
     cli._execute.return_value = json.dumps(OUTLINE)
     result = await cli.outline.get("notes/guide.md")
-    assert result == OUTLINE
+    assert result == [
+        Heading(level=1, text="Introduction", line=1),
+        Heading(level=2, text="Setup", line=12),
+    ]
     cli._execute.assert_awaited_once_with(
         "outline", params={"path": "notes/guide.md"}, output_format="json"
     )

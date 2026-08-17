@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
+from aiobsidian._exceptions import CLIParseError
+from aiobsidian.models.bases import BaseView
+
 RECORDS = [
     {"name": "Task 1", "status": "done"},
     {"name": "Task 2", "status": "todo"},
@@ -19,10 +24,16 @@ async def test_views(cli):
     cli._execute.return_value = "All\ttable\nActive\tcards\n"
     result = await cli.bases.views()
     assert result == [
-        {"name": "All", "type": "table"},
-        {"name": "Active", "type": "cards"},
+        BaseView(name="All", type="table"),
+        BaseView(name="Active", type="cards"),
     ]
     cli._execute.assert_awaited_once_with("base:views")
+
+
+async def test_views_with_an_unexpected_row(cli):
+    cli._execute.return_value = "All\ttable\textra\n"
+    with pytest.raises(CLIParseError):
+        await cli.bases.views()
 
 
 async def test_views_without_any(cli):

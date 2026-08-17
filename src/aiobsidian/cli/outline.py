@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
-
+from ..models import Heading
 from ._base import BaseCLIResource
 
 
@@ -14,17 +13,20 @@ class CLIOutlineResource(BaseCLIResource):
 
     __slots__ = ()
 
-    async def get(self, path: str) -> list[dict[str, Any]]:
+    async def get(self, path: str) -> list[Heading]:
         """Get the heading outline of a file.
 
         Args:
             path: Path to the file relative to the vault root.
 
         Returns:
-            List of heading objects forming the document outline.
+            Every heading in the order the note writes them, flat: the
+            level says how deep a heading sits, nothing nests it.
+
+        Raises:
+            CommandError: If the file is not a markdown file.
         """
         output = await self._cli._execute(
             "outline", params={"path": path}, output_format="json"
         )
-        result: list[dict[str, Any]] = self._parse_json("outline", output)
-        return result
+        return self._parse_json_rows("outline", output, Heading)
