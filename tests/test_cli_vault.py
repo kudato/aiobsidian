@@ -27,6 +27,11 @@ FILE_INFO = (
     "created\t1786836399339\nmodified\t1786836399341\n"
 )
 
+# The same file described to the model directly, which is public and
+# takes a caller's own values rather than the CLI's printed ones. The
+# two moments are what each test varies, so they are not in here.
+FILE_FIELDS = {"path": "note.md", "name": "note", "extension": "md", "size": 137}
+
 # `wordcount` separates with a colon and a space, where every other
 # record command separates with a tab.
 WORD_COUNT = "words: 500\ncharacters: 2800\n"
@@ -380,9 +385,12 @@ async def test_file_info_reads_back_the_json_it_writes(cli):
 def test_file_info_reads_a_number_and_its_text_alike():
     # The CLI hands over text, but the model is public and takes what a
     # caller writes, and 1000 milliseconds is one second either way.
-    fields = {"path": "note.md", "name": "note", "extension": "md", "size": 137}
-    printed = FileInfo.model_validate({**fields, "created": "1000", "modified": "1000"})
-    written = FileInfo.model_validate({**fields, "created": 1000, "modified": 1000})
+    printed = FileInfo.model_validate(
+        {**FILE_FIELDS, "created": "1000", "modified": "1000"}
+    )
+    written = FileInfo.model_validate(
+        {**FILE_FIELDS, "created": 1000, "modified": 1000}
+    )
     assert printed == written
     assert printed.created == datetime(1970, 1, 1, 0, 0, 1, tzinfo=UTC)
 
@@ -392,27 +400,28 @@ def test_file_info_refuses_a_number_that_is_not_whole_milliseconds():
     # point goes with them however round it is: Obsidian prints no
     # point, so `1786836399.0` is a number of seconds by another hand,
     # and reading it as milliseconds would date the file to 1970.
-    fields = {"path": "note.md", "name": "note", "extension": "md", "size": 137}
     for value in ("1.5", 1.5, Decimal("1.5"), Fraction(3, 2), "3/2", 1000.0, "1000.0"):
         with pytest.raises(ValidationError):
-            FileInfo.model_validate({**fields, "created": value, "modified": value})
+            FileInfo.model_validate(
+                {**FILE_FIELDS, "created": value, "modified": value}
+            )
 
 
 @pytest.mark.parametrize("value", [1000, "1000", Decimal("1000"), Fraction(1000)])
 def test_file_info_counts_milliseconds_however_they_are_written(value):
     # A caller reaches for whichever number type is at hand, and a
     # thousand milliseconds is one second in every one of them.
-    fields = {"path": "note.md", "name": "note", "extension": "md", "size": 137}
-    result = FileInfo.model_validate({**fields, "created": value, "modified": value})
+    result = FileInfo.model_validate(
+        {**FILE_FIELDS, "created": value, "modified": value}
+    )
     assert result.created == datetime(1970, 1, 1, 0, 0, 1, tzinfo=UTC)
 
 
 def test_file_info_keeps_the_millisecond_it_was_given():
     # A millisecond is too fine for a float of that size to hold, so the
     # count is added to the epoch rather than divided into seconds.
-    fields = {"path": "note.md", "name": "note", "extension": "md", "size": 137}
     result = FileInfo.model_validate(
-        {**fields, "created": "9214646400339", "modified": "9214646400339"}
+        {**FILE_FIELDS, "created": "9214646400339", "modified": "9214646400339"}
     )
     assert result.created == datetime(2262, 1, 1, 0, 0, 0, 339000, tzinfo=UTC)
 
@@ -420,16 +429,18 @@ def test_file_info_keeps_the_millisecond_it_was_given():
 def test_file_info_refuses_a_moment_without_a_time_zone():
     # `created` and `modified` are documented in UTC, and a moment
     # written without a zone names no one moment to hold them to.
-    fields = {"path": "note.md", "name": "note", "extension": "md", "size": 137}
     for value in (datetime(2026, 8, 15), "2026-08-15T23:26:39", date(2026, 8, 15)):
         with pytest.raises(ValidationError):
-            FileInfo.model_validate({**fields, "created": value, "modified": value})
+            FileInfo.model_validate(
+                {**FILE_FIELDS, "created": value, "modified": value}
+            )
 
 
 def test_file_info_reads_a_moment_from_elsewhere_into_utc():
-    fields = {"path": "note.md", "name": "note", "extension": "md", "size": 137}
     moment = datetime(2026, 8, 16, 2, 26, 39, tzinfo=timezone(timedelta(hours=3)))
-    result = FileInfo.model_validate({**fields, "created": moment, "modified": moment})
+    result = FileInfo.model_validate(
+        {**FILE_FIELDS, "created": moment, "modified": moment}
+    )
     assert result.created == datetime(2026, 8, 15, 23, 26, 39, tzinfo=UTC)
     assert result.created.tzinfo is UTC
 

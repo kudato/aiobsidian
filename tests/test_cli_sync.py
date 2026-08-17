@@ -82,10 +82,8 @@ async def test_status_without_the_quota(cli):
 
 
 async def test_status_with_a_comma_in_the_sizes(cli):
-    cli._execute.return_value = (
-        "status: synced\nvault size: 1,023.44 KB\n"
-        "account usage: 1,023.44 KB / 10.00 GB\n"
-    )
+    # An account holding this vault alone reports the same size twice.
+    cli._execute.return_value = STATUS.replace("3.20 MB", "1,023.44 KB")
     result = await cli.sync.status()
     assert result.vault_size == "1,023.44 KB"
     assert result.account_used == "1,023.44 KB"
@@ -93,7 +91,7 @@ async def test_status_with_a_comma_in_the_sizes(cli):
 
 
 async def test_status_with_a_colon_in_the_device_name(cli):
-    cli._execute.return_value = "status: synced\ndevice: MacBook: work\n"
+    cli._execute.return_value = STATUS.replace("MacBook", "MacBook: work")
     result = await cli.sync.status()
     assert result.device == "MacBook: work"
 
