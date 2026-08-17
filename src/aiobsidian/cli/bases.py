@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..models import BaseView
 from ._base import BaseCLIResource
 
 
@@ -14,7 +15,7 @@ class CLIBasesResource(BaseCLIResource):
 
     __slots__ = ()
 
-    async def views(self) -> list[dict[str, str]]:
+    async def views(self) -> list[BaseView]:
         """List the views of the base file open in the Obsidian UI.
 
         The CLI has no way to address a base file here: `base:views`
@@ -22,18 +23,17 @@ class CLIBasesResource(BaseCLIResource):
         base with `vault.open()` first, or read the file yourself.
 
         Returns:
-            One entry per view, with its ``name`` and its ``type``.
+            One entry per view, in the order the base file defines them.
 
         Raises:
             CommandError: If no file is active, or the active file is not
                 a base file.
+            CLIParseError: If a view row has an unexpected shape.
         """
         output = await self._cli._execute("base:views")
-        return [
-            {"name": row[0], "type": row[1]}
-            for row in self._parse_rows(output)
-            if len(row) == 2
-        ]
+        return self._parse_rows_as(
+            "base:views", output, BaseView, columns=("name", "type")
+        )
 
     async def create(
         self,

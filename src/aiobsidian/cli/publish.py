@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ..models import PublishChange
 from ._base import BaseCLIResource
 
 
@@ -41,20 +42,20 @@ class CLIPublishResource(BaseCLIResource):
         output = await self._cli._execute("publish:site")
         return self._parse_fields("publish:site", output)
 
-    async def status(self) -> list[dict[str, str]]:
+    async def status(self) -> list[PublishChange]:
         """List the changes waiting to be published.
 
         Returns:
-            One entry per changed file, with its ``type`` — ``new``,
-            ``changed`` or ``deleted`` — and its ``path``. Empty when the
-            site is up to date.
+            One entry per changed file. Empty when the site is up to
+            date.
+
+        Raises:
+            CLIParseError: If a change row has an unexpected shape.
         """
         output = await self._cli._execute("publish:status")
-        return [
-            {"type": row[0], "path": row[1]}
-            for row in self._parse_rows(output)
-            if len(row) == 2
-        ]
+        return self._parse_rows_as(
+            "publish:status", output, PublishChange, columns=("type", "path")
+        )
 
     async def add(self, path: str | None = None, *, changed: bool = False) -> str:
         """Publish a file, or every new and changed file.

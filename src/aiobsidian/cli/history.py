@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from .._exceptions import CLIParseError
+from typing import Literal
+
+from ..models import FileVersion
 from ._base import BaseCLIResource
 
 
@@ -13,26 +15,28 @@ class CLIHistoryResource(BaseCLIResource):
 
     __slots__ = ()
 
-    async def versions(self, path: str) -> list[dict[str, str]]:
+    async def versions(self, path: str) -> list[FileVersion]:
         """List versions of a specific file in local history.
 
         Args:
             path: Path to the file relative to the vault root.
 
         Returns:
-            List of versions, each with the ``version`` number, the
-            ``modified`` timestamp and the ``size`` of that version.
+            The versions kept for that file, newest first. Their numbers
+            are positions in this listing rather than identifiers; see
+            `FileVersion.version` for how long one holds.
 
         Raises:
             CLIParseError: If a version row has an unexpected shape.
         """
         output = await self._cli._execute("history", params={"path": path})
-        versions: list[dict[str, str]] = []
-        for row in self._parse_rows(output):
-            if len(row) != 3:
-                raise CLIParseError("history", output)
-            versions.append({"version": row[0], "modified": row[1], "size": row[2]})
-        return versions
+        return self._parse_rows_as(
+            "history",
+            output,
+            FileVersion,
+            columns=("version", "modified", "size"),
+            heading=True,
+        )
 
     async def open(self, path: str) -> None:
         """Open the File Recovery UI for a file.
@@ -46,36 +50,44 @@ class CLIHistoryResource(BaseCLIResource):
         self,
         path: str,
         *,
-        from_version: str | None = None,
-        to_version: str | None = None,
-        filter: str | None = None,
+        from_version: int | None = None,
+        to_version: int | None = None,
+        filter: Literal["local", "sync"] | None = None,
     ) -> str:
         """Get a diff between file versions.
 
+        This command numbers versions of its own: it lists the local and
+        the synced ones together, newest first, so its numbers line up
+        with `versions()` only under ``filter="local"``. With neither
+        version given it prints that combined listing instead of a diff.
+
         Args:
             path: Path to the file relative to the vault root.
-            from_version: Starting version identifier.
-            to_version: Ending version identifier.
-            filter: Filter expression for the diff output.
+            from_version: Version to diff from, counting from 1.
+            to_version: Version to diff to, counting from 1.
+            filter: Restrict the versions to the ``"local"`` ones kept by
+                file recovery, or the ``"sync"`` ones held by Obsidian
+                Sync.
 
         Returns:
             Diff output as a string.
         """
         params: dict[str, str] = {"path": path}
         if from_version is not None:
-            params["from"] = from_version
+            params["from"] = str(from_version)
         if to_version is not None:
-            params["to"] = to_version
+            params["to"] = str(to_version)
         if filter is not None:
             params["filter"] = filter
         return await self._cli._execute("diff", params=params)
 
-    async def read(self, path: str, *, version: str | None = None) -> str:
+    async def read(self, path: str, *, version: int | None = None) -> str:
         """Read a version from local history.
 
         Args:
             path: Path to the file relative to the vault root.
-            version: Version identifier. Defaults to the latest version.
+            version: Version to read, as `versions()` numbers them.
+                Defaults to 1, the newest.
 
         Returns:
             File content at that version, without the header line the CLI
@@ -83,19 +95,19 @@ class CLIHistoryResource(BaseCLIResource):
         """
         params: dict[str, str] = {"path": path}
         if version is not None:
-            params["version"] = version
+            params["version"] = str(version)
         output = await self._cli._execute("history:read", params=params)
         return self._strip_content_header(output)
 
-    async def restore(self, path: str, *, version: str) -> None:
+    async def restore(self, path: str, *, version: int) -> None:
         """Restore a file from local history.
 
         Args:
             path: Path to the file relative to the vault root.
-            version: Version identifier to restore.
+            version: Version to restore, as `versions()` numbers them.
         """
         await self._cli._execute(
-            "history:restore", params={"path": path, "version": version}
+            "history:restore", params={"path": path, "version": str(version)}
         )
 
     async def list(self) -> list[str]:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
-
+from ..models import MatchedFile
 from ._base import BaseCLIResource
 
 
@@ -61,7 +60,7 @@ class CLISearchResource(BaseCLIResource):
         path: str | None = None,
         limit: int | None = None,
         case: bool = False,
-    ) -> list[dict[str, Any]]:
+    ) -> list[MatchedFile]:
         """Search the vault, with the matching line of every hit.
 
         Args:
@@ -71,9 +70,13 @@ class CLISearchResource(BaseCLIResource):
             case: If ``True``, perform case-sensitive search.
 
         Returns:
-            One entry per matching file, each with its ``file`` and a
-            ``matches`` list of ``line`` and ``text`` pairs. The CLI
-            reports the matching line itself, never the lines around it.
+            One entry per matching file, each carrying the lines it
+            matched on. The CLI reports the matching line itself, never
+            the lines around it, and a file can match on none of them —
+            when the query matched its name or its frontmatter.
+
+        Raises:
+            CLIParseError: If a match has an unexpected shape.
         """
         params: dict[str, str] = {"query": query}
         if path is not None:
@@ -84,5 +87,4 @@ class CLISearchResource(BaseCLIResource):
         output = await self._cli._execute(
             "search:context", params=params, flags=flags, output_format="json"
         )
-        result: list[dict[str, Any]] = self._parse_json("search:context", output)
-        return result
+        return self._parse_json_rows("search:context", output, MatchedFile)

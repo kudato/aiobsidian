@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import pytest
+
+from aiobsidian._exceptions import CLIParseError
+from aiobsidian.models.publish import PublishChange
+
 SITE_INFO = "slug\tmysite\nurl\thttps://publish.obsidian.md/mysite\ncustom\thttps://notes.example.com\n"
 
 PUBLISHED_FILES = "about.md\nindex.md\n"
 
-PUBLISH_STATUS = "new\tnotes/draft.md\nchanged\tindex.md\ndeleted\tnotes/gone.md\n"
+# The scan walks the published files first and the vault tree after, so
+# a new file is always reported last.
+PUBLISH_STATUS = "changed\tindex.md\ndeleted\tnotes/gone.md\nnew\tnotes/draft.md\n"
 
 
 async def test_open(cli):
@@ -44,11 +51,18 @@ async def test_status(cli):
     cli._execute.return_value = PUBLISH_STATUS
     result = await cli.publish.status()
     assert result == [
-        {"type": "new", "path": "notes/draft.md"},
-        {"type": "changed", "path": "index.md"},
-        {"type": "deleted", "path": "notes/gone.md"},
+        PublishChange(type="changed", path="index.md"),
+        PublishChange(type="deleted", path="notes/gone.md"),
+        PublishChange(type="new", path="notes/draft.md"),
     ]
     cli._execute.assert_awaited_once_with("publish:status")
+
+
+async def test_status_with_an_unexpected_row(cli):
+    cli._execute.return_value = "new\tnotes/draft.md\textra\n"
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.publish.status()
+    assert exc_info.value.command == "publish:status"
 
 
 async def test_status_up_to_date(cli):

@@ -258,22 +258,51 @@ class BaseCLIResource:
         return output
 
     @classmethod
-    def _parse_rows(cls, output: str, *, separator: str = "\t") -> list[list[str]]:
-        """Parse tabular output into rows of columns.
+    def _parse_rows_as[ModelT: BaseModel](
+        cls,
+        command: str,
+        output: str,
+        model: type[ModelT],
+        *,
+        columns: tuple[str, ...],
+        heading: bool = False,
+    ) -> list[ModelT]:
+        """Parse tab-separated output into models, one per row.
 
-        Lines without the separator are skipped: some commands print a
-        heading line before the table.
+        The commands without a `format=` print their table as plain
+        text, so the column names live here rather than in the output,
+        and every line has to hold one value per column. Values come
+        back as printed, save at the two ends of the output: the blank
+        space around the whole of it goes before the lines are counted,
+        so a first value starting with one, or a last value ending in
+        one, loses it.
 
         Args:
+            command: CLI command name, used for error reporting.
             output: Raw output of the command.
-            separator: Separator between columns.
+            model: Model to validate every row against.
+            columns: Column names, in the order the CLI prints them.
+            heading: If `True`, drop the first line: `history` names the
+                file above its table.
 
         Returns:
-            List of rows, each a list of column values.
+            One model per row, in the order printed, or an empty list
+            for an empty result.
+
+        Raises:
+            CLIParseError: If a row does not carry one value per column,
+                or does not fit the model.
         """
-        rows: list[list[str]] = []
-        for line in cls._parse_lines(output):
-            if separator not in line:
-                continue
-            rows.append([column.strip() for column in line.split(separator)])
-        return rows
+        lines = cls._parse_lines(output)
+        if heading:
+            lines = lines[1:]
+        values: list[ModelT] = []
+        for line in lines:
+            row = line.split("\t")
+            if len(row) != len(columns):
+                raise CLIParseError(command, output)
+            try:
+                values.append(model.model_validate(dict(zip(columns, row))))
+            except ValidationError as exc:
+                raise CLIParseError(command, output) from exc
+        return values

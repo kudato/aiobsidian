@@ -10,6 +10,10 @@
 
 ## Search Models
 
+::: aiobsidian.models.MatchedLine
+
+::: aiobsidian.models.MatchedFile
+
 ::: aiobsidian.models.MatchSpan
 
 ::: aiobsidian.models.SearchMatch
@@ -49,3 +53,19 @@
 ## Plugin Models
 
 ::: aiobsidian.models.Plugin
+
+## Outline Models
+
+::: aiobsidian.models.Heading
+
+## Base Models
+
+::: aiobsidian.models.BaseView
+
+## History Models
+
+::: aiobsidian.models.FileVersion
+
+## Publish Models
+
+::: aiobsidian.models.PublishChange

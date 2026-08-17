@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
 
 from aiobsidian._exceptions import CLIParseError
 from aiobsidian.cli._base import BaseCLIResource
+from aiobsidian.models.bases import BaseView
+from aiobsidian.models.history import FileVersion
 from aiobsidian.models.links import Backlink
 
 
@@ -145,6 +149,96 @@ class TestParseJsonRows:
             BaseCLIResource._parse_json_rows("backlinks", "plain text", Backlink)
 
 
+class TestParseRowsAs:
+    def test_rows(self):
+        output = "All\ttable\nActive\tcards\n"
+        result = BaseCLIResource._parse_rows_as(
+            "base:views", output, BaseView, columns=("name", "type")
+        )
+        assert result == [
+            BaseView(name="All", type="table"),
+            BaseView(name="Active", type="cards"),
+        ]
+
+    def test_sentinel(self):
+        result = BaseCLIResource._parse_rows_as(
+            "base:views", "No views defined.\n", BaseView, columns=("name", "type")
+        )
+        assert result == []
+
+    def test_drops_the_heading_line_when_asked(self):
+        output = "notes/todo.md\n1\t2026-08-16 02:38\t431 B\n"
+        result = BaseCLIResource._parse_rows_as(
+            "history",
+            output,
+            FileVersion,
+            columns=("version", "modified", "size"),
+            heading=True,
+        )
+        assert result == [
+            FileVersion(version=1, modified=datetime(2026, 8, 16, 2, 38), size="431 B")
+        ]
+
+    def test_too_many_columns(self):
+        with pytest.raises(CLIParseError) as exc_info:
+            BaseCLIResource._parse_rows_as(
+                "base:views", "All\ttable\textra\n", BaseView, columns=("name", "type")
+            )
+        assert exc_info.value.command == "base:views"
+
+    def test_too_few_columns(self):
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_rows_as(
+                "history",
+                "notes/todo.md\n1\t2026-08-16 02:38\n",
+                FileVersion,
+                columns=("version", "modified", "size"),
+                heading=True,
+            )
+
+    def test_a_row_that_lost_every_separator(self):
+        # `base:views` prints no heading, so such a line is a broken row
+        # rather than something to skip.
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_rows_as(
+                "base:views", "All\ttable\nActive\n", BaseView, columns=("name", "type")
+            )
+
+    def test_values_arrive_verbatim(self):
+        # A view is named by whoever wrote the base file, so a name that
+        # ends in a space is theirs to keep.
+        output = "All\ttable\nActive \tcards\n"
+        result = BaseCLIResource._parse_rows_as(
+            "base:views", output, BaseView, columns=("name", "type")
+        )
+        assert result == [
+            BaseView(name="All", type="table"),
+            BaseView(name="Active ", type="cards"),
+        ]
+
+    def test_the_ends_of_the_output_are_still_trimmed(self):
+        # `_parse_lines()` strips the blank space around the whole
+        # output before counting lines, which no command puts there.
+        output = " All\ttable\nActive\tcards \n"
+        result = BaseCLIResource._parse_rows_as(
+            "base:views", output, BaseView, columns=("name", "type")
+        )
+        assert result == [
+            BaseView(name="All", type="table"),
+            BaseView(name="Active", type="cards"),
+        ]
+
+    def test_value_of_the_wrong_type(self):
+        output = "one\t2026-08-16 02:38\t431 B\n"
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_rows_as(
+                "history",
+                output,
+                FileVersion,
+                columns=("version", "modified", "size"),
+            )
+
+
 class TestParseLines:
     def test_lines(self):
         assert BaseCLIResource._parse_lines("a.md\nb.md\n") == ["a.md", "b.md"]
@@ -205,14 +299,3 @@ class TestSplitContent:
 
     def test_trailing_backslash(self):
         assert BaseCLIResource._split_content("path\\") == ["path\\"]
-
-
-class TestParseRows:
-    def test_rows(self):
-        output = "welcome.md\n1\t2026-08-16 02:38\t431 B\n"
-        assert BaseCLIResource._parse_rows(output) == [
-            ["1", "2026-08-16 02:38", "431 B"]
-        ]
-
-    def test_no_rows(self):
-        assert BaseCLIResource._parse_rows("welcome.md\n") == []

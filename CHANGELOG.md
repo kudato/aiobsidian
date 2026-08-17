@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 This release is the result of auditing both transports against a live
 Obsidian 1.13.7 and against the CLI command definitions inside the app
 itself. Much of the surface was wrong rather than missing, so most of
-the entries below are breaking, and 47 CLI methods changed what they
+the entries below are breaking, and 49 CLI methods changed what they
 return.
 
 ### Added
@@ -20,7 +20,7 @@ return.
 - `APIStatusError`, `APIRequestError`, `APIConnectionError`, `APITimeoutError` and `APIProtocolError`
 - `APINotFoundError`, `CLINotFoundError` and `CLIParseError`, so a missing note and unparseable output can be told apart from any other failure of that transport
 - `tasks.reopen()` to undo `tasks.complete()`, `tasks.list(todo=)`, `daily.open()`, `publish.add(changed=)` and `CommandError.stdout`
-- `Tag`, `Task`, `Backlink`, `Bookmark`, `Hotkey` and `Plugin`, the models the CLI list commands return
+- `Tag`, `Task`, `Backlink`, `Bookmark`, `Hotkey`, `Plugin`, `Heading`, `MatchedFile`, `MatchedLine`, `BaseView`, `FileVersion` and `PublishChange`, the models the CLI list commands return
 
 ### Removed
 - **Breaking**: the REST `periodic` resource, `ObsidianClient.periodic` and `Period` — the plugin has no such endpoints
@@ -40,6 +40,8 @@ return.
 - **Breaking**: `plugins.enabled()` and `links.unresolved()` return `list[str]`. Asked for JSON, the CLI prints a table, so a one-column answer arrived as a list of one-key objects — `[{"id": "dataview"}]` — and every call site ended in a comprehension over `p["id"]`
 - **Breaking**: `tags.list()`, `tasks.list()`, `links.incoming()`, `bookmarks.list()`, `hotkeys.list()` and `plugins.list()` return models. Asked for JSON the CLI still prints a table, and a table holds text: a task reported its line number as `"5"` and a tag its count as `"4"`. The numbers are numbers again — so a listed task can be passed straight to `tasks.complete()` — an unversioned core plugin reads as `None` rather than `""`, `Tag.name` drops the `#` that `tags.get()` does not want, and `hotkeys.list()` hands back the several bindings a command can carry rather than the one string the CLI joins them into
 - **Breaking**: `hotkeys.get()` returns `list[str]` of bindings, empty when the command has none. It answered `"(none)"` for that, and joined the several bindings a command can carry into one string
+- **Breaking**: `outline.get()`, `search.context()`, `bases.views()`, `history.versions()` and `publish.status()` return models, so every list-returning CLI method does but `bases.query()`, whose columns are the base's own. `outline` and `search:context` are the two commands that really serialise, numbers included; the other three print a plain text table whose column names only ever existed in this library
+- **Breaking**: `history.read(version=)`, `history.restore(version=)` and `history.diff(from_version=, to_version=)` take an `int`, and `history.diff(filter=)` takes `"local"` or `"sync"`. A version is a position in the listing, counting from 1, which is what `FileVersion.version` now carries
 - **Breaking**: `search.query()` returns `list[str]` of paths; the CLI reports no match counts
 - **Breaking**: `tasks.complete()` takes the note and the line, not a task id the CLI has no notion of
 - **Breaking**: every on/off switch is spelled `set_<thing>(value)`, so `sync.toggle(on=)`, `plugins.restrict(on=)`, `dev.mobile(on=)` and `dev.debug(on=)` are `sync.set_paused()`, `plugins.set_restricted()`, `dev.set_mobile()` and `dev.set_debugger()`. `toggle` is left to mean what it says, as in `tasks.toggle()`. Mind that `set_paused(True)` pauses, where `toggle(on=True)` resumed
