@@ -73,6 +73,31 @@ class TestContextManager:
             await cli._execute("version")
 
 
+async def _close_over_a_cancelled_spawn(cli, task, finish) -> None:
+    """Cancel a command mid-spawn and close the client on top of it.
+
+    The handshake both closing tests are built on, and an assertion in
+    its own right: the close must still be waiting while the spawn is
+    on its way, whatever that spawn is about to hand back. What each
+    test says for itself is what became of the command afterwards.
+
+    Args:
+        cli: Client to close.
+        task: The command's task, suspended inside the spawn.
+        finish: What the spawn is waiting on before it ends.
+    """
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    closing = asyncio.create_task(cli.aclose())
+    await asyncio.sleep(0)
+    assert not closing.done()
+    finish.set()
+    async with asyncio.timeout(5):
+        await closing
+
+
 class TestClose:
     async def test_command_after_aclose_raises(self):
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
@@ -164,36 +189,25 @@ class TestClose:
     async def test_aclose_waits_for_a_command_a_cancel_left_starting(
         self, guard_killpg
     ):
-        # A cancel delivered while the spawn is still running leaves
-        # nobody holding the command it is about to produce. The spawn is
-        # held open here so the cancel lands inside that window, and
-        # aclose() is what shows the command was not abandoned to it:
-        # it must not return while one is still coming up, and the group
-        # must be signalled by the time it does.
+        # The spawn is held open so the cancel lands inside it, where the
+        # command exists for nobody. What aclose() has to show is that it
+        # was not abandoned there: the group is signalled by the time the
+        # close returns, and the command is gone from the client.
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
-        materialised = asyncio.Event()
+        finish = asyncio.Event()
         process = _mock_process(returncode=None)
         process.pid = 4242
         process.kill = MagicMock()
 
         async def spawn(*args, **kwargs):
-            await materialised.wait()
+            await finish.wait()
             return process
 
         with patch("asyncio.create_subprocess_exec", spawn):
             task = asyncio.create_task(cli._execute("append", params={"content": "x"}))
             await asyncio.sleep(0)
             assert cli._starting == 1
-            task.cancel()
-            with pytest.raises(asyncio.CancelledError):
-                await task
-
-            closing = asyncio.create_task(cli.aclose())
-            await asyncio.sleep(0)
-            assert not closing.done()
-            materialised.set()
-            async with asyncio.timeout(5):
-                await closing
+            await _close_over_a_cancelled_spawn(cli, task, finish)
 
         guard_killpg.assert_called_once_with(process.pid, signal.SIGKILL)
         assert cli._running == set()
@@ -212,25 +226,16 @@ class TestClose:
         # may leave aclose() waiting for one that is never coming — the
         # count has to drain on the way out either way.
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
-        materialised = asyncio.Event()
+        finish = asyncio.Event()
 
         async def spawn(*args, **kwargs):
-            await materialised.wait()
+            await finish.wait()
             raise ending
 
         with patch("asyncio.create_subprocess_exec", spawn):
             task = asyncio.create_task(cli._execute("append", params={"content": "x"}))
             await asyncio.sleep(0)
-            task.cancel()
-            with pytest.raises(asyncio.CancelledError):
-                await task
-
-            closing = asyncio.create_task(cli.aclose())
-            await asyncio.sleep(0)
-            assert not closing.done()
-            materialised.set()
-            async with asyncio.timeout(5):
-                await closing
+            await _close_over_a_cancelled_spawn(cli, task, finish)
 
         guard_killpg.assert_not_called()
         assert cli._starting == 0
