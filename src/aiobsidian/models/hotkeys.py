@@ -7,6 +7,23 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 _KEYS_SEPARATOR = ", "
 
 
+def split_keys(printed: str) -> list[str]:
+    """Take apart the bindings the CLI printed as one string.
+
+    A command can carry several bindings, and the CLI joins them with
+    `", "` wherever it has one place to put them. The join is safe to
+    undo: Obsidian renders a binding as its modifiers followed by the
+    key, so a comma can only ever be the last character of one.
+
+    Args:
+        printed: Bindings as the CLI printed them.
+
+    Returns:
+        One entry per binding, and none at all for an empty string.
+    """
+    return printed.split(_KEYS_SEPARATOR) if printed else []
+
+
 class Hotkey(BaseModel):
     """The keys bound to one command.
 
@@ -28,7 +45,7 @@ class Hotkey(BaseModel):
 
     @field_validator("keys", mode="before")
     @classmethod
-    def _split_keys(cls, value: Any) -> Any:
+    def _split_column(cls, value: Any) -> Any:
         """Take apart the bindings the CLI joined into one column.
 
         Args:
@@ -39,9 +56,7 @@ class Hotkey(BaseModel):
             the CLI prints for an unbound command. Any other type is
             left alone for the field to refuse.
         """
-        if not isinstance(value, str):
-            return value
-        return value.split(_KEYS_SEPARATOR) if value else []
+        return split_keys(value) if isinstance(value, str) else value
 
     @field_validator("custom", mode="before")
     @classmethod
@@ -54,7 +69,7 @@ class Hotkey(BaseModel):
 
         Returns:
             The word as a boolean, or the value untouched if it is
-            neither, leaving the type error to the field.
+            neither of the two the CLI prints.
         """
         if value in ("custom", "default"):
             return value == "custom"
