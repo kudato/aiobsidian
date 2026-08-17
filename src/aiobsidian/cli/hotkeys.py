@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
-
+from ..models import Hotkey
+from ..models.hotkeys import _split_keys
 from ._base import BaseCLIResource
+
+_NO_HOTKEY = "(none)"
 
 
 class CLIHotkeysResource(BaseCLIResource):
@@ -14,30 +16,32 @@ class CLIHotkeysResource(BaseCLIResource):
 
     __slots__ = ()
 
-    async def get(self, command_id: str, *, verbose: bool = False) -> str:
-        """Get the hotkey binding for a command.
+    async def get(self, command_id: str) -> list[str]:
+        """Get the keys bound to one command.
+
+        The CLI can also mark the binding as the user's or Obsidian's,
+        but not for a command that has none, so `list()` is the only
+        place that answers it for every command.
 
         Args:
             command_id: Command identifier.
-            verbose: If ``True``, mark the binding as custom or default.
 
         Returns:
-            The hotkey as displayed by Obsidian (e.g. ``"⌘ ⇧ F"``, or
-            ``"⌘ ⇧ F (default)"`` with ``verbose``). ``"(none)"`` if the
-            command has no hotkey assigned.
+            Every binding, spelled the way Obsidian displays it, as in
+            `"⌘ ⇧ F"`. Empty when nothing is bound to the command.
         """
-        flags = ["verbose"] if verbose else None
+        output = await self._cli._execute("hotkey", params={"id": command_id})
+        printed = output.strip()
+        return [] if printed == _NO_HOTKEY else _split_keys(printed)
+
+    async def list(self) -> list[Hotkey]:
+        """List the hotkeys of every command.
+
+        Returns:
+            One entry per command the app knows, sorted by identifier,
+            including the commands nothing is bound to.
+        """
         output = await self._cli._execute(
-            "hotkey", params={"id": command_id}, flags=flags
+            "hotkeys", flags=["verbose"], output_format="json"
         )
-        return output.strip()
-
-    async def list(self) -> list[dict[str, Any]]:
-        """List all hotkey bindings.
-
-        Returns:
-            List of hotkey binding objects.
-        """
-        output = await self._cli._execute("hotkeys", output_format="json")
-        result: list[dict[str, Any]] = self._parse_json("hotkeys", output)
-        return result
+        return self._parse_json_rows("hotkeys", output, Hotkey)

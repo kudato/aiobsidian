@@ -4,6 +4,7 @@ import pytest
 
 from aiobsidian._exceptions import CLIParseError
 from aiobsidian.cli._base import BaseCLIResource
+from aiobsidian.models.links import Backlink
 
 
 class TestIsEmptyResult:
@@ -100,6 +101,48 @@ class TestParseJsonColumn:
     def test_invalid_json(self):
         with pytest.raises(CLIParseError):
             BaseCLIResource._parse_json_column("unresolved", "plain text", key="link")
+
+
+class TestParseJsonRows:
+    def test_rows(self):
+        output = '[{"file": "a.md", "count": "2"}, {"file": "b.md", "count": "1"}]'
+        result = BaseCLIResource._parse_json_rows("backlinks", output, Backlink)
+        assert result == [
+            Backlink(file="a.md", count=2),
+            Backlink(file="b.md", count=1),
+        ]
+
+    def test_sentinel(self):
+        result = BaseCLIResource._parse_json_rows(
+            "backlinks", "No backlinks found.\n", Backlink
+        )
+        assert result == []
+
+    def test_missing_column(self):
+        with pytest.raises(CLIParseError) as exc_info:
+            BaseCLIResource._parse_json_rows(
+                "backlinks", '[{"file": "a.md"}]', Backlink
+            )
+        assert exc_info.value.command == "backlinks"
+
+    def test_column_of_the_wrong_type(self):
+        output = '[{"file": "a.md", "count": "many"}]'
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_json_rows("backlinks", output, Backlink)
+
+    def test_not_a_list(self):
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_json_rows(
+                "backlinks", '{"file": "a.md", "count": "2"}', Backlink
+            )
+
+    def test_not_a_list_of_objects(self):
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_json_rows("backlinks", '["a.md"]', Backlink)
+
+    def test_invalid_json(self):
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_json_rows("backlinks", "plain text", Backlink)
 
 
 class TestParseLines:

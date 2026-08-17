@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
-
+from ..models import Plugin
 from ._base import BaseCLIResource
 
 
@@ -92,16 +91,14 @@ class CLIPluginsResource(BaseCLIResource):
         """
         await self._cli._execute("plugin:reload", params={"id": plugin_id})
 
-    async def list(self, *, versions: bool = False) -> list[dict[str, Any]]:
+    async def list(self) -> list[Plugin]:
         """List all installed plugins.
 
-        Args:
-            versions: If ``True``, include version information.
-
         Returns:
-            List of plugin objects.
+            Every installed plugin, core and community alike, sorted by
+            identifier. Only a community plugin carries a version.
         """
-        flags = ["versions"] if versions else None
-        output = await self._cli._execute("plugins", flags=flags, output_format="json")
-        result: list[dict[str, Any]] = self._parse_json("plugins", output)
-        return result
+        output = await self._cli._execute(
+            "plugins", flags=["versions"], output_format="json"
+        )
+        return self._parse_json_rows("plugins", output, Plugin)

@@ -2,62 +2,70 @@ from __future__ import annotations
 
 import json
 
-# The CLI sorts by tag name unless `sort=count` asks otherwise, and these
-# two happen to fall the same way under both orders.
-TAGS_LIST = [
-    {"tag": "#obsidian"},
-    {"tag": "#python"},
-]
+import pytest
 
-# `counts` adds the column, and the CLI prints the number as a string.
-TAGS_WITH_COUNTS = [
+from aiobsidian._exceptions import CLIParseError
+from aiobsidian.models.tags import Tag
+
+# The CLI sorts by tag name unless `sort=count` asks otherwise, and these
+# two happen to fall the same way under both orders. It prints the tag
+# with its sigil, and the count as a string.
+TAGS = [
     {"tag": "#obsidian", "count": "15"},
     {"tag": "#python", "count": "8"},
 ]
 
+PARSED_TAGS = [Tag(name="obsidian", count=15), Tag(name="python", count=8)]
+
 
 async def test_list(cli):
-    cli._execute.return_value = json.dumps(TAGS_LIST)
+    cli._execute.return_value = json.dumps(TAGS)
     result = await cli.tags.list()
-    assert result == TAGS_LIST
+    assert result == PARSED_TAGS
     cli._execute.assert_awaited_once_with(
-        "tags", params=None, flags=None, output_format="json"
+        "tags", params=None, flags=["counts"], output_format="json"
     )
 
 
+async def test_list_drops_the_sigil(cli):
+    cli._execute.return_value = json.dumps([{"tag": "#project/cli", "count": "3"}])
+    result = await cli.tags.list()
+    assert result[0].name == "project/cli"
+
+
+async def test_list_without_a_string_tag(cli):
+    cli._execute.return_value = json.dumps([{"tag": 7, "count": "3"}])
+    with pytest.raises(CLIParseError):
+        await cli.tags.list()
+
+
 async def test_list_sorted(cli):
-    cli._execute.return_value = json.dumps(TAGS_LIST)
+    cli._execute.return_value = json.dumps(TAGS)
     result = await cli.tags.list(sort="count")
-    assert result == TAGS_LIST
+    assert result == PARSED_TAGS
     cli._execute.assert_awaited_once_with(
-        "tags", params={"sort": "count"}, flags=None, output_format="json"
+        "tags", params={"sort": "count"}, flags=["counts"], output_format="json"
     )
 
 
 async def test_list_empty_sort(cli):
-    cli._execute.return_value = json.dumps(TAGS_LIST)
+    cli._execute.return_value = json.dumps(TAGS)
     result = await cli.tags.list(sort="")
-    assert result == TAGS_LIST
+    assert result == PARSED_TAGS
     cli._execute.assert_awaited_once_with(
-        "tags", params={"sort": ""}, flags=None, output_format="json"
+        "tags", params={"sort": ""}, flags=["counts"], output_format="json"
     )
 
 
 async def test_list_with_path(cli):
-    cli._execute.return_value = json.dumps(TAGS_LIST)
-    result = await cli.tags.list(path="notes")
-    assert result == TAGS_LIST
+    cli._execute.return_value = json.dumps(TAGS)
+    result = await cli.tags.list(path="notes/setup.md")
+    assert result == PARSED_TAGS
     cli._execute.assert_awaited_once_with(
-        "tags", params={"path": "notes"}, flags=None, output_format="json"
-    )
-
-
-async def test_list_with_counts(cli):
-    cli._execute.return_value = json.dumps(TAGS_WITH_COUNTS)
-    result = await cli.tags.list(counts=True)
-    assert result == TAGS_WITH_COUNTS
-    cli._execute.assert_awaited_once_with(
-        "tags", params=None, flags=["counts"], output_format="json"
+        "tags",
+        params={"path": "notes/setup.md"},
+        flags=["counts"],
+        output_format="json",
     )
 
 

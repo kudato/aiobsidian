@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
-
+from ..models import Tag
 from ._base import BaseCLIResource
 
 
@@ -34,27 +33,24 @@ class CLITagsResource(BaseCLIResource):
         *,
         sort: str | None = None,
         path: str | None = None,
-        counts: bool = False,
-    ) -> list[dict[str, Any]]:
+    ) -> list[Tag]:
         """List all tags in the vault.
 
         Args:
             sort: Sort order (e.g. ``"count"`` to sort by frequency).
             path: Restrict to the tags of this one file. The CLI refuses
                 a folder: there is no way to scope the listing to one.
-            counts: If ``True``, include usage counts per tag.
 
         Returns:
-            List of tag objects.
+            Every tag with its usage count, in the order the CLI sorted
+            them.
         """
         params: dict[str, str] = {}
         if sort is not None:
             params["sort"] = sort
         if path is not None:
             params["path"] = path
-        flags = ["counts"] if counts else None
         output = await self._cli._execute(
-            "tags", params=params or None, flags=flags, output_format="json"
+            "tags", params=params or None, flags=["counts"], output_format="json"
         )
-        result: list[dict[str, Any]] = self._parse_json("tags", output)
-        return result
+        return self._parse_json_rows("tags", output, Tag)
