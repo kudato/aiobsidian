@@ -94,7 +94,8 @@ class ObsidianCLI:
         self._binary = self._resolve_binary(binary)
         self._running: set[asyncio.subprocess.Process] = set()
         self._killed_by_close: set[asyncio.subprocess.Process] = set()
-        self._starting = 0
+        self._collecting: set[asyncio.Task[None]] = set()
+        self._unsettled = 0
         self._settled = asyncio.Event()
         self._settled.set()
         self._closed = False
@@ -196,10 +197,15 @@ class ObsidianCLI:
 
         Cancelling a running command kills it and everything it started
         before the cancellation propagates, so no orphan keeps writing to the
-        vault and `asyncio.timeout` around a call is safe. Cancellation during
-        the spawn itself is the exception: asyncio kills the command but
-        cannot reach a child it had already started. The command gets no
-        stdin, so one waiting for input fails instead of hanging.
+        vault and `asyncio.timeout` around a call is safe. A cancellation
+        arriving during the spawn is answered the other way round: the
+        command has no pid to signal yet and starts regardless, so the
+        cancellation propagates at once and the command is killed as soon as
+        it exists — which `aclose()` waits for. A loop that stops inside that
+        same window is the one thing beyond reach: it cancels the spawn along
+        with everything else, and asyncio kills the command without reaching a
+        child of its own. The command gets no stdin, so one waiting for input
+        fails instead of hanging.
 
         Args:
             command: CLI command name (e.g. `"read"`, `"daily:path"`).
@@ -239,11 +245,10 @@ class ObsidianCLI:
         # Counted from here, before the spawn can be awaited, so that a
         # concurrent aclose() knows a command exists that is not in
         # _running yet and waits for it rather than returning early.
-        self._starting += 1
-        self._settled.clear()
+        self._unsettle()
         try:
-            try:
-                process = await asyncio.create_subprocess_exec(
+            spawn = asyncio.create_task(
+                asyncio.create_subprocess_exec(
                     *args,
                     stdin=asyncio.subprocess.DEVNULL,
                     stdout=asyncio.subprocess.PIPE,
@@ -252,6 +257,22 @@ class ObsidianCLI:
                     # stops whatever it started. See _kill.
                     start_new_session=True,
                 )
+            )
+            try:
+                # Shielded, because a spawn cannot be called off: the
+                # command starts whether or not anyone is still waiting
+                # for it. Cancelling the wait would throw away the pid it
+                # is about to yield, and with it the only way to reach a
+                # child the command has started in the meantime.
+                process = await asyncio.shield(spawn)
+            except asyncio.CancelledError:
+                # Counted a second time, and only from here: this call is
+                # still inside the `finally` that lowers its own count, so
+                # the total never reaches zero in between and aclose()
+                # goes on waiting for a command that is on its way.
+                self._unsettle()
+                spawn.add_done_callback(self._reclaim)
+                raise
             except OSError as exc:
                 raise BinaryNotFoundError(
                     f"Obsidian CLI binary {self._binary!r} could not be executed: "
@@ -259,9 +280,7 @@ class ObsidianCLI:
                 ) from exc
             self._running.add(process)
         finally:
-            self._starting -= 1
-            if not self._starting:
-                self._settled.set()
+            self._settle()
 
         # Registering and re-checking without an await in between is what
         # makes this safe: aclose() either set _closed before the check,
@@ -364,6 +383,74 @@ class ObsidianCLI:
         """
         cls._signal(process)
         await cls._reap(process)
+
+    def _reclaim(self, spawn: asyncio.Task[asyncio.subprocess.Process]) -> None:
+        """Kill a command nobody is waiting for any more.
+
+        Hung off the spawn rather than run as a task of its own, because
+        a callback cannot be cancelled: whatever became of the call that
+        started the command, the signal goes out the moment its pid
+        exists.
+
+        A spawn that failed, or that a stopping loop cancelled along with
+        everything else, hands back no pid at all. There is nothing to
+        aim at and nothing still coming, so the command simply stops
+        being counted.
+
+        Args:
+            spawn: The finished subprocess creation the cancellation left
+                behind.
+        """
+        if spawn.cancelled() or spawn.exception() is not None:
+            self._settle()
+            return
+        process = spawn.result()
+        self._signal(process)
+        # Counted until the corpse is collected rather than until the
+        # signal is sent: a signalled command is not a stopped one until
+        # the OS says so, and stopped is what aclose() promises.
+        collecting = asyncio.create_task(self._collect(process))
+        self._collecting.add(collecting)
+        collecting.add_done_callback(self._collecting.discard)
+
+    async def _collect(self, process: asyncio.subprocess.Process) -> None:
+        """Wait for a reclaimed command to die, then stop counting it.
+
+        Cancelling this gives up the waiting and not the killing: the
+        signal went out before this was ever scheduled. Only a loop
+        shutting down can cancel it, and then there is nobody left for
+        the count to be true for.
+
+        Args:
+            process: The signalled process to wait for.
+        """
+        try:
+            await self._reap(process)
+        finally:
+            self._settle()
+
+    def _unsettle(self) -> None:
+        """Count one more command whose fate is undecided.
+
+        Coming up, or up and being killed off — either way `aclose()`
+        cannot yet promise that nothing of it is running. The count and
+        the event are one fact in two spellings, the event being set
+        exactly when the count is zero, so both are kept here rather
+        than at each place a command comes and goes.
+        """
+        self._unsettled += 1
+        self._settled.clear()
+
+    def _settle(self) -> None:
+        """Count one command whose fate is decided.
+
+        Decided, not successful: it is running, or the OS refused it, or
+        it is dead. Any of the three is something `aclose()` can act on,
+        which is all the count is for.
+        """
+        self._unsettled -= 1
+        if not self._unsettled:
+            self._settled.set()
 
     @staticmethod
     def _build_error(
@@ -603,12 +690,11 @@ class ObsidianCLI:
         before anything is awaited, so a cancellation there can only
         interrupt the collecting of processes that are already dead.
 
-        A command caught mid-spawn is what that cannot cover. It has no
-        pid yet, so there is nothing to signal on its behalf; this call
-        waits for it instead, and cancelling that wait hands the killing
-        back to the command's own task, which does it as soon as it
-        runs. If that task is cancelled in the same window, asyncio
-        kills the command but not a child the command had started.
+        A command caught mid-spawn is waited for instead of signalled: it
+        has no pid yet, so there is nothing to aim at on its behalf. One
+        that was abandoned mid-spawn is killed by the spawn itself as
+        soon as its pid exists, so cancelling that wait gives up the
+        waiting and not the killing.
 
         Closed is final: any further command raises `RuntimeError`.
         Calling this more than once is harmless.
@@ -634,6 +720,6 @@ class ObsidianCLI:
             # this call started. Waiting for it is what makes the
             # guarantee above true at the moment aclose() returns,
             # rather than whenever its owner task next runs.
-            if not self._starting:
+            if not self._unsettled:
                 return
             await self._settled.wait()
