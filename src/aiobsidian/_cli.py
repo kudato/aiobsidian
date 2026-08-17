@@ -94,6 +94,7 @@ class ObsidianCLI:
         self._binary = self._resolve_binary(binary)
         self._running: set[asyncio.subprocess.Process] = set()
         self._killed_by_close: set[asyncio.subprocess.Process] = set()
+        self._reclaiming: set[asyncio.Task[None]] = set()
         self._starting = 0
         self._settled = asyncio.Event()
         self._settled.set()
@@ -196,10 +197,12 @@ class ObsidianCLI:
 
         Cancelling a running command kills it and everything it started
         before the cancellation propagates, so no orphan keeps writing to the
-        vault and `asyncio.timeout` around a call is safe. Cancellation during
-        the spawn itself is the exception: asyncio kills the command but
-        cannot reach a child it had already started. The command gets no
-        stdin, so one waiting for input fails instead of hanging.
+        vault and `asyncio.timeout` around a call is safe. A cancellation
+        arriving during the spawn is answered the other way round: the
+        command has no pid to signal yet and starts regardless, so the
+        cancellation propagates at once and the command is killed as soon as
+        it exists — which `aclose()` waits for. The command gets no stdin, so
+        one waiting for input fails instead of hanging.
 
         Args:
             command: CLI command name (e.g. `"read"`, `"daily:path"`).
@@ -242,8 +245,8 @@ class ObsidianCLI:
         self._starting += 1
         self._settled.clear()
         try:
-            try:
-                process = await asyncio.create_subprocess_exec(
+            spawn = asyncio.create_task(
+                asyncio.create_subprocess_exec(
                     *args,
                     stdin=asyncio.subprocess.DEVNULL,
                     stdout=asyncio.subprocess.PIPE,
@@ -252,6 +255,17 @@ class ObsidianCLI:
                     # stops whatever it started. See _kill.
                     start_new_session=True,
                 )
+            )
+            try:
+                # Shielded, because a spawn cannot be called off: the
+                # command starts whether or not anyone is still waiting
+                # for it. Cancelling the wait would throw away the pid it
+                # is about to yield, and with it the only way to reach a
+                # child the command has started in the meantime.
+                process = await asyncio.shield(spawn)
+            except asyncio.CancelledError:
+                self._reclaim_later(spawn)
+                raise
             except OSError as exc:
                 raise BinaryNotFoundError(
                     f"Obsidian CLI binary {self._binary!r} could not be executed: "
@@ -364,6 +378,47 @@ class ObsidianCLI:
         """
         cls._signal(process)
         await cls._reap(process)
+
+    def _reclaim_later(self, spawn: asyncio.Task[asyncio.subprocess.Process]) -> None:
+        """Take over a spawn the call that started it was cancelled out of.
+
+        The command is counted a second time, and only from here: the
+        cancelled call is still inside the `try` that lowers its own
+        count, so the total never reaches zero in between and `aclose()`
+        goes on waiting for a command that is on its way rather than
+        returning while it comes up.
+
+        Args:
+            spawn: The subprocess creation the cancellation left running.
+        """
+        self._starting += 1
+        reclaiming = asyncio.create_task(self._reclaim(spawn))
+        # The loop holds no strong reference to a task of its own, and
+        # losing this one mid-flight would leave both the command it is
+        # about to kill and the count it is about to lower behind.
+        self._reclaiming.add(reclaiming)
+        reclaiming.add_done_callback(self._reclaiming.discard)
+
+    async def _reclaim(self, spawn: asyncio.Task[asyncio.subprocess.Process]) -> None:
+        """Kill a command nobody is waiting for any more.
+
+        The spawn is awaited rather than cancelled, because half of it
+        has already happened: what it yields is a running command, and
+        its pid is the only way to reach a child that command started
+        while it was coming up. That child is what asyncio's own teardown
+        misses — it kills the process it holds, never the group.
+
+        Args:
+            spawn: The subprocess creation the cancellation left running.
+        """
+        try:
+            with contextlib.suppress(OSError):
+                process = await spawn
+                await self._kill(process)
+        finally:
+            self._starting -= 1
+            if not self._starting:
+                self._settled.set()
 
     @staticmethod
     def _build_error(
@@ -603,12 +658,11 @@ class ObsidianCLI:
         before anything is awaited, so a cancellation there can only
         interrupt the collecting of processes that are already dead.
 
-        A command caught mid-spawn is what that cannot cover. It has no
-        pid yet, so there is nothing to signal on its behalf; this call
-        waits for it instead, and cancelling that wait hands the killing
-        back to the command's own task, which does it as soon as it
-        runs. If that task is cancelled in the same window, asyncio
-        kills the command but not a child the command had started.
+        A command caught mid-spawn is waited for instead of signalled: it
+        has no pid yet, so there is nothing to aim at on its behalf.
+        Cancelling that wait hands the killing back to the command's own
+        task, which does it as soon as the pid exists — whether or not
+        that task is itself cancelled in the same window.
 
         Closed is final: any further command raises `RuntimeError`.
         Calling this more than once is harmless.

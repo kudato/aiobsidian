@@ -161,6 +161,42 @@ class TestClose:
         assert signalled_by_first_await == 3
         assert cli._running == set()
 
+    async def test_cancelling_a_spawn_kills_the_command_it_yields(self, guard_killpg):
+        # A cancel delivered while the spawn is still running leaves
+        # nobody holding the command it is about to produce. The spawn is
+        # held open here so the cancel lands inside that window, and
+        # aclose() is what shows the command was not abandoned to it:
+        # it must not return while one is still coming up, and the group
+        # must be signalled by the time it does.
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        materialised = asyncio.Event()
+        process = _mock_process(returncode=None)
+        process.pid = 4242
+        process.kill = MagicMock()
+
+        async def spawn(*args, **kwargs):
+            await materialised.wait()
+            return process
+
+        with patch("asyncio.create_subprocess_exec", spawn):
+            task = asyncio.create_task(cli._execute("append", params={"content": "x"}))
+            await asyncio.sleep(0)
+            assert cli._starting == 1
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+            closing = asyncio.create_task(cli.aclose())
+            await asyncio.sleep(0)
+            assert not closing.done()
+            materialised.set()
+            async with asyncio.timeout(5):
+                await closing
+
+        guard_killpg.assert_called_once_with(process.pid, signal.SIGKILL)
+        assert cli._running == set()
+        assert cli._starting == 0
+
     async def test_an_external_kill_is_not_blamed_on_the_close(self):
         # Signal death plus a closed client is not proof that the close
         # did it: something else may have killed the command, and then
@@ -373,6 +409,42 @@ class TestCloseKillsRealProcesses:
                 await task
         assert cli._running == set()
         assert cli._starting == 0
+
+    async def test_cancelling_a_spawn_kills_the_child_the_command_started(
+        self, tmp_path
+    ):
+        # The window held open rather than raced for. Left alone,
+        # create_subprocess_exec returns long before the shell has
+        # forked, and a cancel timed to land inside it would be timing
+        # the fork instead of the fix. What the wrapper reproduces is
+        # where the cancel lands — inside the await on the spawn, with a
+        # grandchild already alive and no pid in anyone's hands.
+        binary, marker = _slow_binary(tmp_path, leader_waits=True)
+        cli = ObsidianCLI("TestVault", binary=str(binary))
+        spawning = asyncio.create_subprocess_exec
+        forked = asyncio.Event()
+        finish = asyncio.Event()
+
+        async def hold_the_spawn(*args, **kwargs):
+            process = await spawning(*args, **kwargs)
+            forked.set()
+            await finish.wait()
+            return process
+
+        with patch("asyncio.create_subprocess_exec", hold_the_spawn):
+            task = asyncio.create_task(cli._execute("read", params={"path": "big.md"}))
+            async with asyncio.timeout(5):
+                await forked.wait()
+            child = await _await_child_pid(marker)
+
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            finish.set()
+
+            await _assert_dead(child)
+            async with asyncio.timeout(5):
+                await cli.aclose()
 
     async def test_a_command_spawned_during_aclose_says_which_race_it_lost(
         self, tmp_path
@@ -682,8 +754,13 @@ class TestErrorDetection:
 class TestProcessLifecycle:
     async def test_cancellation_kills_the_child(self):
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        running = asyncio.Event()
 
         async def hang():
+            # Cancelling before this point is a different case with a
+            # different answer, so the command says when it is running
+            # rather than the test guessing how many turns that takes.
+            running.set()
             await asyncio.Event().wait()
 
         process = AsyncMock()
@@ -696,7 +773,7 @@ class TestProcessLifecycle:
             task = asyncio.create_task(
                 cli._execute("create", params={"path": "big.md"})
             )
-            await asyncio.sleep(0)
+            await running.wait()
             task.cancel()
             with pytest.raises(asyncio.CancelledError):
                 await task
