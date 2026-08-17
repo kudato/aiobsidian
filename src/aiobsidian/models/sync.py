@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 _USAGE_KEY = "account usage"
 _USAGE_SEPARATOR = " / "
-_SIZES = ("vault_size", "account_used", "account_limit")
+_SIZE_FIELDS = ("vault_size", "account_used", "account_limit")
 
 
 class SyncStatus(BaseModel):
@@ -92,8 +92,8 @@ class SyncStatus(BaseModel):
         Raises:
             ValueError: If it reports some of the three and not the rest.
         """
-        reported = [name for name in _SIZES if getattr(self, name) is not None]
-        if reported and len(reported) != len(_SIZES):
+        reported = [name for name in _SIZE_FIELDS if getattr(self, name) is not None]
+        if reported and len(reported) != len(_SIZE_FIELDS):
             raise ValueError(
                 "the quota is reported whole or not at all, "
                 f"and this reports {', '.join(reported)} alone"
