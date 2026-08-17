@@ -94,7 +94,6 @@ class ObsidianCLI:
         self._binary = self._resolve_binary(binary)
         self._running: set[asyncio.subprocess.Process] = set()
         self._killed_by_close: set[asyncio.subprocess.Process] = set()
-        self._reclaiming: set[asyncio.Task[None]] = set()
         self._starting = 0
         self._settled = asyncio.Event()
         self._settled.set()
@@ -242,8 +241,7 @@ class ObsidianCLI:
         # Counted from here, before the spawn can be awaited, so that a
         # concurrent aclose() knows a command exists that is not in
         # _running yet and waits for it rather than returning early.
-        self._starting += 1
-        self._settled.clear()
+        self._one_more_starting()
         try:
             spawn = asyncio.create_task(
                 asyncio.create_subprocess_exec(
@@ -264,7 +262,12 @@ class ObsidianCLI:
                 # child the command has started in the meantime.
                 process = await asyncio.shield(spawn)
             except asyncio.CancelledError:
-                self._reclaim_later(spawn)
+                # Counted a second time, and only from here: this call is
+                # still inside the `finally` that lowers its own count, so
+                # the total never reaches zero in between and aclose()
+                # goes on waiting for a command that is on its way.
+                self._one_more_starting()
+                spawn.add_done_callback(self._reclaim)
                 raise
             except OSError as exc:
                 raise BinaryNotFoundError(
@@ -273,9 +276,7 @@ class ObsidianCLI:
                 ) from exc
             self._running.add(process)
         finally:
-            self._starting -= 1
-            if not self._starting:
-                self._settled.set()
+            self._one_fewer_starting()
 
         # Registering and re-checking without an await in between is what
         # makes this safe: aclose() either set _closed before the check,
@@ -379,46 +380,50 @@ class ObsidianCLI:
         cls._signal(process)
         await cls._reap(process)
 
-    def _reclaim_later(self, spawn: asyncio.Task[asyncio.subprocess.Process]) -> None:
-        """Take over a spawn the call that started it was cancelled out of.
-
-        The command is counted a second time, and only from here: the
-        cancelled call is still inside the `try` that lowers its own
-        count, so the total never reaches zero in between and `aclose()`
-        goes on waiting for a command that is on its way rather than
-        returning while it comes up.
-
-        Args:
-            spawn: The subprocess creation the cancellation left running.
-        """
-        self._starting += 1
-        reclaiming = asyncio.create_task(self._reclaim(spawn))
-        # The loop holds no strong reference to a task of its own, and
-        # losing this one mid-flight would leave both the command it is
-        # about to kill and the count it is about to lower behind.
-        self._reclaiming.add(reclaiming)
-        reclaiming.add_done_callback(self._reclaiming.discard)
-
-    async def _reclaim(self, spawn: asyncio.Task[asyncio.subprocess.Process]) -> None:
+    def _reclaim(self, spawn: asyncio.Task[asyncio.subprocess.Process]) -> None:
         """Kill a command nobody is waiting for any more.
 
-        The spawn is awaited rather than cancelled, because half of it
-        has already happened: what it yields is a running command, and
-        its pid is the only way to reach a child that command started
-        while it was coming up. That child is what asyncio's own teardown
-        misses — it kills the process it holds, never the group.
+        Hung off the spawn rather than run as a task of its own, because
+        a callback cannot be cancelled: the command dies the moment its
+        pid exists, even if what cancelled the call was the loop being
+        torn down. Signalling is the whole of it — the group is dead
+        before this returns, and asyncio collects the corpse.
+
+        A spawn that failed or was cancelled with the loop leaves no pid
+        to aim at, and nothing that could still start. Either way this is
+        where the command stops being counted, because either way there
+        is nothing left for `aclose()` to wait for.
 
         Args:
-            spawn: The subprocess creation the cancellation left running.
+            spawn: The finished subprocess creation the cancellation left
+                behind.
         """
         try:
-            with contextlib.suppress(OSError):
-                process = await spawn
-                await self._kill(process)
+            if not spawn.cancelled() and spawn.exception() is None:
+                self._signal(spawn.result())
         finally:
-            self._starting -= 1
-            if not self._starting:
-                self._settled.set()
+            self._one_fewer_starting()
+
+    def _one_more_starting(self) -> None:
+        """Count a command that has begun starting.
+
+        The count and the event are one fact in two spellings — the
+        event is set exactly when the count is zero — so both are kept
+        here rather than at each place a command comes and goes.
+        """
+        self._starting += 1
+        self._settled.clear()
+
+    def _one_fewer_starting(self) -> None:
+        """Count a command that has finished starting.
+
+        Finished either way: running, refused by the OS, or killed
+        before anyone could use it. What the count tells `aclose()` is
+        that nothing is on its way, not that anything succeeded.
+        """
+        self._starting -= 1
+        if not self._starting:
+            self._settled.set()
 
     @staticmethod
     def _build_error(

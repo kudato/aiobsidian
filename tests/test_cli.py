@@ -161,7 +161,9 @@ class TestClose:
         assert signalled_by_first_await == 3
         assert cli._running == set()
 
-    async def test_cancelling_a_spawn_kills_the_command_it_yields(self, guard_killpg):
+    async def test_aclose_waits_for_a_command_a_cancel_left_starting(
+        self, guard_killpg
+    ):
         # A cancel delivered while the spawn is still running leaves
         # nobody holding the command it is about to produce. The spawn is
         # held open here so the cancel lands inside that window, and
@@ -195,6 +197,42 @@ class TestClose:
 
         guard_killpg.assert_called_once_with(process.pid, signal.SIGKILL)
         assert cli._running == set()
+        assert cli._starting == 0
+
+    @pytest.mark.parametrize(
+        "ending",
+        [OSError(2, "No such file or directory"), asyncio.CancelledError()],
+        ids=["the binary could not be executed", "the loop was torn down"],
+    )
+    async def test_aclose_returns_when_a_spawn_left_starting_yields_nothing(
+        self, guard_killpg, ending
+    ):
+        # Two ways for a spawn nobody is waiting for any more to end
+        # without a pid. Neither leaves a command to kill, and neither
+        # may leave aclose() waiting for one that is never coming — the
+        # count has to drain on the way out either way.
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        materialised = asyncio.Event()
+
+        async def spawn(*args, **kwargs):
+            await materialised.wait()
+            raise ending
+
+        with patch("asyncio.create_subprocess_exec", spawn):
+            task = asyncio.create_task(cli._execute("append", params={"content": "x"}))
+            await asyncio.sleep(0)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+            closing = asyncio.create_task(cli.aclose())
+            await asyncio.sleep(0)
+            assert not closing.done()
+            materialised.set()
+            async with asyncio.timeout(5):
+                await closing
+
+        guard_killpg.assert_not_called()
         assert cli._starting == 0
 
     async def test_an_external_kill_is_not_blamed_on_the_close(self):
@@ -410,7 +448,7 @@ class TestCloseKillsRealProcesses:
         assert cli._running == set()
         assert cli._starting == 0
 
-    async def test_cancelling_a_spawn_kills_the_child_the_command_started(
+    async def test_execute_cancelled_mid_spawn_kills_the_child_it_started(
         self, tmp_path
     ):
         # The window held open rather than raced for. Left alone,
