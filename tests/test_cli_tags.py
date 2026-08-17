@@ -3,6 +3,12 @@ from __future__ import annotations
 import json
 
 TAGS_LIST = [
+    {"tag": "#python"},
+    {"tag": "#obsidian"},
+]
+
+# `counts` adds the column, and the CLI prints the number as a string.
+TAGS_WITH_COUNTS = [
     {"tag": "#python", "count": "15"},
     {"tag": "#obsidian", "count": "8"},
 ]
@@ -45,9 +51,9 @@ async def test_list_with_path(cli):
 
 
 async def test_list_with_counts(cli):
-    cli._execute.return_value = json.dumps(TAGS_LIST)
+    cli._execute.return_value = json.dumps(TAGS_WITH_COUNTS)
     result = await cli.tags.list(counts=True)
-    assert result == TAGS_LIST
+    assert result == TAGS_WITH_COUNTS
     cli._execute.assert_awaited_once_with(
         "tags", params=None, flags=["counts"], output_format="json"
     )

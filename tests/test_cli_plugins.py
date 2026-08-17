@@ -3,8 +3,15 @@ from __future__ import annotations
 import json
 
 PLUGINS = [
+    {"id": "backlink"},
     {"id": "dataview"},
-    {"id": "templater"},
+]
+
+# Core plugins ship with the app and report no version; only community
+# ones carry a number.
+PLUGINS_WITH_VERSIONS = [
+    {"id": "backlink", "version": ""},
+    {"id": "dataview", "version": "0.5.68"},
 ]
 
 ENABLED_PLUGINS = [
@@ -40,9 +47,9 @@ async def test_list(cli):
 
 
 async def test_list_with_versions(cli):
-    cli._execute.return_value = json.dumps(PLUGINS)
+    cli._execute.return_value = json.dumps(PLUGINS_WITH_VERSIONS)
     result = await cli.plugins.list(versions=True)
-    assert result == PLUGINS
+    assert result == PLUGINS_WITH_VERSIONS
     cli._execute.assert_awaited_once_with(
         "plugins", flags=["versions"], output_format="json"
     )
