@@ -5,6 +5,8 @@ and the second one is easy to forget. These tests fail when a subpackage
 defines something public that its `__all__` does not name.
 """
 
+from __future__ import annotations
+
 import importlib
 import pkgutil
 
@@ -31,7 +33,7 @@ def _raise(name):
     raise
 
 
-def _defined_names(package, base):
+def _public_subclass_names(package, base):
     """Collect the public classes a package defines across its modules.
 
     Args:
@@ -70,7 +72,7 @@ IDS = [package.__name__ for package, _ in PACKAGES]
 
 @pytest.mark.parametrize(("package", "base"), PACKAGES, ids=IDS)
 def test_all_matches_what_the_package_defines(package, base):
-    assert set(package.__all__) == _defined_names(package, base)
+    assert set(package.__all__) == _public_subclass_names(package, base)
 
 
 @pytest.mark.parametrize(("package", "base"), PACKAGES, ids=IDS)

@@ -27,7 +27,7 @@ def _spells_a_number(printed: str) -> bool:
     return True
 
 
-class _MomentsInMilliseconds(BaseModel):
+class _MomentsFromMilliseconds(BaseModel):
     """What both file records read their two moments by.
 
     Obsidian keeps one file system record and this library is handed it
@@ -96,7 +96,7 @@ class _MomentsInMilliseconds(BaseModel):
         return value.astimezone(UTC)
 
 
-class FileStat(_MomentsInMilliseconds):
+class FileStat(_MomentsFromMilliseconds):
     """File system metadata for a vault file.
 
     The plugin passes Obsidian's own record on untouched, so the two
@@ -197,7 +197,7 @@ class FolderInfo(BaseModel):
     size: int
 
 
-class FileInfo(_MomentsInMilliseconds):
+class FileInfo(_MomentsFromMilliseconds):
     """A file in the vault.
 
     The two moments are moments in UTC, and a moment handed to the model
