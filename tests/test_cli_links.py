@@ -6,6 +6,11 @@ INCOMING = [
     {"file": "projects/main.md"},
 ]
 
+# `counts` adds how many times that note links here, as a string.
+INCOMING_WITH_COUNTS = [
+    {"file": "projects/main.md", "count": "2"},
+]
+
 UNRESOLVED = [
     {"link": "missing-note"},
 ]
@@ -34,9 +39,9 @@ async def test_incoming(cli):
 
 
 async def test_incoming_with_counts(cli):
-    cli._execute.return_value = json.dumps(INCOMING)
+    cli._execute.return_value = json.dumps(INCOMING_WITH_COUNTS)
     result = await cli.links.incoming("note.md", counts=True)
-    assert result == INCOMING
+    assert result == INCOMING_WITH_COUNTS
     cli._execute.assert_awaited_once_with(
         "backlinks",
         params={"path": "note.md"},
@@ -54,8 +59,14 @@ async def test_incoming_without_backlinks(cli):
 async def test_unresolved(cli):
     cli._execute.return_value = json.dumps(UNRESOLVED)
     result = await cli.links.unresolved()
-    assert result == UNRESOLVED
+    assert result == ["missing-note"]
     cli._execute.assert_awaited_once_with("unresolved", output_format="json")
+
+
+async def test_unresolved_without_broken_links(cli):
+    cli._execute.return_value = "No unresolved links found.\n"
+    result = await cli.links.unresolved()
+    assert result == []
 
 
 async def test_orphans(cli):

@@ -3,12 +3,23 @@ from __future__ import annotations
 import json
 
 PLUGINS = [
-    {"id": "dataview"},
-    {"id": "templater"},
+    {"id": "backlink"},
+    {"id": "bookmarks"},
+    {"id": "obsidian-local-rest-api"},
 ]
 
+# Core plugins ship with the app and report no version; only community
+# ones carry a number.
+PLUGINS_WITH_VERSIONS = [
+    {"id": "backlink", "version": ""},
+    {"id": "bookmarks", "version": ""},
+    {"id": "obsidian-local-rest-api", "version": "5.1.0"},
+]
+
+# The community plugin is installed but switched off.
 ENABLED_PLUGINS = [
-    {"id": "dataview"},
+    {"id": "backlink"},
+    {"id": "bookmarks"},
 ]
 
 
@@ -39,9 +50,9 @@ async def test_list(cli):
 
 
 async def test_list_with_versions(cli):
-    cli._execute.return_value = json.dumps(PLUGINS)
+    cli._execute.return_value = json.dumps(PLUGINS_WITH_VERSIONS)
     result = await cli.plugins.list(versions=True)
-    assert result == PLUGINS
+    assert result == PLUGINS_WITH_VERSIONS
     cli._execute.assert_awaited_once_with(
         "plugins", flags=["versions"], output_format="json"
     )
@@ -50,7 +61,7 @@ async def test_list_with_versions(cli):
 async def test_enabled(cli):
     cli._execute.return_value = json.dumps(ENABLED_PLUGINS)
     result = await cli.plugins.enabled()
-    assert result == ENABLED_PLUGINS
+    assert result == ["backlink", "bookmarks"]
     cli._execute.assert_awaited_once_with("plugins:enabled", output_format="json")
 
 

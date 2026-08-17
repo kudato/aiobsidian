@@ -56,6 +56,52 @@ class TestParseJson:
         assert exc_info.value.output == "plain text output"
 
 
+class TestParseJsonColumn:
+    def test_column(self):
+        output = '[{"id": "backlink"}, {"id": "bookmarks"}]'
+        result = BaseCLIResource._parse_json_column("plugins:enabled", output, key="id")
+        assert result == ["backlink", "bookmarks"]
+
+    def test_sentinel(self):
+        result = BaseCLIResource._parse_json_column(
+            "unresolved", "No unresolved links found.\n", key="link"
+        )
+        assert result == []
+
+    def test_ignores_the_other_columns(self):
+        output = '[{"id": "backlink", "version": ""}]'
+        result = BaseCLIResource._parse_json_column("plugins:enabled", output, key="id")
+        assert result == ["backlink"]
+
+    def test_missing_key(self):
+        with pytest.raises(CLIParseError) as exc_info:
+            BaseCLIResource._parse_json_column(
+                "unresolved", '[{"target": "missing-note"}]', key="link"
+            )
+        assert exc_info.value.command == "unresolved"
+
+    @pytest.mark.parametrize("output", ['[{"link": 1}]', '[{"link": null}]'])
+    def test_non_string_value(self, output):
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_json_column("unresolved", output, key="link")
+
+    def test_not_a_list(self):
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_json_column(
+                "plugins:enabled", '{"id": "backlink"}', key="id"
+            )
+
+    def test_not_a_list_of_objects(self):
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_json_column(
+                "plugins:enabled", '["backlink"]', key="id"
+            )
+
+    def test_invalid_json(self):
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_json_column("unresolved", "plain text", key="link")
+
+
 class TestParseLines:
     def test_lines(self):
         assert BaseCLIResource._parse_lines("a.md\nb.md\n") == ["a.md", "b.md"]
