@@ -7,7 +7,8 @@ from aiobsidian.models.bookmarks import Bookmark
 # `verbose` prints the type and the title beside the value. A file
 # bookmark carries its subpath in the value, a search bookmark falls back
 # to its query for a title, a url bookmark left untitled has none, and a
-# group points at nothing at all.
+# group points at nothing at all. The listing is flat, so the bookmark
+# held by the group follows it as an entry of its own.
 BOOKMARKS = [
     {"type": "file", "value": "notes/important.md", "title": "important"},
     {"type": "file", "value": "notes/important.md#Setup", "title": "important#Setup"},
@@ -15,6 +16,7 @@ BOOKMARKS = [
     {"type": "search", "value": "tag:#todo", "title": "tag:#todo"},
     {"type": "url", "value": "https://obsidian.md", "title": ""},
     {"type": "group", "value": "", "title": "Reading"},
+    {"type": "file", "value": "books/dune.md", "title": "dune"},
 ]
 
 
@@ -30,6 +32,7 @@ async def test_list(cli):
         Bookmark(type="search", value="tag:#todo", title="tag:#todo"),
         Bookmark(type="url", value="https://obsidian.md", title=""),
         Bookmark(type="group", value="", title="Reading"),
+        Bookmark(type="file", value="books/dune.md", title="dune"),
     ]
     cli._execute.assert_awaited_once_with(
         "bookmarks", flags=["verbose"], output_format="json"

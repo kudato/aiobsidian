@@ -4,10 +4,11 @@ import json
 
 from aiobsidian.models.links import Backlink
 
-# `counts` adds how many times that note links here, as a string.
+# The CLI sorts by path and prints how many times that note links here
+# as a string.
 INCOMING = [
-    {"file": "projects/main.md", "count": "2"},
     {"file": "notes/setup.md", "count": "1"},
+    {"file": "projects/main.md", "count": "2"},
 ]
 
 UNRESOLVED = [
@@ -32,8 +33,8 @@ async def test_incoming(cli):
     cli._execute.return_value = json.dumps(INCOMING)
     result = await cli.links.incoming("note.md")
     assert result == [
-        Backlink(file="projects/main.md", count=2),
         Backlink(file="notes/setup.md", count=1),
+        Backlink(file="projects/main.md", count=2),
     ]
     cli._execute.assert_awaited_once_with(
         "backlinks",

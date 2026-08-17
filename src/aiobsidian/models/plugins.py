@@ -13,11 +13,12 @@ class Plugin(BaseModel):
             `plugins.enable()` and `plugins.disable()` take.
         version: Version of a community plugin, or `None` for a core
             plugin — those ship with Obsidian and carry no version of
-            their own.
+            their own. Required, so a listing printed without the
+            column is refused rather than read as all-core.
     """
 
     id: str
-    version: str | None = None
+    version: str | None
 
     @field_validator("version", mode="before")
     @classmethod

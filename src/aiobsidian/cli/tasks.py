@@ -28,11 +28,15 @@ class CLITasksResource(BaseCLIResource):
         """List tasks across the vault.
 
         Args:
-            path: Restrict to tasks in files under this path.
+            path: Restrict to the tasks of this one file. The CLI
+                refuses a folder: there is no way to scope the listing
+                to one. Ignored when ``daily`` is given.
             daily: If ``True``, only list tasks from the daily note.
             done: If ``True``, list only tasks whose status box is not
                 blank: completed ones and any custom status character.
             todo: If ``True``, list only tasks with a blank status box.
+                Ignored when ``done`` is given, which the CLI reads
+                first.
 
         Returns:
             The tasks, sorted by file and then by line. Each carries the

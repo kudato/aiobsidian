@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 
 _TODO_STATUS = " "
 
@@ -26,6 +26,7 @@ class Task(BaseModel):
     file: str
     line: int
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def done(self) -> bool:
         """Whether Obsidian counts the task as done.

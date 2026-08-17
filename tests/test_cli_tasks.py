@@ -35,6 +35,7 @@ async def test_list(cli):
 async def test_list_reports_the_line_as_a_number(cli):
     cli._execute.return_value = json.dumps(TASKS)
     result = await cli.tasks.list()
+    assert result[0].line == 3
     await cli.tasks.complete(result[0].file, result[0].line)
     cli._execute.assert_awaited_with(
         "task", params={"path": "todo.md", "line": "3"}, flags=["done"]
@@ -55,10 +56,10 @@ async def test_list_no_tasks(cli):
 
 async def test_list_with_path(cli):
     cli._execute.return_value = json.dumps(TASKS)
-    result = await cli.tasks.list(path="notes")
+    result = await cli.tasks.list(path="todo.md")
     assert result == PARSED_TASKS
     cli._execute.assert_awaited_once_with(
-        "tasks", params={"path": "notes"}, flags=None, output_format="json"
+        "tasks", params={"path": "todo.md"}, flags=None, output_format="json"
     )
 
 
@@ -89,15 +90,12 @@ async def test_list_todo(cli):
     )
 
 
-async def test_list_all_flags(cli):
+async def test_list_daily_and_done(cli):
     cli._execute.return_value = json.dumps(DONE_TASKS)
-    result = await cli.tasks.list(path="notes", daily=True, done=True)
+    result = await cli.tasks.list(daily=True, done=True)
     assert result == [PARSED_TASKS[1]]
     cli._execute.assert_awaited_once_with(
-        "tasks",
-        params={"path": "notes"},
-        flags=["daily", "done"],
-        output_format="json",
+        "tasks", params=None, flags=["daily", "done"], output_format="json"
     )
 
 

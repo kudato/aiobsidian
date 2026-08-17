@@ -54,6 +54,9 @@ raw = await cli.run("wordcount", params={"path": "note.md"})
 
 raw = await cli.run("tags", flags=["total"])
 # '8\n'
+
+# `tasks` can filter by status character, which no method exposes
+raw = await cli.run("tasks", params={"status": "/"}, output_format="json")
 ```
 
 Prefer the resource methods where they exist — they know the shape of
