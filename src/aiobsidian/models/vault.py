@@ -125,8 +125,10 @@ class FileInfo(BaseModel):
             and `note.`. `name` keeps the case it was written in, so
             the two need not spell the file name back.
         size: File size in bytes.
-        created: When the file was created, in UTC. A file system that
-            records no creation time reports the epoch instead.
+        created: When the file was created, in UTC, as the file system
+            reports it. One that records no creation time answers with
+            the epoch or with the moment the inode last changed, and
+            the second of those passes for a creation time.
         modified: When the file was last modified, in UTC.
     """
 
