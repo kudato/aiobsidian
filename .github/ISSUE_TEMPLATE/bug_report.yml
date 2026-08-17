@@ -23,7 +23,7 @@ body:
       placeholder: |
         ```python
         async with ObsidianClient("key") as client:
-            await client.vault.get("note.md")  # fails with ...
+            await client.vault.read("note.md")  # fails with ...
         ```
     validations:
       required: true

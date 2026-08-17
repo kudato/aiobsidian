@@ -1,6 +1,6 @@
 # Vault Operations
 
-The `client.vault` resource provides full CRUD operations on files and directories in your Obsidian vault.
+The `client.vault` resource reads, writes, patches, deletes, lists and opens the files of your Obsidian vault. `ObsidianCLI` spells all of these the same way, so code that only reads and writes notes runs unchanged on either transport.
 
 ## Paths
 

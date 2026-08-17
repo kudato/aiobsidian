@@ -14,6 +14,9 @@ class _Listing(BaseModel):
 
     Private on purpose: callers get the list itself, so the wrapper
     only has to survive as far as `list()` reading `.files` off it.
+
+    Attributes:
+        files: Entries of the folder, a subfolder ending in a slash.
     """
 
     files: list[str]

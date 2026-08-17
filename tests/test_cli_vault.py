@@ -39,7 +39,7 @@ async def test_write_empty(cli):
 
 
 async def test_write_without_overwrite(cli):
-    cli._execute.return_value = ""
+    cli._execute.return_value = "Created: note.md\n"
     await cli.vault.write("note.md", "content", overwrite=False)
     cli._execute.assert_awaited_once_with(
         "create",

@@ -399,7 +399,7 @@ class ObsidianCLI:
 
     @cached_property
     def vault(self) -> CLIVaultResource:
-        """Access vault file operations (read, write, append, move, delete, list)."""
+        """Access vault files (open, read, write, append, rename, delete, list)."""
         from .cli.vault import CLIVaultResource
 
         return CLIVaultResource(self)
@@ -427,7 +427,7 @@ class ObsidianCLI:
 
     @cached_property
     def tags(self) -> CLITagsResource:
-        """Access tag operations (list, get, rename)."""
+        """Access tag operations (list, get)."""
         from .cli.tags import CLITagsResource
 
         return CLITagsResource(self)
@@ -525,7 +525,7 @@ class ObsidianCLI:
 
     @cached_property
     def outline(self) -> CLIOutlineResource:
-        """Access document outline (headings)."""
+        """Access the headings of a note (get)."""
         from .cli.outline import CLIOutlineResource
 
         return CLIOutlineResource(self)

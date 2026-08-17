@@ -71,7 +71,7 @@ asyncio.run(main())
 
 | Resource | Access | Description |
 |----------|--------|-------------|
-| **vault** | `cli.vault` | Read, create, append, prepend, move, rename, delete, list |
+| **vault** | `cli.vault` | Read, write, append, prepend, move, rename, delete, list, open |
 | **daily** | `cli.daily` | Daily note operations |
 | **search** | `cli.search` | Full-text search |
 | **properties** | `cli.properties` | YAML frontmatter properties |

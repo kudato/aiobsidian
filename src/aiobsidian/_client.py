@@ -236,7 +236,7 @@ class ObsidianClient:
 
     @cached_property
     def vault(self) -> VaultResource:
-        """Access vault file operations (read, write, append, patch, delete, list)."""
+        """Access vault files (read, write, append, patch, delete, list, open)."""
         from .rest.vault import VaultResource
 
         return VaultResource(self)
