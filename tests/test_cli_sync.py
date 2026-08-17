@@ -116,16 +116,19 @@ async def test_status_with_the_vault_size_alone(cli):
     assert exc_info.value.command == "sync:status"
 
 
-def test_sync_status_refuses_a_quota_reported_by_halves():
-    # The same rule the public model holds a caller to, whichever of the
-    # three sizes they leave out.
-    for sizes in (
+@pytest.mark.parametrize(
+    "sizes",
+    [
         {"vault_size": "3.20 MB"},
         {"account_used": "3.20 MB", "account_limit": "10.00 GB"},
         {"vault_size": "3.20 MB", "account_used": "3.20 MB"},
-    ):
-        with pytest.raises(ValidationError):
-            SyncStatus(status="synced", **sizes)
+    ],
+)
+def test_status_refuses_a_quota_reported_by_halves(sizes):
+    # The same rule the public model holds a caller to, whichever of the
+    # three sizes they leave out.
+    with pytest.raises(ValidationError):
+        SyncStatus.model_validate({"status": "synced", **sizes})
 
 
 async def test_status_without_the_status_field(cli):
