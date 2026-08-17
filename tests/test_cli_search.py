@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
+from aiobsidian._exceptions import CLIParseError
 from aiobsidian.models.search import MatchedFile, MatchedLine
 
 RESULTS = ["welcome.md", "notes/linked.md"]
@@ -106,6 +109,19 @@ async def test_context(cli):
         flags=None,
         output_format="json",
     )
+
+
+async def test_context_reports_the_line_as_a_number(cli):
+    cli._execute.return_value = json.dumps(CONTEXT_RESULTS)
+    result = await cli.search.context("welcome")
+    assert isinstance(result[0].matches[0].line, int)
+
+
+async def test_context_without_the_matches_key(cli):
+    cli._execute.return_value = json.dumps([{"file": "welcome.md"}])
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.search.context("welcome")
+    assert exc_info.value.command == "search:context"
 
 
 async def test_context_no_matches(cli):

@@ -265,21 +265,21 @@ class BaseCLIResource:
         model: type[ModelT],
         *,
         columns: tuple[str, ...],
+        heading: bool = False,
     ) -> list[ModelT]:
-        """Parse tabular output into models, one per row.
+        """Parse tab-separated output into models, one per row.
 
         The commands without a `format=` print their table as plain
-        text, so the column names live here rather than in the output.
-        A line carrying no separator at all is read as a heading and
-        skipped, the way `_parse_rows()` reads it: `history` names the
-        file above its table, and nothing tells that line apart from a
-        row that lost every separator.
+        text, so the column names live here rather than in the output,
+        and every line has to hold one value per column.
 
         Args:
             command: CLI command name, used for error reporting.
             output: Raw output of the command.
             model: Model to validate every row against.
             columns: Column names, in the order the CLI prints them.
+            heading: If `True`, drop the first line: `history` names the
+                file above its table.
 
         Returns:
             One model per row, in the order printed, or an empty list
@@ -289,35 +289,16 @@ class BaseCLIResource:
             CLIParseError: If a row does not carry one value per column,
                 or does not fit the model.
         """
+        lines = cls._parse_lines(output)
+        if heading:
+            lines = lines[1:]
         values: list[ModelT] = []
-        for row in cls._parse_rows(output):
+        for line in lines:
+            row = [column.strip() for column in line.split("\t")]
             if len(row) != len(columns):
                 raise CLIParseError(command, output)
             try:
-                values.append(
-                    model.model_validate(dict(zip(columns, row, strict=True)))
-                )
+                values.append(model.model_validate(dict(zip(columns, row))))
             except ValidationError as exc:
                 raise CLIParseError(command, output) from exc
         return values
-
-    @classmethod
-    def _parse_rows(cls, output: str, *, separator: str = "\t") -> list[list[str]]:
-        """Parse tabular output into rows of columns.
-
-        Lines without the separator are skipped: some commands print a
-        heading line before the table.
-
-        Args:
-            output: Raw output of the command.
-            separator: Separator between columns.
-
-        Returns:
-            List of rows, each a list of column values.
-        """
-        rows: list[list[str]] = []
-        for line in cls._parse_lines(output):
-            if separator not in line:
-                continue
-            rows.append([column.strip() for column in line.split(separator)])
-        return rows

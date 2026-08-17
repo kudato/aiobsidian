@@ -24,6 +24,13 @@ async def test_get(cli):
     )
 
 
+async def test_get_reports_numbers_as_numbers(cli):
+    cli._execute.return_value = json.dumps(OUTLINE)
+    result = await cli.outline.get("notes/guide.md")
+    assert isinstance(result[0].level, int)
+    assert isinstance(result[0].line, int)
+
+
 async def test_get_no_headings(cli):
     cli._execute.return_value = "No headings found.\n"
     result = await cli.outline.get("notes/plain.md")

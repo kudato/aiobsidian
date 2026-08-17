@@ -35,6 +35,7 @@ class CLIHistoryResource(BaseCLIResource):
             output,
             FileVersion,
             columns=("version", "modified", "size"),
+            heading=True,
         )
 
     async def open(self, path: str) -> None:

@@ -32,8 +32,9 @@ async def test_views(cli):
 
 async def test_views_with_an_unexpected_row(cli):
     cli._execute.return_value = "All\ttable\textra\n"
-    with pytest.raises(CLIParseError):
+    with pytest.raises(CLIParseError) as exc_info:
         await cli.bases.views()
+    assert exc_info.value.command == "base:views"
 
 
 async def test_views_without_any(cli):

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
 
 from aiobsidian._exceptions import CLIParseError
@@ -164,12 +166,18 @@ class TestParseRowsAs:
         )
         assert result == []
 
-    def test_skips_the_heading_line(self):
-        output = "notes/todo.md\nAll\ttable\n"
+    def test_drops_the_heading_line_when_asked(self):
+        output = "notes/todo.md\n1\t2026-08-16 02:38\t431 B\n"
         result = BaseCLIResource._parse_rows_as(
-            "base:views", output, BaseView, columns=("name", "type")
+            "history",
+            output,
+            FileVersion,
+            columns=("version", "modified", "size"),
+            heading=True,
         )
-        assert result == [BaseView(name="All", type="table")]
+        assert result == [
+            FileVersion(version=1, modified=datetime(2026, 8, 16, 2, 38), size="431 B")
+        ]
 
     def test_too_many_columns(self):
         with pytest.raises(CLIParseError) as exc_info:
@@ -185,15 +193,16 @@ class TestParseRowsAs:
                 "notes/todo.md\n1\t2026-08-16 02:38\n",
                 FileVersion,
                 columns=("version", "modified", "size"),
+                heading=True,
             )
 
-    def test_a_row_that_lost_every_separator_reads_as_a_heading(self):
-        # Nothing tells such a line apart from the file name `history`
-        # prints above its table, so it goes the way the heading goes.
-        result = BaseCLIResource._parse_rows_as(
-            "base:views", "All\ttable\nActive\n", BaseView, columns=("name", "type")
-        )
-        assert result == [BaseView(name="All", type="table")]
+    def test_a_row_that_lost_every_separator(self):
+        # `base:views` prints no heading, so such a line is a broken row
+        # rather than something to skip.
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_rows_as(
+                "base:views", "All\ttable\nActive\n", BaseView, columns=("name", "type")
+            )
 
     def test_value_of_the_wrong_type(self):
         output = "one\t2026-08-16 02:38\t431 B\n"
@@ -266,14 +275,3 @@ class TestSplitContent:
 
     def test_trailing_backslash(self):
         assert BaseCLIResource._split_content("path\\") == ["path\\"]
-
-
-class TestParseRows:
-    def test_rows(self):
-        output = "welcome.md\n1\t2026-08-16 02:38\t431 B\n"
-        assert BaseCLIResource._parse_rows(output) == [
-            ["1", "2026-08-16 02:38", "431 B"]
-        ]
-
-    def test_no_rows(self):
-        assert BaseCLIResource._parse_rows("welcome.md\n") == []

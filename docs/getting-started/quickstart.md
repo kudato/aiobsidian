@@ -121,8 +121,8 @@ for path in await cli.search.query("python asyncio"):
 
 # The same search, with the line every hit matched on
 for hit in await cli.search.context("python asyncio"):
-    for match in hit["matches"]:
-        print(f"{hit['file']}:{match['line']}  {match['text']}")
+    for match in hit.matches:
+        print(f"{hit.file}:{match.line}  {match.text}")
 ```
 
 ### Daily notes

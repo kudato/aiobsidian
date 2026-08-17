@@ -30,11 +30,12 @@ class SearchMatch(BaseModel):
 
 
 class MatchedLine(BaseModel):
-    """A line of a note that a search matched.
+    """One thing a search matched, and the line it sits on.
 
     Attributes:
         line: Line number within the note, counting from 1.
-        text: The line as the note writes it.
+        text: The line the match sits on, with its indentation trimmed
+            off.
     """
 
     line: int
@@ -42,13 +43,14 @@ class MatchedLine(BaseModel):
 
 
 class MatchedFile(BaseModel):
-    """A note a search matched, with the lines it matched on.
+    """A note a search matched, and where in it.
 
     Attributes:
         file: Path to the note relative to the vault root.
-        matches: The matching lines, in the order they appear in the
-            note. Empty when the query matched the note without
-            matching any line of it.
+        matches: One entry per match, in the order they occur, so a line
+            matched twice is listed twice. Empty when the query matched
+            the note without matching its text — on its name or one of
+            its properties.
     """
 
     file: str

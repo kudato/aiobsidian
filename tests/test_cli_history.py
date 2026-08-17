@@ -42,8 +42,20 @@ async def test_versions_with_an_unreadable_timestamp(cli):
 
 async def test_versions_unexpected_row(cli):
     cli._execute.return_value = "notes/todo.md\n1\t2026-08-16 02:38\n"
-    with pytest.raises(CLIParseError):
+    with pytest.raises(CLIParseError) as exc_info:
         await cli.history.versions("notes/todo.md")
+    assert exc_info.value.command == "history"
+
+
+async def test_versions_in_a_language_that_renumbers_the_digits(cli):
+    # Obsidian formats the timestamp under the locale of its own UI
+    # language, and an Arabic one prints Arabic-Indic digits.
+    cli._execute.return_value = (
+        "notes/todo.md\n1\t\u0662\u0660\u0662\u0666-\u0660\u0668-"
+        "\u0661\u0666 \u0660\u0662:\u0663\u0668\t431 B\n"
+    )
+    result = await cli.history.versions("notes/todo.md")
+    assert result[0].modified == datetime(2026, 8, 16, 2, 38)
 
 
 async def test_open(cli):
@@ -54,19 +66,35 @@ async def test_open(cli):
     )
 
 
-async def test_diff(cli):
-    cli._execute.return_value = "- old line\n+ new line"
+# With neither version given the command lists the versions instead of
+# diffing, local and synced ones together, padded into columns.
+DIFF_LISTING = (
+    "notes/todo.md\n"
+    "1   Local 2026-08-16 02:38:11       431 B  \n"
+    "2   Sync  2026-08-15 21:04:57       402 B  [MacBook]\n"
+)
+
+DIFF_OUTPUT = (
+    "--- notes/todo.md (Local #2, 2026-08-15 21:04:57)\n"
+    "+++ notes/todo.md (Local #1, 2026-08-16 02:38:11)\n"
+    "- old line\n"
+    "+ new line\n"
+)
+
+
+async def test_diff_without_versions_lists_them(cli):
+    cli._execute.return_value = DIFF_LISTING
     result = await cli.history.diff("notes/todo.md")
-    assert result == "- old line\n+ new line"
+    assert result == DIFF_LISTING
     cli._execute.assert_awaited_once_with("diff", params={"path": "notes/todo.md"})
 
 
 async def test_diff_all_params(cli):
-    cli._execute.return_value = "- old\n+ new"
+    cli._execute.return_value = DIFF_OUTPUT
     result = await cli.history.diff(
         "notes/todo.md", from_version=1, to_version=2, filter="local"
     )
-    assert result == "- old\n+ new"
+    assert result == DIFF_OUTPUT
     cli._execute.assert_awaited_once_with(
         "diff",
         params={
