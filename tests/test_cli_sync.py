@@ -5,8 +5,8 @@ import pytest
 from aiobsidian._exceptions import CLIParseError
 from aiobsidian.models.sync import SyncStatus
 
-# Obsidian rounds every size to two decimals, and prints a size below a
-# kilobyte whole.
+# Obsidian rounds every size to two decimals, groups a thousand of a
+# unit with a comma, and prints a size below a kilobyte whole.
 STATUS = (
     "status: synced\n"
     "vault: MyVault\n"
@@ -79,6 +79,17 @@ async def test_status_without_the_quota(cli):
     cli._execute.return_value = "status: syncing\nvault: MyVault\ndevice: MacBook\n"
     result = await cli.sync.status()
     assert result == SyncStatus(status="syncing", vault="MyVault", device="MacBook")
+
+
+async def test_status_with_a_comma_in_the_sizes(cli):
+    cli._execute.return_value = (
+        "status: synced\nvault size: 1,023.44 KB\n"
+        "account usage: 1,023.44 KB / 10.00 GB\n"
+    )
+    result = await cli.sync.status()
+    assert result.vault_size == "1,023.44 KB"
+    assert result.account_used == "1,023.44 KB"
+    assert result.account_limit == "10.00 GB"
 
 
 async def test_status_with_a_colon_in_the_device_name(cli):

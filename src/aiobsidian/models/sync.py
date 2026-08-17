@@ -27,8 +27,9 @@ class SyncStatus(BaseModel):
         device: Name this device is known by on Sync.
         vault_size: How much of the quota this vault takes up, as the
             CLI prints it — rounded to two decimals and carrying its
-            unit, as in `"4.06 KB"`. Only a size below a kilobyte is
-            printed whole, as in `"431 B"`.
+            unit, as in `"4.06 KB"`, and a comma too once it reaches a
+            thousand of that unit, as in `"1,023.44 KB"`. Only a size
+            below a kilobyte is printed whole, as in `"431 B"`.
         account_used: How much of the quota the whole account takes up,
             in the same rounded form.
         account_limit: How much the account is allowed, in the same

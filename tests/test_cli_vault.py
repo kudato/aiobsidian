@@ -330,8 +330,9 @@ async def test_file_info_reads_the_timestamps_as_milliseconds(cli):
 async def test_file_info_reads_a_small_timestamp_as_milliseconds_too(
     cli, field, printed
 ):
-    # A file system that records no birth time reports one just past the
-    # epoch, which is a plausible number of seconds and is not one.
+    # The CLI prints milliseconds whatever the number is, so the unit is
+    # not for pydantic to guess: it reads a small number as seconds,
+    # which would date a file from days after the epoch to 2001.
     cli._execute.return_value = FILE_INFO.replace(printed, "1000000000")
     result = await cli.vault.file_info("note.md")
     assert getattr(result, field) == datetime(1970, 1, 12, 13, 46, 40, tzinfo=UTC)
