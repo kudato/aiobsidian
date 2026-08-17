@@ -7,7 +7,8 @@ from ._base import BaseCLIResource
 class CLISyncResource(BaseCLIResource):
     """CLI resource for Obsidian Sync operations.
 
-    Only `set_paused` and `status` work whatever Sync is doing. The rest
+    Only `is_paused`, `set_paused` and `status` work whatever Sync is
+    doing. The rest
     want it set up for the vault and running, and answer `Error: Sync is
     not set up for this vault.` or, once it is set up, a sentence naming
     the state — paused, or in error — that stops them. Both surface as a
@@ -20,15 +21,42 @@ class CLISyncResource(BaseCLIResource):
 
     __slots__ = ()
 
-    async def set_paused(self, value: bool) -> None:
+    async def is_paused(self) -> bool:
+        """Check whether Obsidian Sync is paused.
+
+        Returns:
+            ``True`` if Sync is paused, ``False`` if it is running.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
+        """
+        output = await self._cli._execute("sync")
+        return self._parse_either(
+            "sync", output, true="Sync is paused.", false="Sync is running."
+        )
+
+    async def set_paused(self, value: bool) -> bool:
         """Pause or resume Obsidian Sync.
 
         Args:
             value: ``True`` pauses sync, ``False`` resumes it.
+
+        Returns:
+            ``True`` if this call changed anything, ``False`` if Sync
+            was already the way it was asked to be.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
         """
         # Inverted on purpose: the CLI names the flags after the state
         # it puts sync into, so `on` resumes and `off` pauses.
-        await self._cli._execute("sync", flags=["off" if value else "on"])
+        output = await self._cli._execute("sync", flags=["off" if value else "on"])
+        return self._parse_either(
+            "sync",
+            output,
+            true="Sync paused." if value else "Sync resumed.",
+            false="Sync is already paused." if value else "Sync is already running.",
+        )
 
     async def open(self) -> None:
         """Open the Sync history UI."""

@@ -143,20 +143,58 @@ class CLIDevResource(BaseCLIResource):
         output = await self._cli._execute("dev:css", params=params)
         return output.strip()
 
-    async def set_mobile(self, value: bool) -> None:
+    async def set_mobile(self, value: bool) -> bool:
         """Turn mobile emulation on or off.
 
-        Obsidian reloads its window right after answering, unless the
-        setting was already in the state asked for; give it a moment
-        before the next command.
+        Obsidian reloads its window right after answering, and only when
+        the setting actually changed — which is what this returns, so a
+        caller that has to sit out the reload knows whether there is one
+        coming.
+
+        This is the one switch with nothing to read it back: asked for
+        neither state the command flips the emulation rather than
+        reporting it, so there is no way to ask without answering the
+        question differently than it stood.
 
         Args:
             value: ``True`` enables emulation, ``False`` disables it.
+
+        Returns:
+            ``True`` if this call changed anything, ``False`` if
+            emulation was already the way it was asked to be.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
         """
         flags = ["on"] if value else ["off"]
-        await self._cli._execute("dev:mobile", flags=flags)
+        state = "enabled" if value else "disabled"
+        output = await self._cli._execute("dev:mobile", flags=flags)
+        return self._parse_either(
+            "dev:mobile",
+            output,
+            true=f"Mobile emulation {state}. Reloading...",
+            false=f"Mobile emulation is already {state}.",
+        )
 
-    async def set_debugger(self, value: bool) -> None:
+    async def is_attached(self) -> bool:
+        """Check whether the debugger is attached.
+
+        Returns:
+            ``True`` if the Chrome DevTools Protocol debugger is
+            attached, ``False`` otherwise.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
+        """
+        output = await self._cli._execute("dev:debug")
+        return self._parse_either(
+            "dev:debug",
+            output,
+            true="Debugger is attached.",
+            false="Debugger is detached.",
+        )
+
+    async def set_debugger(self, value: bool) -> bool:
         """Attach or detach the Chrome DevTools Protocol debugger.
 
         `console()` needs it attached and fails otherwise. Detaching
@@ -170,9 +208,31 @@ class CLIDevResource(BaseCLIResource):
         Args:
             value: ``True`` attaches the debugger, ``False`` detaches
                 it and clears the captured console messages.
+
+        Returns:
+            ``True`` if this call changed anything, ``False`` if the
+            debugger was already the way it was asked to be. Nothing was
+            captured and nothing discarded in that case.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
         """
         flags = ["on"] if value else ["off"]
-        await self._cli._execute("dev:debug", flags=flags)
+        output = await self._cli._execute("dev:debug", flags=flags)
+        return self._parse_either(
+            "dev:debug",
+            output,
+            true=(
+                "Debugger attached. Console capture started."
+                if value
+                else "Debugger detached. Console capture stopped."
+            ),
+            false=(
+                "Debugger is already attached."
+                if value
+                else "Debugger is not attached."
+            ),
+        )
 
     async def cdp(self, method: str, params: str) -> str:
         """Execute a Chrome DevTools Protocol command.
