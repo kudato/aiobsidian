@@ -40,7 +40,7 @@ async def test_versions_with_an_unreadable_timestamp(cli):
         await cli.history.versions("notes/todo.md")
 
 
-async def test_versions_unexpected_row(cli):
+async def test_versions_with_an_unexpected_row(cli):
     cli._execute.return_value = "notes/todo.md\n1\t2026-08-16 02:38\n"
     with pytest.raises(CLIParseError) as exc_info:
         await cli.history.versions("notes/todo.md")
@@ -56,6 +56,12 @@ async def test_versions_in_a_language_that_renumbers_the_digits(cli):
     )
     result = await cli.history.versions("notes/todo.md")
     assert result[0].modified == datetime(2026, 8, 16, 2, 38)
+
+
+async def test_versions_without_any(cli):
+    cli._execute.return_value = "No history found for this file.\n"
+    result = await cli.history.versions("notes/fresh.md")
+    assert result == []
 
 
 async def test_open(cli):
@@ -84,7 +90,7 @@ DIFF_OUTPUT = (
 )
 
 
-async def test_diff_without_versions_lists_them(cli):
+async def test_diff_without_versions_passes_the_listing_through(cli):
     cli._execute.return_value = DIFF_LISTING
     result = await cli.history.diff("notes/todo.md")
     assert result == DIFF_LISTING

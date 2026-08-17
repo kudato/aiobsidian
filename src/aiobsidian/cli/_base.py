@@ -271,7 +271,11 @@ class BaseCLIResource:
 
         The commands without a `format=` print their table as plain
         text, so the column names live here rather than in the output,
-        and every line has to hold one value per column.
+        and every line has to hold one value per column. Values come
+        back as printed, save at the two ends of the output: the blank
+        space around the whole of it goes before the lines are counted,
+        so a first value starting with one, or a last value ending in
+        one, loses it.
 
         Args:
             command: CLI command name, used for error reporting.

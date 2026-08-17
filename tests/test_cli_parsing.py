@@ -216,6 +216,18 @@ class TestParseRowsAs:
             BaseView(name="Active ", type="cards"),
         ]
 
+    def test_the_ends_of_the_output_are_still_trimmed(self):
+        # `_parse_lines()` strips the blank space around the whole
+        # output before counting lines, which no command puts there.
+        output = " All\ttable\nActive\tcards \n"
+        result = BaseCLIResource._parse_rows_as(
+            "base:views", output, BaseView, columns=("name", "type")
+        )
+        assert result == [
+            BaseView(name="All", type="table"),
+            BaseView(name="Active", type="cards"),
+        ]
+
     def test_value_of_the_wrong_type(self):
         output = "one\t2026-08-16 02:38\t431 B\n"
         with pytest.raises(CLIParseError):
