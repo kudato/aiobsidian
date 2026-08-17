@@ -101,13 +101,14 @@ class BaseCLIResource:
             raise CLIParseError(command, output) from exc
 
     @classmethod
-    def _parse_json_column(cls, command: str, output: str, key: str) -> list[str]:
+    def _parse_json_column(cls, command: str, output: str, *, key: str) -> list[str]:
         """Parse JSON output whose objects hold a single named value.
 
-        Some commands answer with a list of one-key objects —
-        `plugins:enabled` prints `[{"id": "dataview"}]` — because JSON has
-        no other way to label a column. The label is fixed and known here,
-        so the values come back on their own.
+        Asked for `format=json`, the CLI prints a table, so a one-column
+        answer arrives as a list of one-key objects — `plugins:enabled`
+        prints `[{"id": "dataview"}]`. The key names the column rather
+        than the value, and is known here, so the values come back on
+        their own.
 
         Args:
             command: CLI command name, used for error reporting.
@@ -120,16 +121,17 @@ class BaseCLIResource:
 
         Raises:
             CLIParseError: If the output is not valid JSON, is not a list
-                of objects, or an object does not carry `key`.
+                of objects, or an object does not carry `key` as a string.
         """
         rows = cls._parse_json(command, output)
         if not isinstance(rows, list):
             raise CLIParseError(command, output)
         values: list[str] = []
         for row in rows:
-            if not isinstance(row, dict) or key not in row:
+            value = row.get(key) if isinstance(row, dict) else None
+            if not isinstance(value, str):
                 raise CLIParseError(command, output)
-            values.append(str(row[key]))
+            values.append(value)
         return values
 
     @classmethod

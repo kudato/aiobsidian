@@ -49,11 +49,11 @@ class CLILinksResource(BaseCLIResource):
         """Get all unresolved (broken) links in the vault.
 
         Returns:
-            The link targets nothing in the vault answers to, as written
-            in the notes.
+            The link targets that no note in the vault answers to, spelled
+            as the notes write them.
         """
         output = await self._cli._execute("unresolved", output_format="json")
-        return self._parse_json_column("unresolved", output, "link")
+        return self._parse_json_column("unresolved", output, key="link")
 
     async def orphans(self) -> list[str]:
         """Get orphan notes (notes with no incoming links).

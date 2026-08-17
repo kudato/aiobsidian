@@ -50,7 +50,7 @@ class CLIPluginsResource(BaseCLIResource):
             community alike.
         """
         output = await self._cli._execute("plugins:enabled", output_format="json")
-        return self._parse_json_column("plugins:enabled", output, "id")
+        return self._parse_json_column("plugins:enabled", output, key="id")
 
     async def enable(self, plugin_id: str) -> None:
         """Enable a plugin.
