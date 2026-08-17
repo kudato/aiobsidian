@@ -4,6 +4,8 @@ import pytest
 
 from aiobsidian._exceptions import CLIParseError
 from aiobsidian.cli._base import BaseCLIResource
+from aiobsidian.models.bases import BaseView
+from aiobsidian.models.history import FileVersion
 from aiobsidian.models.links import Backlink
 
 
@@ -143,6 +145,65 @@ class TestParseJsonRows:
     def test_invalid_json(self):
         with pytest.raises(CLIParseError):
             BaseCLIResource._parse_json_rows("backlinks", "plain text", Backlink)
+
+
+class TestParseRowsAs:
+    def test_rows(self):
+        output = "All\ttable\nActive\tcards\n"
+        result = BaseCLIResource._parse_rows_as(
+            "base:views", output, BaseView, columns=("name", "type")
+        )
+        assert result == [
+            BaseView(name="All", type="table"),
+            BaseView(name="Active", type="cards"),
+        ]
+
+    def test_sentinel(self):
+        result = BaseCLIResource._parse_rows_as(
+            "base:views", "No views defined.\n", BaseView, columns=("name", "type")
+        )
+        assert result == []
+
+    def test_skips_the_heading_line(self):
+        output = "notes/todo.md\nAll\ttable\n"
+        result = BaseCLIResource._parse_rows_as(
+            "base:views", output, BaseView, columns=("name", "type")
+        )
+        assert result == [BaseView(name="All", type="table")]
+
+    def test_too_many_columns(self):
+        with pytest.raises(CLIParseError) as exc_info:
+            BaseCLIResource._parse_rows_as(
+                "base:views", "All\ttable\textra\n", BaseView, columns=("name", "type")
+            )
+        assert exc_info.value.command == "base:views"
+
+    def test_too_few_columns(self):
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_rows_as(
+                "history",
+                "notes/todo.md\n1\t2026-08-16 02:38\n",
+                FileVersion,
+                columns=("version", "modified", "size"),
+            )
+
+    def test_a_row_that_lost_every_separator_reads_as_a_heading(self):
+        # Nothing tells such a line apart from the file name `history`
+        # prints above its table, so it goes the way the heading goes.
+        result = BaseCLIResource._parse_rows_as(
+            "base:views", "All\ttable\nActive\n", BaseView, columns=("name", "type")
+        )
+        assert result == [BaseView(name="All", type="table")]
+
+    def test_value_of_the_wrong_type(self):
+        output = "one\t2026-08-16 02:38\t431 B\n"
+        with pytest.raises(CLIParseError):
+            BaseCLIResource._parse_rows_as(
+                "history",
+                output,
+                FileVersion,
+                columns=("version", "modified", "size"),
+            )
 
 
 class TestParseLines:

@@ -29,6 +29,32 @@ class SearchMatch(BaseModel):
     context: str
 
 
+class MatchedLine(BaseModel):
+    """A line of a note that a search matched.
+
+    Attributes:
+        line: Line number within the note, counting from 1.
+        text: The line as the note writes it.
+    """
+
+    line: int
+    text: str
+
+
+class MatchedFile(BaseModel):
+    """A note a search matched, with the lines it matched on.
+
+    Attributes:
+        file: Path to the note relative to the vault root.
+        matches: The matching lines, in the order they appear in the
+            note. Empty when the query matched the note without
+            matching any line of it.
+    """
+
+    file: str
+    matches: list[MatchedLine]
+
+
 class SearchResult(BaseModel):
     """A search result entry.
 
