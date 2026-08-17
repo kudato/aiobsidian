@@ -8,14 +8,15 @@ from aiobsidian.models.hotkeys import Hotkey
 # adds the column that tells a binding the user set from one Obsidian
 # ships. Several bindings on one command arrive joined by `", "` in that
 # single column — `workspace:next-tab` ships with two — and a binding can
-# itself be a comma. The last row is a default the user cleared, which is
-# the only way a binding reads as the user's while having no keys.
+# itself be a comma. `editor:toggle-bold` is a default the user cleared,
+# which is the only way a binding reads as the user's while having no
+# keys.
 HOTKEYS = [
     {"id": "app:delete-file", "hotkey": "", "custom": "default"},
     {"id": "app:go-back", "hotkey": "⌘ ⌥ ←", "custom": "default"},
     {"id": "app:open-settings", "hotkey": "⌘ ,", "custom": "default"},
-    {"id": "workspace:next-tab", "hotkey": "⌃ Tab, ⌘ ⇧ ]", "custom": "default"},
     {"id": "editor:toggle-bold", "hotkey": "", "custom": "custom"},
+    {"id": "workspace:next-tab", "hotkey": "⌃ Tab, ⌘ ⇧ ]", "custom": "default"},
 ]
 
 
@@ -26,8 +27,8 @@ async def test_list(cli):
         Hotkey(command_id="app:delete-file", keys=[], custom=False),
         Hotkey(command_id="app:go-back", keys=["⌘ ⌥ ←"], custom=False),
         Hotkey(command_id="app:open-settings", keys=["⌘ ,"], custom=False),
-        Hotkey(command_id="workspace:next-tab", keys=["⌃ Tab", "⌘ ⇧ ]"], custom=False),
         Hotkey(command_id="editor:toggle-bold", keys=[], custom=True),
+        Hotkey(command_id="workspace:next-tab", keys=["⌃ Tab", "⌘ ⇧ ]"], custom=False),
     ]
     cli._execute.assert_awaited_once_with(
         "hotkeys", flags=["verbose"], output_format="json"

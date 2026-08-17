@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 _KEYS_SEPARATOR = ", "
 
 
-def split_keys(printed: str) -> list[str]:
+def _split_keys(printed: str) -> list[str]:
     """Take apart the bindings the CLI printed as one string.
 
     A command can carry several bindings, and the CLI joins them with
@@ -56,7 +56,7 @@ class Hotkey(BaseModel):
             the CLI prints for an unbound command. Any other type is
             left alone for the field to refuse.
         """
-        return split_keys(value) if isinstance(value, str) else value
+        return _split_keys(value) if isinstance(value, str) else value
 
     @field_validator("custom", mode="before")
     @classmethod

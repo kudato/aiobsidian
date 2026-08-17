@@ -12,9 +12,9 @@ class Task(BaseModel):
         status: The character between the brackets: a space for an open
             task, `"x"` for a completed one, anything else for one of
             the custom statuses a theme or plugin defines.
-        text: The task's line as the note writes it, list marker and
-            checkbox included. Empty when the CLI could not read the
-            line back.
+        text: The task's line, list marker and checkbox included and
+            any indentation trimmed off. Empty when the CLI could not
+            read the line back.
         file: Path to the note holding the task.
         line: Line number within that note, counting from 1 — the
             number `tasks.toggle()`, `tasks.complete()` and

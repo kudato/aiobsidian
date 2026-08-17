@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
+from aiobsidian._exceptions import CLIParseError
 from aiobsidian.models.plugins import Plugin
 
 # `plugins` lists everything installed. Core plugins ship with the app and
@@ -49,6 +52,13 @@ async def test_list(cli):
     cli._execute.assert_awaited_once_with(
         "plugins", flags=["versions"], output_format="json"
     )
+
+
+async def test_list_without_the_version_column(cli):
+    cli._execute.return_value = json.dumps([{"id": "backlink"}])
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.plugins.list()
+    assert exc_info.value.command == "plugins"
 
 
 async def test_enabled(cli):

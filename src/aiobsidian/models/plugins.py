@@ -30,6 +30,7 @@ class Plugin(BaseModel):
 
         Returns:
             `None` for the empty string the CLI prints for a core
-            plugin, otherwise the value untouched.
+            plugin, otherwise the value untouched — including any other
+            type, which is left for the field to refuse.
         """
-        return value or None
+        return (value or None) if isinstance(value, str) else value

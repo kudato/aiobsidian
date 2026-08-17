@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..models import Hotkey
-from ..models.hotkeys import split_keys
+from ..models.hotkeys import _split_keys
 from ._base import BaseCLIResource
 
 _NO_HOTKEY = "(none)"
@@ -29,13 +29,10 @@ class CLIHotkeysResource(BaseCLIResource):
         Returns:
             Every binding, spelled the way Obsidian displays it, as in
             `"⌘ ⇧ F"`. Empty when nothing is bound to the command.
-
-        Raises:
-            CLINotFoundError: If no command carries that identifier.
         """
         output = await self._cli._execute("hotkey", params={"id": command_id})
         printed = output.strip()
-        return [] if printed == _NO_HOTKEY else split_keys(printed)
+        return [] if printed == _NO_HOTKEY else _split_keys(printed)
 
     async def list(self) -> list[Hotkey]:
         """List the hotkeys of every command.

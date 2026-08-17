@@ -13,7 +13,9 @@ TASKS = [
     {"status": "/", "text": "- [/] Read the RFC", "file": "todo.md", "line": "5"},
 ]
 
-DONE_TASKS = [TASKS[1]]
+# `done` selects everything whose box is not blank, custom statuses
+# included; `todo` selects only the blank ones.
+DONE_TASKS = [TASKS[1], TASKS[2]]
 TODO_TASKS = [TASKS[0]]
 
 PARSED_TASKS = [
@@ -46,6 +48,7 @@ async def test_list_tells_an_open_task_from_any_other(cli):
     cli._execute.return_value = json.dumps(TASKS)
     result = await cli.tasks.list()
     assert [task.done for task in result] == [False, True, True]
+    assert result[0].model_dump()["done"] is False
 
 
 async def test_list_no_tasks(cli):
@@ -72,10 +75,10 @@ async def test_list_daily(cli):
     )
 
 
-async def test_list_done_returns_completed_only(cli):
+async def test_list_done_returns_every_filled_box(cli):
     cli._execute.return_value = json.dumps(DONE_TASKS)
     result = await cli.tasks.list(done=True)
-    assert result == [PARSED_TASKS[1]]
+    assert result == [PARSED_TASKS[1], PARSED_TASKS[2]]
     cli._execute.assert_awaited_once_with(
         "tasks", params=None, flags=["done"], output_format="json"
     )
@@ -93,7 +96,7 @@ async def test_list_todo(cli):
 async def test_list_daily_and_done(cli):
     cli._execute.return_value = json.dumps(DONE_TASKS)
     result = await cli.tasks.list(daily=True, done=True)
-    assert result == [PARSED_TASKS[1]]
+    assert result == [PARSED_TASKS[1], PARSED_TASKS[2]]
     cli._execute.assert_awaited_once_with(
         "tasks", params=None, flags=["daily", "done"], output_format="json"
     )
