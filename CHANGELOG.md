@@ -25,7 +25,7 @@ return.
 - **Breaking**: the REST `periodic` resource, `ObsidianClient.periodic` and `Period` — the plugin has no such endpoints
 - **Breaking**: `SearchResource.dataview()` and `ContentType.DATAVIEW_DQL`, for the same reason
 - **Breaking**: `tasks.create()`, `tags.rename()` and `daily.create()` — no such CLI commands exist
-- **Breaking**: parameters the CLI does not accept — `search.query(matches=)`, `search.context(lines=)`, `daily.read(date=)`, `vault.create(silent=)`, `vault.list(path=)`, `bases.views(path=)`, `publish.status(path=)` and `bases.create(**fields)`
+- **Breaking**: parameters the CLI does not accept — `search.query(matches=)`, `search.context(lines=)`, `daily.read(date=)`, `vault.write(silent=)`, `bases.views(path=)`, `publish.status(path=)` and `bases.create(**fields)`
 
 ### Changed
 - **Breaking**: `NotFoundError` hangs off `ObsidianError` rather than `APIError` and carries no `status_code`. It is what both transports now raise for something that does not exist, through `APINotFoundError` and `CLINotFoundError`, so `issubclass(NotFoundError, APIError)` is `False` and an `except NotFoundError` written for REST also catches a missing note over the CLI
@@ -37,9 +37,12 @@ return.
 - **Breaking**: `search.query()` returns `list[str]` of paths; the CLI reports no match counts
 - **Breaking**: `tasks.complete()` takes the note and the line, not a task id the CLI has no notion of
 - **Breaking**: every on/off switch is spelled `set_<thing>(value)`, so `sync.toggle(on=)`, `plugins.restrict(on=)`, `dev.mobile(on=)` and `dev.debug(on=)` are `sync.set_paused()`, `plugins.set_restricted()`, `dev.set_mobile()` and `dev.set_debugger()`. `toggle` is left to mean what it says, as in `tasks.toggle()`. Mind that `set_paused(True)` pauses, where `toggle(on=True)` resumed
-- **Breaking**: `vault.list()` and `vault.folders()` call their first argument `folder`, and it now does something. Both sent `path=`, which `files` and `folders` ignore, so `vault.list("Notes")` listed the whole vault
+- **Breaking**: one name per operation, whichever transport you are holding. REST `vault.get()`, `vault.update()`, `active.get()` and `active.update()` are `read()` and `write()`. `read()` is what the CLI already called it; `write()` is new to both transports, because CLI `vault.create()` named the command it runs rather than the operation it performs. `write()` means create-or-replace everywhere, so the CLI's `overwrite` defaults to `True`; `overwrite=False` still refuses a file that exists, which is the one thing REST cannot do
+- **Breaking**: `client.open.open(filename)` is `client.vault.open(path)`, and `OpenResource` is gone with the `client.open` property. Opening is something you do to a vault file, and the CLI had already put it there
+- **Breaking**: `client.vault.list()` returns `list[str]` and calls its argument `folder`. `VaultDirectory` is gone with it: it wrapped a single list in a single field, so every call ended in `.files`. The two transports still list different things, and now say so — REST answers with one level and marks a subfolder with a trailing slash, while the CLI walks the tree, reports only files, and leaves folders to `folders()`
+- **Breaking**: CLI `vault.list()` and `vault.folders()` call their first argument `folder`, and it now does something. Both sent `path=`, which `files` and `folders` ignore, so `vault.list("Notes")` listed the whole vault
 - **Breaking**: `sync.read()` and `sync.restore()` take `version` as an `int`
-- **Breaking**: `dev.dom()` takes `match_all=` rather than shadowing `all`, `dev.screenshot()` returns `None` because the CLI writes the file and prints nothing, `vault.create()` defaults `content` to `""`, and `publish.add()` and `publish.open()` return the CLI's reply instead of `None`
+- **Breaking**: `dev.dom()` takes `match_all=` rather than shadowing `all`, `dev.screenshot()` returns `None` because the CLI writes the file and prints nothing, `vault.write()` defaults `content` to `""`, and `publish.add()` and `publish.open()` return the CLI's reply instead of `None`
 - **Breaking**: leaving an `ObsidianCLI` context manager now closes the client. It was a no-op before, so one instance could serve several `async with` blocks; entering a closed one now raises `RuntimeError`
 - **Breaking**: a request the HTTP layer refuses to send — an unparseable `host`, a `scheme` that is not HTTP, a `port` out of range, an illegal header — raises `ValueError` instead of surfacing as a transport failure or an `ExceptionGroup`
 - **Breaking**: patching against Local REST API 5.x sends the 1.x patch protocol, and `DocumentMap` reports targets in the spelling `patch()` accepts

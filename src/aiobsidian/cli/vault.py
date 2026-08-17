@@ -32,36 +32,37 @@ class CLIVaultResource(BaseCLIResource):
         """
         return await self._cli._execute("read", params={"path": path})
 
-    async def create(
+    async def write(
         self,
         path: str,
         content: str = "",
         *,
         name: str | None = None,
         template: str | None = None,
-        overwrite: bool = False,
+        overwrite: bool = True,
     ) -> None:
-        """Create a new file in the vault.
+        """Create or replace a file in the vault.
 
         Content with literal ``\\n`` or ``\\t`` sequences is written in several
         calls, so the file is built up incrementally rather than atomically.
 
         Args:
-            path: Path for the new file relative to the vault root. When
+            path: Path for the file relative to the vault root. When
                 ``name`` is given this is the folder to create it in.
             content: File content. Cannot be combined with ``template``.
             name: File name, without a directory prefix, appended to
                 ``path``.
             template: Template to fill the new file with. The CLI reads
                 the template instead of ``content``, never both.
-            overwrite: If ``True``, overwrite an existing file.
+            overwrite: If ``False``, refuse to touch a file that is
+                already there and let the CLI report it as a failure.
 
         Raises:
             ValueError: If both ``content`` and ``template`` are given.
         """
         if content and template is not None:
             raise ValueError(
-                "create() takes content or template, not both: "
+                "write() takes content or template, not both: "
                 "the CLI writes the template and drops the content"
             )
         params: dict[str, str] = {"path": path}
@@ -82,13 +83,13 @@ class CLIVaultResource(BaseCLIResource):
     def _created_path(path: str, name: str | None) -> str:
         """Work out where the CLI puts a file it was asked to create.
 
-        `create` joins `path` and `name` when both are given, and adds a
-        `.md` extension when the result has none. The rest of a content
-        write is appended to that file, not to `path`.
+        The `create` command joins `path` and `name` when both are
+        given, and adds a `.md` extension when the result has none. The
+        rest of a content write is appended to that file, not to `path`.
 
         Args:
-            path: Path passed to `create`.
-            name: File name passed to `create`, if any.
+            path: Path passed to `write`.
+            name: File name passed to `write`, if any.
 
         Returns:
             Path of the created file, relative to the vault root.

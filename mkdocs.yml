@@ -63,7 +63,6 @@ nav:
       - Active File: guide/active-file.md
       - Commands: guide/commands.md
       - Search: guide/search.md
-      - Open Files: guide/open.md
       - Error Handling: guide/error-handling.md
   - API Reference:
       - ObsidianCLI: reference/cli.md
@@ -100,7 +99,6 @@ nav:
           - Active File: reference/resources/active.md
           - Commands: reference/resources/commands.md
           - Search: reference/resources/search.md
-          - Open: reference/resources/open.md
           - System: reference/resources/system.md
       - Models: reference/models.md
       - Enums: reference/enums.md

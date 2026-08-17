@@ -2,9 +2,24 @@ from __future__ import annotations
 
 from typing import Literal, overload
 
+from pydantic import BaseModel
+
 from .._types import ContentType, JsonValue, PatchOperation, TargetType
-from ..models.vault import DocumentMap, NoteJson, VaultDirectory
+from ..models.vault import DocumentMap, NoteJson
 from ._base import ContentResource
+
+
+class _Listing(BaseModel):
+    """The envelope the listing endpoint wraps its one list in.
+
+    Private on purpose: callers get the list itself, so the wrapper
+    only has to survive as far as `list()` reading `.files` off it.
+
+    Attributes:
+        files: Entries of the folder, a subfolder ending in a slash.
+    """
+
+    files: list[str]
 
 
 class VaultResource(ContentResource):
@@ -14,8 +29,11 @@ class VaultResource(ContentResource):
 
     _BASE_URL = "/vault"
 
+    # Opening a note is a vault operation with an endpoint of its own.
+    _OPEN_URL = "/open"
+
     @overload
-    async def get(
+    async def read(
         self,
         path: str,
         *,
@@ -23,7 +41,7 @@ class VaultResource(ContentResource):
     ) -> str: ...
 
     @overload
-    async def get(
+    async def read(
         self,
         path: str,
         *,
@@ -31,7 +49,7 @@ class VaultResource(ContentResource):
     ) -> NoteJson: ...
 
     @overload
-    async def get(
+    async def read(
         self,
         path: str,
         *,
@@ -39,20 +57,20 @@ class VaultResource(ContentResource):
     ) -> DocumentMap: ...
 
     @overload
-    async def get(
+    async def read(
         self,
         path: str,
         *,
         content_type: ContentType,
     ) -> str | NoteJson | DocumentMap: ...
 
-    async def get(
+    async def read(
         self,
         path: str,
         *,
         content_type: ContentType = ContentType.MARKDOWN,
     ) -> str | NoteJson | DocumentMap:
-        """Get the content of a vault file.
+        """Read the content of a vault file.
 
         Args:
             path: Path to the file relative to the vault root
@@ -73,7 +91,25 @@ class VaultResource(ContentResource):
             f"{self._BASE_URL}/{self._encode_path(path)}", content_type
         )
 
-    async def update(self, path: str, content: str) -> None:
+    async def open(self, path: str, *, new_leaf: bool = False) -> None:
+        """Open a file in the Obsidian UI.
+
+        Warning:
+            This is not a read-only operation. If the file does not
+            exist, Obsidian creates an empty note at `path` and opens
+            that — the call succeeds instead of raising.
+
+        Args:
+            path: Path to the file relative to the vault root.
+                A leading slash is ignored.
+            new_leaf: If `True`, open the file in a new tab.
+        """
+        params = {"newLeaf": "true"} if new_leaf else {}
+        await self._client.request(
+            "POST", f"{self._OPEN_URL}/{self._encode_path(path)}", params=params
+        )
+
+    async def write(self, path: str, content: str) -> None:
         """Create or replace a file in the vault.
 
         Args:
@@ -160,17 +196,23 @@ class VaultResource(ContentResource):
             "DELETE", f"{self._BASE_URL}/{self._encode_path(path)}"
         )
 
-    async def list(self, path: str = "") -> VaultDirectory:
-        """List files in a vault directory.
+    async def list(self, folder: str = "") -> list[str]:
+        """List the entries of one vault folder.
+
+        The listing is one level deep and names both files and
+        subfolders, a subfolder with a trailing slash. `ObsidianCLI`
+        splits the same ground differently: its `list()` walks the tree
+        and reports only files, and folders have `folders()` to
+        themselves.
 
         Args:
-            path: Directory path relative to the vault root.
-                Empty string for the root directory.
+            folder: Folder path relative to the vault root. Empty
+                string for the vault root.
 
         Returns:
-            A `VaultDirectory` containing the list of file paths.
+            Names of the entries, relative to `folder`.
         """
-        encoded = self._encode_path(path)
+        encoded = self._encode_path(folder)
         trailing = f"{encoded}/" if encoded else ""
         response = await self._client.request("GET", f"{self._BASE_URL}/{trailing}")
-        return VaultDirectory.model_validate(response.json())
+        return _Listing.model_validate(response.json()).files

@@ -20,27 +20,27 @@ DOC_MAP_JSON = {
 }
 
 
-async def test_get_markdown(mock_api, client):
+async def test_read_markdown(mock_api, client):
     mock_api.get("/active/").respond(200, text="# Active note")
 
-    result = await client.active.get()
+    result = await client.active.read()
 
     assert result == "# Active note"
 
 
-async def test_get_note_json(mock_api, client):
+async def test_read_note_json(mock_api, client):
     mock_api.get("/active/").respond(200, json=NOTE_JSON)
 
-    result = await client.active.get(content_type=ContentType.NOTE_JSON)
+    result = await client.active.read(content_type=ContentType.NOTE_JSON)
 
     assert isinstance(result, NoteJson)
     assert result.path == "active.md"
 
 
-async def test_update(mock_api, client):
+async def test_write(mock_api, client):
     route = mock_api.put("/active/").respond(204)
 
-    await client.active.update("# Updated")
+    await client.active.write("# Updated")
 
     request: httpx.Request = route.calls[0].request
     assert request.content == b"# Updated"
@@ -106,21 +106,21 @@ async def test_delete(mock_api, client):
     assert route.called
 
 
-async def test_get_document_map(mock_api, client):
+async def test_read_document_map(mock_api, client):
     route = mock_api.get("/active/").respond(200, json=DOC_MAP_JSON)
 
-    result = await client.active.get(content_type=ContentType.DOCUMENT_MAP)
+    result = await client.active.read(content_type=ContentType.DOCUMENT_MAP)
 
     assert isinstance(result, DocumentMap)
     assert result.headings == ["Active"]
     assert route.calls[0].request.headers["markdown-patch-version"] == "1"
 
 
-async def test_get_not_found(mock_api, client):
+async def test_read_not_found(mock_api, client):
     mock_api.get("/active/").respond(404, json={"message": "No active file"})
 
     with pytest.raises(NotFoundError) as exc_info:
-        await client.active.get()
+        await client.active.read()
 
     assert exc_info.value.status_code == 404
 

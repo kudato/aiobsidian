@@ -59,7 +59,7 @@ async def main():
         status = await client.system.status()
         print(status.versions.obsidian)
 
-        content = await client.vault.get("notes/hello.md")
+        content = await client.vault.read("notes/hello.md")
         print(content)
 
 asyncio.run(main())
@@ -71,7 +71,7 @@ asyncio.run(main())
 
 | Resource | Access | Description |
 |----------|--------|-------------|
-| **vault** | `cli.vault` | Read, create, append, prepend, move, rename, delete, list |
+| **vault** | `cli.vault` | Read, write, append, prepend, move, rename, delete, list, open |
 | **daily** | `cli.daily` | Daily note operations |
 | **search** | `cli.search` | Full-text search |
 | **properties** | `cli.properties` | YAML frontmatter properties |
@@ -102,11 +102,10 @@ asyncio.run(main())
 
 | Resource | Access | Description |
 |----------|--------|-------------|
-| **vault** | `client.vault` | CRUD operations on any file |
+| **vault** | `client.vault` | Read, write, patch, delete and open any file |
 | **active** | `client.active` | Operations on the currently open file |
 | **commands** | `client.commands` | List and execute Obsidian commands |
 | **search** | `client.search` | Simple text search, JsonLogic |
-| **open** | `client.open` | Open files in Obsidian UI |
 | **system** | `client.system` | Server status, OpenAPI spec |
 
 ### General

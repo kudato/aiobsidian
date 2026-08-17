@@ -43,7 +43,7 @@ CLI-first: works out of the box with the [Obsidian CLI](https://obsidian.md/cli)
             status = await client.system.status()
             print(f"Obsidian v{status.versions.obsidian}")
 
-            content = await client.vault.get("Notes/hello.md")
+            content = await client.vault.read("Notes/hello.md")
             print(content)
 
     asyncio.run(main())

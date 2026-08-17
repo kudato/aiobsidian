@@ -24,7 +24,7 @@ asyncio.run(main())
 
 | Resource | Access | Description |
 |----------|--------|-------------|
-| **vault** | `cli.vault` | Read, create, append, prepend, move, rename, delete, list |
+| **vault** | `cli.vault` | Read, write, append, prepend, move, rename, delete, list, open |
 | **daily** | `cli.daily` | Daily note: read, open, append, prepend, path |
 | **search** | `cli.search` | Full-text search |
 | **properties** | `cli.properties` | YAML frontmatter properties: list, read, set, remove |
@@ -57,8 +57,8 @@ asyncio.run(main())
 # Read a note
 content = await cli.vault.read("notes/hello.md")
 
-# Create a note
-await cli.vault.create("notes/new.md", "# New Note\n\nContent here.")
+# Create or replace a note
+await cli.vault.write("notes/new.md", "# New Note\n\nContent here.")
 
 # Append to a note
 await cli.vault.append("notes/hello.md", "\n## New section")
@@ -163,32 +163,31 @@ asyncio.run(main())
 
 | Resource | Access | Description |
 |----------|--------|-------------|
-| **vault** | `client.vault` | Read, create, update, and delete vault files |
+| **vault** | `client.vault` | Read, write, patch, delete and open vault files |
 | **active** | `client.active` | Operate on the currently open file |
 | **commands** | `client.commands` | List and execute Obsidian commands |
 | **search** | `client.search` | Search vault content |
-| **open** | `client.open` | Open files in the Obsidian UI |
 | **system** | `client.system` | Server status and OpenAPI spec |
 
 ### Reading a note
 
 ```python
 # Get raw Markdown
-content = await client.vault.get("Notes/hello.md")
+content = await client.vault.read("Notes/hello.md")
 print(content)
 
 # Get structured JSON (with frontmatter, tags, stats)
 from aiobsidian import ContentType
 
-note = await client.vault.get("Notes/hello.md", content_type=ContentType.NOTE_JSON)
+note = await client.vault.read("Notes/hello.md", content_type=ContentType.NOTE_JSON)
 print(note.frontmatter)
 print(note.tags)
 ```
 
-### Creating a note
+### Writing a note
 
 ```python
-await client.vault.update("Notes/new-note.md", "# My New Note\n\nHello, world!")
+await client.vault.write("Notes/new-note.md", "# My New Note\n\nHello, world!")
 ```
 
 ### Searching

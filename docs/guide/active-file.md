@@ -7,7 +7,7 @@ The `client.active` resource operates on the file currently open (focused) in th
 ### Markdown content
 
 ```python
-content = await client.active.get()
+content = await client.active.read()
 print(content)
 ```
 
@@ -16,7 +16,7 @@ print(content)
 ```python
 from aiobsidian import ContentType
 
-note = await client.active.get(content_type=ContentType.NOTE_JSON)
+note = await client.active.read(content_type=ContentType.NOTE_JSON)
 print(note.frontmatter)
 print(note.tags)
 print(note.path)
@@ -27,7 +27,7 @@ print(note.path)
 ```python
 from aiobsidian import ContentType
 
-doc_map = await client.active.get(content_type=ContentType.DOCUMENT_MAP)
+doc_map = await client.active.read(content_type=ContentType.DOCUMENT_MAP)
 print(doc_map.headings)
 print(doc_map.blocks)
 ```
@@ -37,7 +37,7 @@ print(doc_map.blocks)
 Replace the entire content of the active file:
 
 ```python
-await client.active.update("# Updated Title\n\nNew content here.")
+await client.active.write("# Updated Title\n\nNew content here.")
 ```
 
 ## Appending content

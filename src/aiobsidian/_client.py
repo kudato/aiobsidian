@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 
     from .rest.active import ActiveFileResource
     from .rest.commands import CommandsResource
-    from .rest.open import OpenResource
     from .rest.search import SearchResource
     from .rest.system import SystemResource
     from .rest.vault import VaultResource
@@ -126,7 +125,7 @@ class ObsidianClient:
         """Send an HTTP request to the Obsidian REST API.
 
         This is a low-level method used internally by resource classes.
-        Prefer using the resource methods (e.g. `client.vault.get()`)
+        Prefer using the resource methods (e.g. `client.vault.read()`)
         for typical operations.
 
         Args:
@@ -237,7 +236,7 @@ class ObsidianClient:
 
     @cached_property
     def vault(self) -> VaultResource:
-        """Access vault file operations (read, create, append, patch, delete, list)."""
+        """Access vault files (read, write, append, patch, delete, list, open)."""
         from .rest.vault import VaultResource
 
         return VaultResource(self)
@@ -262,13 +261,6 @@ class ObsidianClient:
         from .rest.search import SearchResource
 
         return SearchResource(self)
-
-    @cached_property
-    def open(self) -> OpenResource:
-        """Open files in the Obsidian UI."""
-        from .rest.open import OpenResource
-
-        return OpenResource(self)
 
     @cached_property
     def system(self) -> SystemResource:

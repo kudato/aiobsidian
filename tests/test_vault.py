@@ -3,7 +3,7 @@ import pytest
 
 from aiobsidian._exceptions import AuthenticationError, NotFoundError
 from aiobsidian._types import ContentType, PatchOperation, TargetType
-from aiobsidian.models.vault import DocumentMap, NoteJson, VaultDirectory
+from aiobsidian.models.vault import DocumentMap, NoteJson
 
 NOTE_JSON = {
     "content": "# Hello\nWorld",
@@ -20,28 +20,28 @@ DOC_MAP_JSON = {
 }
 
 
-async def test_get_markdown(mock_api, client):
+async def test_read_markdown(mock_api, client):
     mock_api.get("/vault/hello.md").respond(200, text="# Hello")
 
-    result = await client.vault.get("hello.md")
+    result = await client.vault.read("hello.md")
 
     assert result == "# Hello"
 
 
-async def test_get_note_json(mock_api, client):
+async def test_read_note_json(mock_api, client):
     mock_api.get("/vault/hello.md").respond(200, json=NOTE_JSON)
 
-    result = await client.vault.get("hello.md", content_type=ContentType.NOTE_JSON)
+    result = await client.vault.read("hello.md", content_type=ContentType.NOTE_JSON)
 
     assert isinstance(result, NoteJson)
     assert result.path == "notes/hello.md"
     assert result.stat.size == 42
 
 
-async def test_get_document_map(mock_api, client):
+async def test_read_document_map(mock_api, client):
     route = mock_api.get("/vault/hello.md").respond(200, json=DOC_MAP_JSON)
 
-    result = await client.vault.get("hello.md", content_type=ContentType.DOCUMENT_MAP)
+    result = await client.vault.read("hello.md", content_type=ContentType.DOCUMENT_MAP)
 
     assert isinstance(result, DocumentMap)
     assert result.headings == ["Hello", "Hello::Details"]
@@ -50,10 +50,10 @@ async def test_get_document_map(mock_api, client):
     assert route.calls[0].request.headers["markdown-patch-version"] == "1"
 
 
-async def test_get_markdown_omits_patch_version(mock_api, client):
+async def test_read_markdown_omits_patch_version(mock_api, client):
     route = mock_api.get("/vault/hello.md").respond(200, text="# Hello")
 
-    await client.vault.get("hello.md")
+    await client.vault.read("hello.md")
 
     assert "markdown-patch-version" not in route.calls[0].request.headers
 
@@ -64,10 +64,10 @@ def test_document_map_populate_by_name():
     assert result.frontmatter_fields == ["title"]
 
 
-async def test_update(mock_api, client):
+async def test_write(mock_api, client):
     route = mock_api.put("/vault/new.md").respond(204)
 
-    await client.vault.update("new.md", "# New note")
+    await client.vault.write("new.md", "# New note")
 
     assert route.called
     request: httpx.Request = route.calls[0].request
@@ -115,8 +115,7 @@ async def test_list_root(mock_api, client):
 
     result = await client.vault.list()
 
-    assert isinstance(result, VaultDirectory)
-    assert "note.md" in result.files
+    assert result == ["note.md", "folder/"]
 
 
 async def test_list_subdirectory(mock_api, client):
@@ -124,23 +123,23 @@ async def test_list_subdirectory(mock_api, client):
 
     result = await client.vault.list("folder")
 
-    assert result.files == ["sub.md"]
+    assert result == ["sub.md"]
 
 
-async def test_get_not_found(mock_api, client):
+async def test_read_not_found(mock_api, client):
     mock_api.get("/vault/missing.md").respond(404, json={"message": "File not found"})
 
     with pytest.raises(NotFoundError) as exc_info:
-        await client.vault.get("missing.md")
+        await client.vault.read("missing.md")
 
     assert exc_info.value.status_code == 404
 
 
-async def test_update_unauthorized(mock_api, client):
+async def test_write_unauthorized(mock_api, client):
     mock_api.put("/vault/secret.md").respond(401, json={"message": "Unauthorized"})
 
     with pytest.raises(AuthenticationError) as exc_info:
-        await client.vault.update("secret.md", "content")
+        await client.vault.write("secret.md", "content")
 
     assert exc_info.value.status_code == 401
 
@@ -162,9 +161,9 @@ async def test_patch_prepend_to_block(mock_api, client):
     assert request.headers["target"] == "abc123"
 
 
-async def test_get_sends_accept_header(mock_api, client):
+async def test_read_sends_accept_header(mock_api, client):
     route = mock_api.get("/vault/note.md").respond(200, text="# Hello")
-    await client.vault.get("note.md")
+    await client.vault.read("note.md")
     assert route.calls[0].request.headers["accept"] == "text/markdown"
 
 
@@ -269,71 +268,71 @@ async def test_patch_custom_delimiter(mock_api, client):
 async def test_list_strips_trailing_slashes(mock_api, client):
     mock_api.get("/vault/folder/").respond(200, json={"files": ["a.md"]})
     result = await client.vault.list("/folder/")
-    assert result.files == ["a.md"]
+    assert result == ["a.md"]
 
 
-async def test_get_path_with_spaces(mock_api, client):
+async def test_read_path_with_spaces(mock_api, client):
     route = mock_api.get("/vault/notes/my%20note.md").respond(200, text="# Spaced")
 
-    result = await client.vault.get("notes/my note.md")
+    result = await client.vault.read("notes/my note.md")
 
     assert result == "# Spaced"
     assert route.called
 
 
-async def test_get_path_with_unicode(mock_api, client):
+async def test_read_path_with_unicode(mock_api, client):
     encoded = (
         "/vault/%D0%B7%D0%B0%D0%BC%D0%B5%D1%82%D0%BA%D0%B8"
         "/%D0%B7%D0%B0%D0%BC%D0%B5%D1%82%D0%BA%D0%B0.md"
     )
     route = mock_api.get(encoded).respond(200, text="# Кириллица")
 
-    result = await client.vault.get("заметки/заметка.md")
+    result = await client.vault.read("заметки/заметка.md")
 
     assert result == "# Кириллица"
     assert route.called
 
 
-async def test_get_deep_nested_path(mock_api, client):
+async def test_read_deep_nested_path(mock_api, client):
     route = mock_api.get("/vault/a/b/c/d/file.md").respond(200, text="# Deep")
 
-    result = await client.vault.get("a/b/c/d/file.md")
+    result = await client.vault.read("a/b/c/d/file.md")
 
     assert result == "# Deep"
     assert route.called
 
 
-async def test_get_path_with_hash(mock_api, client):
+async def test_read_path_with_hash(mock_api, client):
     route = mock_api.get("/vault/scratch/note%23hash.md").respond(200, text="# Hash")
 
-    result = await client.vault.get("scratch/note#hash.md")
+    result = await client.vault.read("scratch/note#hash.md")
 
     assert result == "# Hash"
     assert route.called
 
 
-async def test_get_path_with_percent(mock_api, client):
+async def test_read_path_with_percent(mock_api, client):
     route = mock_api.get("/vault/scratch/note%2050%25.md").respond(200, text="# Half")
 
-    result = await client.vault.get("scratch/note 50%.md")
+    result = await client.vault.read("scratch/note 50%.md")
 
     assert result == "# Half"
     assert route.called
 
 
-async def test_get_path_with_question_mark(mock_api, client):
+async def test_read_path_with_question_mark(mock_api, client):
     route = mock_api.get("/vault/scratch/q%3Fmark.md").respond(200, text="# Query")
 
-    result = await client.vault.get("scratch/q?mark.md")
+    result = await client.vault.read("scratch/q?mark.md")
 
     assert result == "# Query"
     assert route.called
 
 
-async def test_update_path_with_hash(mock_api, client):
+async def test_write_path_with_hash(mock_api, client):
     route = mock_api.put("/vault/scratch/note%23hash.md").respond(204)
 
-    await client.vault.update("scratch/note#hash.md", "OVERWRITTEN")
+    await client.vault.write("scratch/note#hash.md", "OVERWRITTEN")
 
     assert route.called
     assert route.calls[0].request.url.raw_path == b"/vault/scratch/note%23hash.md"
@@ -347,19 +346,19 @@ async def test_delete_path_with_hash(mock_api, client):
     assert route.called
 
 
-async def test_get_leading_slash(mock_api, client):
+async def test_read_leading_slash(mock_api, client):
     route = mock_api.get("/vault/notes/a.md").respond(200, text="# A")
 
-    result = await client.vault.get("/notes/a.md")
+    result = await client.vault.read("/notes/a.md")
 
     assert result == "# A"
     assert route.called
 
 
-async def test_update_leading_slash(mock_api, client):
+async def test_write_leading_slash(mock_api, client):
     route = mock_api.put("/vault/notes/a.md").respond(204)
 
-    await client.vault.update("/notes/a.md", "content")
+    await client.vault.write("/notes/a.md", "content")
 
     assert route.called
 
@@ -399,7 +398,7 @@ async def test_list_path_with_hash(mock_api, client):
 
     result = await client.vault.list("scratch/tag#folder")
 
-    assert result.files == ["a.md"]
+    assert result == ["a.md"]
 
 
 async def test_patch_non_ascii_target(mock_api, client):
@@ -415,3 +414,52 @@ async def test_patch_non_ascii_target(mock_api, client):
 
     request: httpx.Request = route.calls[0].request
     assert request.headers["target"] == "%D0%97%D0%B0%D0%BC%D0%B5%D1%82%D0%BA%D0%B8"
+
+
+async def test_open(mock_api, client):
+    route = mock_api.post("/open/notes/hello.md").respond(200)
+
+    await client.vault.open("notes/hello.md")
+
+    assert route.called
+
+
+async def test_open_new_leaf(mock_api, client):
+    route = mock_api.post("/open/notes/hello.md").respond(200)
+
+    await client.vault.open("notes/hello.md", new_leaf=True)
+
+    request: httpx.Request = route.calls[0].request
+    assert "newLeaf=true" in str(request.url)
+
+
+async def test_open_omits_new_leaf_by_default(mock_api, client):
+    route = mock_api.post("/open/note.md").respond(200)
+
+    await client.vault.open("note.md")
+
+    assert "newLeaf" not in str(route.calls[0].request.url)
+
+
+async def test_open_not_found(mock_api, client):
+    mock_api.post("/open/missing.md").respond(404, json={"message": "File not found"})
+
+    with pytest.raises(NotFoundError):
+        await client.vault.open("missing.md")
+
+
+async def test_open_path_with_question_mark(mock_api, client):
+    route = mock_api.post("/open/scratch/q%3Fmark.md").respond(200)
+
+    await client.vault.open("scratch/q?mark.md")
+
+    assert route.called
+    assert route.calls[0].request.url.raw_path == b"/open/scratch/q%3Fmark.md"
+
+
+async def test_open_leading_slash(mock_api, client):
+    route = mock_api.post("/open/notes/hello.md").respond(200)
+
+    await client.vault.open("/notes/hello.md")
+
+    assert route.called
