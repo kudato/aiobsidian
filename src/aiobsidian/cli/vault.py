@@ -114,7 +114,7 @@ class CLIVaultResource(BaseCLIResource):
 
     async def create_unique(
         self,
-        name: str = "",
+        suffix: str = "",
         content: str = "",
         *,
         open: bool = False,
@@ -135,9 +135,9 @@ class CLIVaultResource(BaseCLIResource):
         atomically.
 
         Args:
-            name: Appended to the generated timestamp, after a space,
-                rather than used as the name. Empty leaves the timestamp
-                on its own.
+            suffix: Follows the generated timestamp, after a space. The
+                CLI calls it the name, but the name is the timestamp;
+                empty leaves it on its own.
             content: Note content. Written instead of the plugin's
                 template, which fills only a note left empty.
             open: If ``True``, show the note in Obsidian afterwards.
@@ -150,8 +150,8 @@ class CLIVaultResource(BaseCLIResource):
         """
         parts = self._split_content(content)
         params: dict[str, str] = {"content": parts[0]}
-        if name:
-            params["name"] = name
+        if suffix:
+            params["name"] = suffix
         if pane is not None:
             params["paneType"] = pane
         flags = ["open"] if open else None
@@ -360,13 +360,31 @@ class CLIVaultResource(BaseCLIResource):
         Returns:
             List of file paths.
         """
+        output = await self._cli._execute("files", params=self._files_in(folder, ext))
+        return self._parse_lines(output)
+
+    @staticmethod
+    def _files_in(folder: str, ext: str | None) -> dict[str, str] | None:
+        """Narrow the `files` command to a folder, an extension, or both.
+
+        Listing files and counting them are the same command asked the
+        same question, so what makes it a question is written once.
+
+        Args:
+            folder: Folder path relative to the vault root, empty for
+                the whole vault.
+            ext: File extension to keep, or `None` for every file.
+
+        Returns:
+            Parameters for the command, or `None` when it is being
+            asked about the whole vault.
+        """
         params: dict[str, str] = {}
         if folder:
             params["folder"] = folder
         if ext is not None:
             params["ext"] = ext
-        output = await self._cli._execute("files", params=params or None)
-        return self._parse_lines(output)
+        return params or None
 
     async def file_count(self, folder: str = "", *, ext: str | None = None) -> int:
         """Count files in the vault.
@@ -385,9 +403,4 @@ class CLIVaultResource(BaseCLIResource):
         Raises:
             CLIParseError: If the output is not a whole number.
         """
-        params: dict[str, str] = {}
-        if folder:
-            params["folder"] = folder
-        if ext is not None:
-            params["ext"] = ext
-        return await self._count("files", params=params or None)
+        return await self._count("files", params=self._files_in(folder, ext))
