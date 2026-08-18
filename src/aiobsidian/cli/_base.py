@@ -168,6 +168,28 @@ class BaseCLIResource:
         except ValidationError as exc:
             raise CLIParseError(command, output) from exc
 
+    async def _count(
+        self, command: str, *, params: dict[str, str] | None = None
+    ) -> int:
+        """Ask a listing command for its length instead of its listing.
+
+        `total` is the CLI's word for it wherever a command lists
+        something, so the flag is named here rather than at each command
+        that has one.
+
+        Args:
+            command: CLI command that lists what is to be counted.
+            params: Parameters narrowing what it lists.
+
+        Returns:
+            How many things the command would have listed.
+
+        Raises:
+            CLIParseError: If the output is not a whole number.
+        """
+        output = await self._cli._execute(command, params=params, flags=["total"])
+        return self._parse_count(command, output)
+
     @staticmethod
     def _parse_count(command: str, output: str) -> int:
         """Parse output that is a count and nothing else.

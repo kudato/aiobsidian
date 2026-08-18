@@ -329,8 +329,7 @@ class CLIVaultResource(BaseCLIResource):
             CLIParseError: If the output is not a whole number.
         """
         params = {"folder": folder} if folder else None
-        output = await self._cli._execute("folders", params=params, flags=["total"])
-        return self._parse_count("folders", output)
+        return await self._count("folders", params=params)
 
     async def wordcount(self, path: str) -> WordCount:
         """Get word and character count for a file.
@@ -391,7 +390,4 @@ class CLIVaultResource(BaseCLIResource):
             params["folder"] = folder
         if ext is not None:
             params["ext"] = ext
-        output = await self._cli._execute(
-            "files", params=params or None, flags=["total"]
-        )
-        return self._parse_count("files", output)
+        return await self._count("files", params=params or None)

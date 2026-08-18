@@ -151,27 +151,30 @@ async def test_write_all_params(cli):
 
 
 # `unique` prints the path it settled on and nothing else. The name is
-# the plugin's timestamp format, with whatever was asked for after it.
-UNIQUE_PATH = "202608180312 Meeting.md\n"
+# the plugin's timestamp format, in its default `YYYYMMDDHHmm`, and a
+# name given to the command follows it after a space.
+UNIQUE_PATH = "202608180312.md\n"
+UNIQUE_NAMED_PATH = "202608180312 Meeting.md\n"
 
 
 async def test_create_unique(cli):
     cli._execute.return_value = UNIQUE_PATH
     result = await cli.vault.create_unique()
-    assert result == "202608180312 Meeting.md"
+    assert result == "202608180312.md"
     cli._execute.assert_awaited_once_with("unique", params={"content": ""}, flags=None)
 
 
 async def test_create_unique_with_a_name_and_content(cli):
-    cli._execute.return_value = UNIQUE_PATH
-    await cli.vault.create_unique("Meeting", "# Agenda")
+    cli._execute.return_value = UNIQUE_NAMED_PATH
+    result = await cli.vault.create_unique("Meeting", "# Agenda")
+    assert result == "202608180312 Meeting.md"
     cli._execute.assert_awaited_once_with(
         "unique", params={"content": "# Agenda", "name": "Meeting"}, flags=None
     )
 
 
 async def test_create_unique_showing_the_note(cli):
-    cli._execute.return_value = UNIQUE_PATH
+    cli._execute.return_value = UNIQUE_NAMED_PATH
     await cli.vault.create_unique("Meeting", open=True, pane="split")
     cli._execute.assert_awaited_once_with(
         "unique",
@@ -184,14 +187,14 @@ async def test_create_unique_with_backslash_escapes(cli):
     # Nothing but the command's own answer says where the note went, so
     # the rest of the content is appended to the path it reported rather
     # than to one worked out in advance.
-    cli._execute.return_value = UNIQUE_PATH
+    cli._execute.side_effect = [UNIQUE_PATH, "Appended to: 202608180312.md\n"]
     result = await cli.vault.create_unique(content=r"a\tb")
-    assert result == "202608180312 Meeting.md"
+    assert result == "202608180312.md"
     assert cli._execute.await_args_list == [
         call("unique", params={"content": "a\\"}, flags=None),
         call(
             "append",
-            params={"path": "202608180312 Meeting.md", "content": "tb"},
+            params={"path": "202608180312.md", "content": "tb"},
             flags=["inline"],
         ),
     ]
@@ -214,7 +217,7 @@ async def test_append_inline(cli):
 
 
 async def test_prepend(cli):
-    cli._execute.return_value = ""
+    cli._execute.return_value = "Prepended to: note.md\n"
     await cli.vault.prepend("note.md", "first")
     cli._execute.assert_awaited_once_with(
         "prepend", params={"path": "note.md", "content": "first"}, flags=None
@@ -222,7 +225,7 @@ async def test_prepend(cli):
 
 
 async def test_prepend_inline(cli):
-    cli._execute.return_value = ""
+    cli._execute.return_value = "Prepended to: note.md\n"
     await cli.vault.prepend("note.md", "first", inline=True)
     cli._execute.assert_awaited_once_with(
         "prepend", params={"path": "note.md", "content": "first"}, flags=["inline"]
@@ -270,7 +273,7 @@ async def test_append_inline_with_backslash_escapes(cli):
 
 
 async def test_prepend_with_backslash_escapes(cli):
-    cli._execute.return_value = ""
+    cli._execute.return_value = "Prepended to: note.md\n"
     await cli.vault.prepend("note.md", r"C:\notes\temp")
     assert cli._execute.await_args_list == [
         call("prepend", params={"path": "note.md", "content": "temp"}, flags=None),

@@ -40,7 +40,7 @@ async def test_recent_count(cli):
     cli._execute.return_value = "2\n"
     result = await cli.tabs.recent_count()
     assert result == 2
-    cli._execute.assert_awaited_once_with("recents", flags=["total"])
+    cli._execute.assert_awaited_once_with("recents", params=None, flags=["total"])
 
 
 async def test_recent_count_when_there_are_none(cli):

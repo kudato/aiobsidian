@@ -47,8 +47,7 @@ class CLITabsResource(BaseCLIResource):
         Raises:
             CLIParseError: If the output is not a whole number.
         """
-        output = await self._cli._execute("recents", flags=["total"])
-        return self._parse_count("recents", output)
+        return await self._count("recents")
 
     async def list(self) -> list[str]:
         """List open tabs.
