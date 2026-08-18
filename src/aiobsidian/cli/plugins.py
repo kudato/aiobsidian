@@ -29,20 +29,48 @@ class CLIPluginsResource(BaseCLIResource):
         output = await self._cli._execute("plugin", params={"id": plugin_id})
         return self._parse_fields_as("plugin", output, PluginInfo)
 
-    async def set_restricted(self, value: bool) -> None:
+    async def is_restricted(self) -> bool:
+        """Check whether restricted mode is on.
+
+        Returns:
+            ``True`` if restricted mode is on and every community plugin
+            with it off, ``False`` otherwise.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
+        """
+        output = await self._cli._execute("plugins:restrict")
+        return self._parse_yes_or_no("plugins:restrict", output, yes="on", no="off")
+
+    async def set_restricted(self, value: bool) -> bool:
         """Turn restricted mode on or off.
 
-        Obsidian reloads its window right after answering, unless the
-        setting was already in the state asked for; give it a moment
-        before the next command.
+        Obsidian reloads its window right after answering, and only when
+        the setting actually changed — which is what this returns, so a
+        caller that has to sit out the reload knows whether there is one
+        coming.
 
         Args:
             value: ``True`` enables restricted mode, which turns every
                 community plugin off; ``False`` disables restricted mode
                 and lets them run again.
+
+        Returns:
+            ``True`` if this call changed anything, ``False`` if
+            restricted mode was already the way it was asked to be.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
         """
         flags = ["on"] if value else ["off"]
-        await self._cli._execute("plugins:restrict", flags=flags)
+        state = "enabled" if value else "disabled"
+        output = await self._cli._execute("plugins:restrict", flags=flags)
+        return self._parse_yes_or_no(
+            "plugins:restrict",
+            output,
+            yes=f"Restricted mode {state}. Reloading...",
+            no=f"Restricted mode is already {state}.",
+        )
 
     async def enabled(self) -> list[str]:
         """List enabled plugins.

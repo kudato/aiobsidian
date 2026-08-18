@@ -138,16 +138,48 @@ async def test_info_with_a_stray_line(cli):
         await cli.plugins.info("daily-notes")
 
 
+async def test_is_restricted_when_on(cli):
+    # The one switch that answers a read in a word rather than a
+    # sentence.
+    cli._execute.return_value = "on\n"
+    assert await cli.plugins.is_restricted() is True
+    cli._execute.assert_awaited_once_with("plugins:restrict")
+
+
+async def test_is_restricted_when_off(cli):
+    cli._execute.return_value = "off\n"
+    assert await cli.plugins.is_restricted() is False
+
+
 async def test_set_restricted_true(cli):
-    cli._execute.return_value = ""
-    await cli.plugins.set_restricted(True)
+    cli._execute.return_value = "Restricted mode enabled. Reloading...\n"
+    assert await cli.plugins.set_restricted(True) is True
     cli._execute.assert_awaited_once_with("plugins:restrict", flags=["on"])
 
 
+async def test_set_restricted_true_when_already_restricted(cli):
+    # Nothing changed, so nothing reloads either — which is the whole
+    # reason a caller needs to be told apart from the line above.
+    cli._execute.return_value = "Restricted mode is already enabled.\n"
+    assert await cli.plugins.set_restricted(True) is False
+
+
 async def test_set_restricted_false(cli):
-    cli._execute.return_value = ""
-    await cli.plugins.set_restricted(False)
+    cli._execute.return_value = "Restricted mode disabled. Reloading...\n"
+    assert await cli.plugins.set_restricted(False) is True
     cli._execute.assert_awaited_once_with("plugins:restrict", flags=["off"])
+
+
+async def test_set_restricted_false_when_already_unrestricted(cli):
+    cli._execute.return_value = "Restricted mode is already disabled.\n"
+    assert await cli.plugins.set_restricted(False) is False
+
+
+async def test_set_restricted_with_an_unknown_reply(cli):
+    cli._execute.return_value = "Restricted mode enabled.\n"
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.plugins.set_restricted(True)
+    assert exc_info.value.command == "plugins:restrict"
 
 
 async def test_list(cli):

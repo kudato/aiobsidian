@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+from aiobsidian._exceptions import CLIParseError
+
 CONSOLE_OUTPUT = "08:38:02 Received CLI command\n08:38:03 Plugin loaded\n"
 CONSOLE_MSGS = ["08:38:02 Received CLI command", "08:38:03 Plugin loaded"]
 
@@ -114,27 +116,67 @@ async def test_css_with_prop(cli):
 
 
 async def test_set_mobile_true(cli):
-    cli._execute.return_value = ""
-    await cli.dev.set_mobile(True)
+    cli._execute.return_value = "Mobile emulation enabled. Reloading...\n"
+    assert await cli.dev.set_mobile(True) is True
     cli._execute.assert_awaited_once_with("dev:mobile", flags=["on"])
 
 
+async def test_set_mobile_true_when_already_emulating(cli):
+    cli._execute.return_value = "Mobile emulation is already enabled.\n"
+    assert await cli.dev.set_mobile(True) is False
+
+
 async def test_set_mobile_false(cli):
-    cli._execute.return_value = ""
-    await cli.dev.set_mobile(False)
+    cli._execute.return_value = "Mobile emulation disabled. Reloading...\n"
+    assert await cli.dev.set_mobile(False) is True
     cli._execute.assert_awaited_once_with("dev:mobile", flags=["off"])
 
 
+async def test_set_mobile_false_when_not_emulating(cli):
+    cli._execute.return_value = "Mobile emulation is already disabled.\n"
+    assert await cli.dev.set_mobile(False) is False
+
+
+async def test_is_attached_when_attached(cli):
+    cli._execute.return_value = "Debugger is attached.\n"
+    assert await cli.dev.is_attached() is True
+    cli._execute.assert_awaited_once_with("dev:debug")
+
+
+async def test_is_attached_when_detached(cli):
+    cli._execute.return_value = "Debugger is detached.\n"
+    assert await cli.dev.is_attached() is False
+
+
+async def test_is_attached_with_the_answer_to_a_flag(cli):
+    cli._execute.return_value = "Debugger attached. Console capture started.\n"
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.dev.is_attached()
+    assert exc_info.value.command == "dev:debug"
+
+
 async def test_set_debugger_true(cli):
-    cli._execute.return_value = ""
-    await cli.dev.set_debugger(True)
+    cli._execute.return_value = "Debugger attached. Console capture started.\n"
+    assert await cli.dev.set_debugger(True) is True
     cli._execute.assert_awaited_once_with("dev:debug", flags=["on"])
 
 
+async def test_set_debugger_true_when_already_attached(cli):
+    cli._execute.return_value = "Debugger is already attached.\n"
+    assert await cli.dev.set_debugger(True) is False
+
+
 async def test_set_debugger_false(cli):
-    cli._execute.return_value = ""
-    await cli.dev.set_debugger(False)
+    cli._execute.return_value = "Debugger detached. Console capture stopped.\n"
+    assert await cli.dev.set_debugger(False) is True
     cli._execute.assert_awaited_once_with("dev:debug", flags=["off"])
+
+
+async def test_set_debugger_false_when_not_attached(cli):
+    # Detaching what was never attached is the one no-op that does not
+    # say "already", so nothing about the wording can be assumed.
+    cli._execute.return_value = "Debugger is not attached.\n"
+    assert await cli.dev.set_debugger(False) is False
 
 
 async def test_cdp(cli):

@@ -32,16 +32,57 @@ VERSION = (
 )
 
 
+async def test_is_paused_when_paused(cli):
+    cli._execute.return_value = "Sync is paused.\n"
+    assert await cli.sync.is_paused() is True
+    cli._execute.assert_awaited_once_with("sync")
+
+
+async def test_is_paused_when_running(cli):
+    cli._execute.return_value = "Sync is running.\n"
+    assert await cli.sync.is_paused() is False
+
+
+async def test_is_paused_with_the_answer_to_a_flag(cli):
+    # One command both reads and writes, so the reply to a change is
+    # exactly what a read must not accept: it says what happened, not
+    # how things stand, and a bare `sync` never prints it.
+    cli._execute.return_value = "Sync paused.\n"
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.sync.is_paused()
+    assert exc_info.value.command == "sync"
+
+
 async def test_set_paused_true_pauses(cli):
     cli._execute.return_value = "Sync paused.\n"
-    await cli.sync.set_paused(True)
+    assert await cli.sync.set_paused(True) is True
     cli._execute.assert_awaited_once_with("sync", flags=["off"])
+
+
+async def test_set_paused_true_when_already_paused(cli):
+    cli._execute.return_value = "Sync is already paused.\n"
+    assert await cli.sync.set_paused(True) is False
 
 
 async def test_set_paused_false_resumes(cli):
     cli._execute.return_value = "Sync resumed.\n"
-    await cli.sync.set_paused(False)
+    assert await cli.sync.set_paused(False) is True
     cli._execute.assert_awaited_once_with("sync", flags=["on"])
+
+
+async def test_set_paused_false_when_already_running(cli):
+    cli._execute.return_value = "Sync is already running.\n"
+    assert await cli.sync.set_paused(False) is False
+
+
+async def test_set_paused_with_the_answer_to_the_other_flag(cli):
+    # Each direction has its own pair of sentences, and reading one
+    # direction's answer as the other's would report a resume as a
+    # pause that changed nothing.
+    cli._execute.return_value = "Sync resumed.\n"
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.sync.set_paused(True)
+    assert exc_info.value.command == "sync"
 
 
 async def test_open(cli):
