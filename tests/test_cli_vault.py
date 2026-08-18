@@ -157,14 +157,14 @@ UNIQUE_PATH = "202608180312.md\n"
 UNIQUE_NAMED_PATH = "202608180312 Meeting.md\n"
 
 
-async def test_create_unique(cli):
+async def test_create_unique_without_a_suffix(cli):
     cli._execute.return_value = UNIQUE_PATH
     result = await cli.vault.create_unique()
     assert result == "202608180312.md"
     cli._execute.assert_awaited_once_with("unique", params={"content": ""}, flags=None)
 
 
-async def test_create_unique_with_a_name_and_content(cli):
+async def test_create_unique_with_a_suffix_and_content(cli):
     cli._execute.return_value = UNIQUE_NAMED_PATH
     result = await cli.vault.create_unique("Meeting", "# Agenda")
     assert result == "202608180312 Meeting.md"
@@ -329,7 +329,7 @@ async def test_list(cli):
     cli._execute.assert_awaited_once_with("files", params=None)
 
 
-async def test_file_count(cli):
+async def test_file_count_for_the_whole_vault(cli):
     cli._execute.return_value = "47\n"
     result = await cli.vault.file_count()
     assert result == 47
@@ -656,7 +656,7 @@ async def test_wordcount_with_a_stray_line(cli):
         await cli.vault.wordcount("note.md")
 
 
-async def test_folder_count(cli):
+async def test_folder_count_for_the_whole_vault(cli):
     cli._execute.return_value = "14\n"
     result = await cli.vault.folder_count()
     assert result == 14
@@ -672,7 +672,7 @@ async def test_folder_count_below_a_folder(cli):
     )
 
 
-async def test_resolve(cli):
+async def test_resolve_a_name_to_its_file(cli):
     # The same record `file_info` reads, asked for by name rather than
     # by path, so the path in it is the answer to where the name went.
     cli._execute.return_value = FILE_INFO

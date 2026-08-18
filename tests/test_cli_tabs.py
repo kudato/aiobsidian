@@ -36,7 +36,7 @@ async def test_recents(cli):
     cli._execute.assert_awaited_once_with("recents")
 
 
-async def test_recent_count(cli):
+async def test_recent_count_when_there_are_some(cli):
     cli._execute.return_value = "2\n"
     result = await cli.tabs.recent_count()
     assert result == 2
