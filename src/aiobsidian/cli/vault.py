@@ -360,11 +360,13 @@ class CLIVaultResource(BaseCLIResource):
         Returns:
             List of file paths.
         """
-        output = await self._cli._execute("files", params=self._files_in(folder, ext))
+        output = await self._cli._execute(
+            "files", params=self._files_filter(folder, ext)
+        )
         return self._parse_lines(output)
 
     @staticmethod
-    def _files_in(folder: str, ext: str | None) -> dict[str, str] | None:
+    def _files_filter(folder: str, ext: str | None) -> dict[str, str] | None:
         """Narrow the `files` command to a folder, an extension, or both.
 
         Listing files and counting them are the same command asked the
@@ -403,4 +405,4 @@ class CLIVaultResource(BaseCLIResource):
         Raises:
             CLIParseError: If the output is not a whole number.
         """
-        return await self._count("files", params=self._files_in(folder, ext))
+        return await self._count("files", params=self._files_filter(folder, ext))
