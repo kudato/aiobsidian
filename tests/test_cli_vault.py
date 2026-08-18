@@ -38,9 +38,19 @@ WORD_COUNT = "words: 500\ncharacters: 2800\n"
 
 
 async def test_open(cli):
-    cli._execute.return_value = ""
+    cli._execute.return_value = "Opened: note.md\n"
     await cli.vault.open("note.md")
-    cli._execute.assert_awaited_once_with("open", params={"path": "note.md"})
+    cli._execute.assert_awaited_once_with(
+        "open", params={"path": "note.md"}, flags=None
+    )
+
+
+async def test_open_in_a_new_tab(cli):
+    cli._execute.return_value = "Opened: note.md\n"
+    await cli.vault.open("note.md", new_tab=True)
+    cli._execute.assert_awaited_once_with(
+        "open", params={"path": "note.md"}, flags=["newtab"]
+    )
 
 
 async def test_read(cli):
@@ -98,6 +108,28 @@ async def test_write_with_template(cli):
     )
 
 
+async def test_write_showing_the_file(cli):
+    cli._execute.return_value = "Created: note.md\n"
+    await cli.vault.write("note.md", "content", open=True, new_tab=True)
+    cli._execute.assert_awaited_once_with(
+        "create",
+        params={"path": "note.md", "content": "content"},
+        flags=["overwrite", "open", "newtab"],
+    )
+
+
+async def test_write_where_to_show_it_without_showing_it(cli):
+    # The CLI reads `newtab` only after `open` has sent it looking for a
+    # pane, so on its own the flag is inert — sent, and nothing more.
+    cli._execute.return_value = "Created: note.md\n"
+    await cli.vault.write("note.md", "content", new_tab=True)
+    cli._execute.assert_awaited_once_with(
+        "create",
+        params={"path": "note.md", "content": "content"},
+        flags=["overwrite", "newtab"],
+    )
+
+
 async def test_write_rejects_content_and_template(cli):
     with pytest.raises(ValueError, match="content or template"):
         await cli.vault.write("note.md", "content", template="daily")
@@ -118,6 +150,56 @@ async def test_write_all_params(cli):
     )
 
 
+# `unique` prints the path it settled on and nothing else. The name is
+# the plugin's timestamp format, in its default `YYYYMMDDHHmm`, and a
+# name given to the command follows it after a space.
+UNIQUE_PATH = "202608180312.md\n"
+UNIQUE_NAMED_PATH = "202608180312 Meeting.md\n"
+
+
+async def test_create_unique_without_a_suffix(cli):
+    cli._execute.return_value = UNIQUE_PATH
+    result = await cli.vault.create_unique()
+    assert result == "202608180312.md"
+    cli._execute.assert_awaited_once_with("unique", params={"content": ""}, flags=None)
+
+
+async def test_create_unique_with_a_suffix_and_content(cli):
+    cli._execute.return_value = UNIQUE_NAMED_PATH
+    result = await cli.vault.create_unique("Meeting", "# Agenda")
+    assert result == "202608180312 Meeting.md"
+    cli._execute.assert_awaited_once_with(
+        "unique", params={"content": "# Agenda", "name": "Meeting"}, flags=None
+    )
+
+
+async def test_create_unique_showing_the_note(cli):
+    cli._execute.return_value = UNIQUE_NAMED_PATH
+    await cli.vault.create_unique("Meeting", open=True, pane="split")
+    cli._execute.assert_awaited_once_with(
+        "unique",
+        params={"content": "", "name": "Meeting", "paneType": "split"},
+        flags=["open"],
+    )
+
+
+async def test_create_unique_with_backslash_escapes(cli):
+    # Nothing but the command's own answer says where the note went, so
+    # the rest of the content is appended to the path it reported rather
+    # than to one worked out in advance.
+    cli._execute.side_effect = [UNIQUE_PATH, "Appended to: 202608180312.md\n"]
+    result = await cli.vault.create_unique(content=r"a\tb")
+    assert result == "202608180312.md"
+    assert cli._execute.await_args_list == [
+        call("unique", params={"content": "a\\"}, flags=None),
+        call(
+            "append",
+            params={"path": "202608180312.md", "content": "tb"},
+            flags=["inline"],
+        ),
+    ]
+
+
 async def test_append(cli):
     cli._execute.return_value = ""
     await cli.vault.append("note.md", "extra")
@@ -135,10 +217,18 @@ async def test_append_inline(cli):
 
 
 async def test_prepend(cli):
-    cli._execute.return_value = ""
+    cli._execute.return_value = "Prepended to: note.md\n"
     await cli.vault.prepend("note.md", "first")
     cli._execute.assert_awaited_once_with(
-        "prepend", params={"path": "note.md", "content": "first"}
+        "prepend", params={"path": "note.md", "content": "first"}, flags=None
+    )
+
+
+async def test_prepend_inline(cli):
+    cli._execute.return_value = "Prepended to: note.md\n"
+    await cli.vault.prepend("note.md", "first", inline=True)
+    cli._execute.assert_awaited_once_with(
+        "prepend", params={"path": "note.md", "content": "first"}, flags=["inline"]
     )
 
 
@@ -183,10 +273,10 @@ async def test_append_inline_with_backslash_escapes(cli):
 
 
 async def test_prepend_with_backslash_escapes(cli):
-    cli._execute.return_value = ""
+    cli._execute.return_value = "Prepended to: note.md\n"
     await cli.vault.prepend("note.md", r"C:\notes\temp")
     assert cli._execute.await_args_list == [
-        call("prepend", params={"path": "note.md", "content": "temp"}),
+        call("prepend", params={"path": "note.md", "content": "temp"}, flags=None),
         call(
             "prepend",
             params={"path": "note.md", "content": "notes\\"},
@@ -237,6 +327,31 @@ async def test_list(cli):
     result = await cli.vault.list()
     assert result == ["a.md", "b.md"]
     cli._execute.assert_awaited_once_with("files", params=None)
+
+
+async def test_file_count_for_the_whole_vault(cli):
+    cli._execute.return_value = "47\n"
+    result = await cli.vault.file_count()
+    assert result == 47
+    cli._execute.assert_awaited_once_with("files", params=None, flags=["total"])
+
+
+async def test_file_count_in_a_folder_by_extension(cli):
+    cli._execute.return_value = "3\n"
+    result = await cli.vault.file_count("notes", ext="md")
+    assert result == 3
+    cli._execute.assert_awaited_once_with(
+        "files", params={"folder": "notes", "ext": "md"}, flags=["total"]
+    )
+
+
+async def test_file_count_with_a_listing_for_an_answer(cli):
+    # `total` is what makes the answer a number; without it the same
+    # command prints the listing, and a listing is not a count.
+    cli._execute.return_value = "a.md\nb.md\n"
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.vault.file_count()
+    assert exc_info.value.command == "files"
 
 
 async def test_list_with_folder_positional(cli):
@@ -539,3 +654,28 @@ async def test_wordcount_with_a_stray_line(cli):
     cli._execute.return_value = WORD_COUNT + "and one more thing\n"
     with pytest.raises(CLIParseError):
         await cli.vault.wordcount("note.md")
+
+
+async def test_folder_count_for_the_whole_vault(cli):
+    cli._execute.return_value = "14\n"
+    result = await cli.vault.folder_count()
+    assert result == 14
+    cli._execute.assert_awaited_once_with("folders", params=None, flags=["total"])
+
+
+async def test_folder_count_below_a_folder(cli):
+    cli._execute.return_value = "2\n"
+    result = await cli.vault.folder_count("notes")
+    assert result == 2
+    cli._execute.assert_awaited_once_with(
+        "folders", params={"folder": "notes"}, flags=["total"]
+    )
+
+
+async def test_resolve_a_name_to_its_file(cli):
+    # The same record `file_info` reads, asked for by name rather than
+    # by path, so the path in it is the answer to where the name went.
+    cli._execute.return_value = FILE_INFO
+    result = await cli.vault.resolve("note")
+    assert result.path == "note.md"
+    cli._execute.assert_awaited_once_with("file", params={"file": "note"})

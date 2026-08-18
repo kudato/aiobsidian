@@ -20,6 +20,10 @@ return.
 - `APIStatusError`, `APIRequestError`, `APIConnectionError`, `APITimeoutError` and `APIProtocolError`
 - `APINotFoundError`, `CLINotFoundError` and `CLIParseError`, so a missing note and unparseable output can be told apart from any other failure of that transport
 - `tasks.reopen()` to undo `tasks.complete()`, `tasks.list(todo=)`, `daily.open()`, `publish.add(changed=)` and `CommandError.stdout`
+- `vault.create_unique()`, the Unique note creator's command: it names a note after the moment it was created, puts it where that plugin says, and reports the path it landed on
+- `vault.resolve()`, which looks a note up by name the way a wikilink does and hands back its record, so a name can be turned into the path every other method takes
+- `vault.file_count()`, `vault.folder_count()` and `tabs.recent_count()`, which ask the CLI for the number rather than count a listing that had to be printed and read back first
+- `vault.open(new_tab=)`, `vault.write(open=, new_tab=)` and `vault.prepend(inline=)`
 - `sync.is_paused()`, `plugins.is_restricted()` and `dev.is_attached()`, the read side of the on/off switches. Mobile emulation has no counterpart to give: asked for neither state its command flips the emulation instead of reporting it
 - `Tag`, `Task`, `Backlink`, `Bookmark`, `Hotkey`, `Plugin`, `Heading`, `MatchedFile`, `MatchedLine`, `BaseView`, `FileVersion` and `PublishChange`, the models the CLI list commands return
 - `VaultInfo`, `FolderInfo`, `FileInfo`, `WordCount`, `PluginInfo`, `SyncStatus` and `PublishSite`, the models the CLI commands that describe one thing return
