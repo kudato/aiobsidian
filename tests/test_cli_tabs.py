@@ -34,3 +34,18 @@ async def test_recents(cli):
     result = await cli.tabs.recents()
     assert result == ["notes/note.md", "notes/old.md"]
     cli._execute.assert_awaited_once_with("recents")
+
+
+async def test_recent_count(cli):
+    cli._execute.return_value = "2\n"
+    result = await cli.tabs.recent_count()
+    assert result == 2
+    cli._execute.assert_awaited_once_with("recents", flags=["total"])
+
+
+async def test_recent_count_when_there_are_none(cli):
+    # Counted, the empty list is a zero rather than the "No recent
+    # files." the listing answers with.
+    cli._execute.return_value = "0\n"
+    result = await cli.tabs.recent_count()
+    assert result == 0

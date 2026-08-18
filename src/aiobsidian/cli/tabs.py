@@ -35,6 +35,21 @@ class CLITabsResource(BaseCLIResource):
         output = await self._cli._execute("recents")
         return self._parse_lines(output)
 
+    async def recent_count(self) -> int:
+        """Count recently opened files.
+
+        What `recents()` would return the length of, without the listing
+        itself travelling through the CLI to be counted here.
+
+        Returns:
+            How many files Obsidian is keeping in that list.
+
+        Raises:
+            CLIParseError: If the output is not a whole number.
+        """
+        output = await self._cli._execute("recents", flags=["total"])
+        return self._parse_count("recents", output)
+
     async def list(self) -> list[str]:
         """List open tabs.
 

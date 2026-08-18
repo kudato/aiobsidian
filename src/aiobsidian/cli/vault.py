@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from ..models import FileInfo, FolderInfo, VaultInfo, WordCount
 from ._base import BaseCLIResource
 
@@ -13,13 +15,16 @@ class CLIVaultResource(BaseCLIResource):
 
     __slots__ = ()
 
-    async def open(self, path: str) -> None:
+    async def open(self, path: str, *, new_tab: bool = False) -> None:
         """Open a file in the Obsidian UI.
 
         Args:
             path: Path to the file relative to the vault root.
+            new_tab: If ``True``, open in a new tab instead of the
+                active one.
         """
-        await self._cli._execute("open", params={"path": path})
+        flags = ["newtab"] if new_tab else None
+        await self._cli._execute("open", params={"path": path}, flags=flags)
 
     async def read(self, path: str) -> str:
         """Read the content of a vault file.
@@ -40,6 +45,8 @@ class CLIVaultResource(BaseCLIResource):
         name: str | None = None,
         template: str | None = None,
         overwrite: bool = True,
+        open: bool = False,
+        new_tab: bool = False,
     ) -> None:
         """Create or replace a file in the vault.
 
@@ -56,6 +63,10 @@ class CLIVaultResource(BaseCLIResource):
                 the template instead of ``content``, never both.
             overwrite: If ``False``, refuse to touch a file that is
                 already there and let the CLI report it as a failure.
+            open: If ``True``, show the file in Obsidian afterwards.
+            new_tab: Where to show it, for when ``open`` is asked for.
+                On its own it does nothing, since the CLI reads it only
+                once it has been told to open something.
 
         Raises:
             ValueError: If both ``content`` and ``template`` are given.
@@ -73,8 +84,12 @@ class CLIVaultResource(BaseCLIResource):
             params["content"] = parts[0]
         if name is not None:
             params["name"] = name
-        flags = ["overwrite"] if overwrite else None
-        await self._cli._execute("create", params=params, flags=flags)
+        flags = ["overwrite"] if overwrite else []
+        if open:
+            flags.append("open")
+        if new_tab:
+            flags.append("newtab")
+        await self._cli._execute("create", params=params, flags=flags or None)
         await self._write_parts(
             "append", parts[1:], params={"path": self._created_path(path, name)}
         )
@@ -97,6 +112,54 @@ class CLIVaultResource(BaseCLIResource):
         target = f"{path.rstrip('/')}/{name}" if name is not None else path
         return target if target.rfind(".") > 0 else f"{target}.md"
 
+    async def create_unique(
+        self,
+        name: str = "",
+        content: str = "",
+        *,
+        open: bool = False,
+        pane: Literal["tab", "split", "window"] | None = None,
+    ) -> str:
+        """Create a note named after the moment it was created.
+
+        The Unique note creator core plugin owns this one, so it answers
+        `Error: Command "unique" not found` while that plugin is off,
+        and it decides both where the note goes and what it is called:
+        the name is a timestamp in the format configured there, and the
+        folder and template are that plugin's settings rather than
+        arguments. There is no way to say where the note should land, so
+        the path it did land in is what comes back.
+
+        Content with literal ``\\n`` or ``\\t`` sequences is written in
+        several calls, so the note is built up incrementally rather than
+        atomically.
+
+        Args:
+            name: Appended to the generated timestamp, after a space,
+                rather than used as the name. Empty leaves the timestamp
+                on its own.
+            content: Note content. Written instead of the plugin's
+                template, which fills only a note left empty.
+            open: If ``True``, show the note in Obsidian afterwards.
+            pane: Where to show it, for when ``open`` is asked for. On
+                its own it does nothing, since the CLI reads it only
+                once it has been told to open something.
+
+        Returns:
+            Path of the created note, relative to the vault root.
+        """
+        parts = self._split_content(content)
+        params: dict[str, str] = {"content": parts[0]}
+        if name:
+            params["name"] = name
+        if pane is not None:
+            params["paneType"] = pane
+        flags = ["open"] if open else None
+        output = await self._cli._execute("unique", params=params, flags=flags)
+        path = output.strip()
+        await self._write_parts("append", parts[1:], params={"path": path})
+        return path
+
     async def append(self, path: str, content: str, *, inline: bool = False) -> None:
         """Append content to a vault file.
 
@@ -115,7 +178,7 @@ class CLIVaultResource(BaseCLIResource):
         )
         await self._write_parts("append", parts[1:], params={"path": path})
 
-    async def prepend(self, path: str, content: str) -> None:
+    async def prepend(self, path: str, content: str, *, inline: bool = False) -> None:
         """Prepend content to a vault file.
 
         Content with literal ``\\n`` or ``\\t`` sequences is written in several
@@ -124,9 +187,17 @@ class CLIVaultResource(BaseCLIResource):
         Args:
             path: Path to the file relative to the vault root.
             content: Content to prepend.
+            inline: If ``True``, prepend without a newline separator, so
+                the content runs straight into what was there.
         """
         parts = self._split_content(content)
-        await self._cli._execute("prepend", params={"path": path, "content": parts[-1]})
+        flags = ["inline"] if inline else None
+        # The separator goes between the content and the file, so the
+        # flag belongs to the part written against the file itself —
+        # which is the last one, prepended first.
+        await self._cli._execute(
+            "prepend", params={"path": path, "content": parts[-1]}, flags=flags
+        )
         await self._write_parts("prepend", parts[-2::-1], params={"path": path})
 
     async def move(self, path: str, to: str) -> None:
@@ -186,6 +257,32 @@ class CLIVaultResource(BaseCLIResource):
         output = await self._cli._execute("file", params={"path": path})
         return self._parse_fields_as("file", output, FileInfo)
 
+    async def resolve(self, name: str) -> FileInfo:
+        """Find the file a note name points at.
+
+        Every other method here takes a path, because a path is exact.
+        This is the one that takes a name and resolves it the way a
+        wikilink does: the note is looked up wherever it lives, and an
+        ambiguous name lands on whichever match Obsidian would follow.
+        The record it hands back carries the path, which is what the
+        rest of this resource wants.
+
+        Args:
+            name: Note name as a link would spell it, with or without
+                the extension and with as much of the path as it takes
+                to be unambiguous.
+
+        Returns:
+            The file's name, size and timestamps, and the path it was
+            found at.
+
+        Raises:
+            CLINotFoundError: If no file answers to that name.
+            CLIParseError: If the output has an unexpected shape.
+        """
+        output = await self._cli._execute("file", params={"file": name})
+        return self._parse_fields_as("file", output, FileInfo)
+
     async def folder_info(self, path: str) -> FolderInfo:
         """Get information about a folder.
 
@@ -214,6 +311,26 @@ class CLIVaultResource(BaseCLIResource):
         params = {"folder": folder} if folder else None
         output = await self._cli._execute("folders", params=params)
         return self._parse_lines(output)
+
+    async def folder_count(self, folder: str = "") -> int:
+        """Count folders in the vault.
+
+        What `folders()` would return the length of, without the listing
+        itself travelling through the CLI to be counted here.
+
+        Args:
+            folder: Parent folder path relative to the vault root. Empty
+                string counts every folder in the vault.
+
+        Returns:
+            How many folders there are below that point, at any depth.
+
+        Raises:
+            CLIParseError: If the output is not a whole number.
+        """
+        params = {"folder": folder} if folder else None
+        output = await self._cli._execute("folders", params=params, flags=["total"])
+        return self._parse_count("folders", output)
 
     async def wordcount(self, path: str) -> WordCount:
         """Get word and character count for a file.
@@ -251,3 +368,30 @@ class CLIVaultResource(BaseCLIResource):
             params["ext"] = ext
         output = await self._cli._execute("files", params=params or None)
         return self._parse_lines(output)
+
+    async def file_count(self, folder: str = "", *, ext: str | None = None) -> int:
+        """Count files in the vault.
+
+        What `list()` would return the length of, without the listing
+        itself travelling through the CLI to be counted here.
+
+        Args:
+            folder: Folder path relative to the vault root. Empty string
+                counts every file in the vault.
+            ext: Count only files with this extension (e.g. ``"md"``).
+
+        Returns:
+            How many files there are below that point, at any depth.
+
+        Raises:
+            CLIParseError: If the output is not a whole number.
+        """
+        params: dict[str, str] = {}
+        if folder:
+            params["folder"] = folder
+        if ext is not None:
+            params["ext"] = ext
+        output = await self._cli._execute(
+            "files", params=params or None, flags=["total"]
+        )
+        return self._parse_count("files", output)

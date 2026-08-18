@@ -169,6 +169,29 @@ class BaseCLIResource:
             raise CLIParseError(command, output) from exc
 
     @staticmethod
+    def _parse_count(command: str, output: str) -> int:
+        """Parse output that is a count and nothing else.
+
+        Asked for a `total`, the CLI prints the number on its own
+        instead of the listing it counts, which is what makes asking
+        worth it: a vault of ten thousand notes answers in one line.
+
+        Args:
+            command: CLI command name, used for error reporting.
+            output: Raw output of the command.
+
+        Returns:
+            The number printed.
+
+        Raises:
+            CLIParseError: If the output is not a whole number.
+        """
+        try:
+            return int(output.strip())
+        except ValueError:
+            raise CLIParseError(command, output) from None
+
+    @staticmethod
     def _parse_yes_or_no(command: str, output: str, *, yes: str, no: str) -> bool:
         """Parse output that answers with one of two known sentences.
 
