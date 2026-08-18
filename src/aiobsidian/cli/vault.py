@@ -265,7 +265,9 @@ class CLIVaultResource(BaseCLIResource):
         wikilink does: the note is looked up wherever it lives, and an
         ambiguous name lands on whichever match Obsidian would follow.
         The record it hands back carries the path, which is what the
-        rest of this resource wants.
+        rest of this resource wants. Two calls rather than one, so a
+        rename between them leaves the path pointing at nothing — or,
+        worse, at whatever took its place.
 
         Args:
             name: Note name as a link would spell it, with or without
