@@ -690,7 +690,7 @@ class TestExecute:
         assert not isinstance(exc_info.value, CLINotFoundError)
 
     async def test_a_returned_usage_message_raises(self):
-        # `command`, `template:insert` and `history:restore` report a
+        # `command`, `history:restore` and `workspace:save` report a
         # parameter they cannot do without by returning the usage rather
         # than raising it, so it arrives with no `Error: ` on it.
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")

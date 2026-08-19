@@ -220,9 +220,9 @@ UNEXPECTED_OUTPUT = (
 """Answers no command documents: blank space, JSON cut short, JSON of
 the wrong shape, prose where a table was expected, and a row with more
 columns than any table has. Then three the CLI really prints — the
-empty-result lines it writes without the full stop the rest of them
-end in, and which every method has to survive whether or not it is the
-one that prints them."""
+empty-result lines it writes without the full stop the rest of them end
+in, `bases`, `base:query` and `diff` in that order — which every method
+has to survive whether or not it is the one that prints them."""
 
 
 def _resource_names() -> list[str]:

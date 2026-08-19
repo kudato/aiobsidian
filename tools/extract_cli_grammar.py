@@ -248,7 +248,9 @@ def parse_options(source: str) -> dict[str, dict[str, Any]]:
         else:
             colon = text.find(":", index)
             if colon == -1:
-                raise ExtractionError(f"a parameter without a colon: {text[index:60]}")
+                raise ExtractionError(
+                    f"a parameter without a colon: {text[index : index + 60]}"
+                )
             key, index = text[index:colon].strip(), colon
         index = _skip_space(text, index)
         if text[index : index + 1] != ":":
@@ -328,7 +330,9 @@ def _read_key(source: str, index: int) -> tuple[str, int]:
         return read_js_string(source, index)
     colon = source.find(":", index)
     if colon == -1:
-        raise ExtractionError(f"a key with no colon after it: {source[index:60]}")
+        raise ExtractionError(
+            f"a key with no colon after it: {source[index : index + 60]}"
+        )
     return source[index:colon].strip(), colon
 
 

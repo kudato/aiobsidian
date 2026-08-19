@@ -237,13 +237,15 @@ class Grammar:
         handler, implied = self.resolve(command)
         options = self.commands[handler]
 
+        # In the order `_build_argv` lays them out, because the
+        # dispatcher keeps the last of a name given twice.
         given: dict[str, str | None] = {} if implied is None else {implied: None}
-        for name in flags or ():
-            given[name] = None
-        for name, value in (params or {}).items():
-            given[name] = value
         if output_format is not None:
             given["format"] = output_format
+        for name, value in (params or {}).items():
+            given[name] = value
+        for name in flags or ():
+            given[name] = None
 
         self._apply_format_shorthand(options, given)
 

@@ -86,9 +86,9 @@ normal content.
 
 Three failures arrive without that prefix, and are recognised anyway:
 
-- a few commands report a parameter they cannot do without by returning their usage
-  instead of raising. That starts with `Missing required parameter: `, and is read the
-  same way, by the prefix
+- `command`, `history:restore` and `workspace:save` report a parameter they cannot do
+  without by returning their usage instead of raising it. That starts with
+  `Missing required parameter: `, and is read the same way, by the prefix
 - `Vault not found.` — the `vault=` name reached no vault Obsidian knows. It is decided
   before the command reaches a vault, so it carries no prefix, and raises `CommandError`
   rather than `CLINotFoundError`: a vault you cannot reach would otherwise answer

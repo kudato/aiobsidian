@@ -12,16 +12,13 @@ if TYPE_CHECKING:
     from .._cli import ObsidianCLI
 
 _EMPTY_RESULT_PATTERN = re.compile(
-    r"^No [^\n]+\.$"
-    r"|^No base files found in vault$"
-    r"|^No views defined in base file$"
-    r"|^No version history found for [^\n]+$"
+    r"^No [^\n]+\.$|^No base files found in vault$|^No views defined in base file$"
 )
 """The one line the CLI prints instead of an empty listing. Nearly all of
 them are a sentence and end like one, and matching the full stop is what
-keeps a note called `No idea.md` from reading as one. Three do not have
-it, so they are named: leaving them out had `bases.list()` hand back the
-sentence as a path."""
+keeps a note called `No idea.md` from reading as one. Two do not have it,
+so they are named rather than matched: leaving them out had
+`bases.list()` hand the sentence back as the path of a base."""
 _ESCAPE_BOUNDARY_PATTERN = re.compile(r"(?<=\\)(?=[nt])")
 
 

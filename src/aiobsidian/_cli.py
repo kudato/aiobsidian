@@ -60,7 +60,7 @@ _UNKNOWN_COMMAND_PATTERN = re.compile(r'^Error: Command "[^"]*" not found')
 _MISSING_PARAMETER_PREFIX = "Missing required parameter: "
 """How a handler reports a parameter it cannot do without. Most raise it,
 and a raised failure is printed with the `Error: ` above; `command`,
-`template:insert` and `history:restore` return it instead, so it arrives
+`history:restore` and `workspace:save` return it instead, so it arrives
 as ordinary output and is read here by its prefix."""
 
 _UNPREFIXED_FAILURES = frozenset(
