@@ -12,11 +12,14 @@
 
 ```bash
 uv sync --all-groups                   # install all deps (dev + docs); plain `uv sync` drops docs
-uv run ruff check src/ tests/          # lint
-uv run ruff format src/ tests/         # auto-format
-uv run mypy src/ tests/typing_examples.py   # type check
+uv run ruff check src/ tests/ tools/   # lint
+uv run ruff format src/ tests/ tools/  # auto-format
+uv run mypy src/ tools/ tests/typing_examples.py   # type check
 uv run pytest                          # run tests
 uv run mkdocs build                    # build static docs
+
+# Refresh the CLI grammar the tests check against, from an installed Obsidian
+uv run python tools/extract_cli_grammar.py > tests/data/cli_grammar.json
 ```
 
 ## Code style
@@ -37,3 +40,5 @@ uv run mkdocs build                    # build static docs
 - `asyncio_mode = "auto"` — no async markers needed
 - REST: `respx.mock` with the `client` fixture; CLI: the `cli` fixture with `AsyncMock` on `_execute`
 - CLI test data must reproduce real `obsidian` output, not what the code happens to send
+- The `cli` fixture checks every command line against `tests/data/cli_grammar.json`, the grammar of the shipped app; a new command or parameter has to be one Obsidian registers
+- Every public CLI method needs an entry in `CALLS` in `tests/test_cli_contract.py`, which is what checks its command line, its empty answer and its error propagation
