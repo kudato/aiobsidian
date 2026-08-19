@@ -18,6 +18,12 @@ uv run python tools/extract_cli_grammar.py > tests/data/cli_grammar.json
 ```
 
 Pass `--asar` to read an app installed somewhere this does not look.
+
+The bundle is transpiled to ES5, so the registrations hold nothing but
+object and string literals: no template literals, no regular expressions,
+no shorthand and no spread. This reads them on that assumption and
+refuses anything else rather than guessing, because a grammar guessed
+wrong is worse than none — the tests would check against it and agree.
 """
 
 from __future__ import annotations
@@ -34,6 +40,7 @@ _ASAR_CANDIDATES = (
     "/Applications/Obsidian.app/Contents/Resources/obsidian.asar",
     "/opt/Obsidian/resources/obsidian.asar",
     "/usr/lib/obsidian/resources/obsidian.asar",
+    R"C:\Program Files\Obsidian\resources\obsidian.asar",
 )
 
 _REGISTRATION = re.compile(r"\.register(?:Cli)?Handler\(")
@@ -56,7 +63,9 @@ def read_asar(path: Path) -> dict[str, bytes]:
         path: Path to the archive.
 
     Returns:
-        The contents of every file in the archive, by archive path.
+        The contents of every file in the archive, by archive path. A
+        file the packer left outside the archive is named and skipped:
+        `obsidian.asar` has none, and its neighbour `app.asar` does.
 
     Raises:
         ExtractionError: If the archive cannot be read as an asar.
@@ -77,6 +86,9 @@ def read_asar(path: Path) -> dict[str, bytes]:
         for name, entry in node.get("files", {}).items():
             if "files" in entry:
                 walk(entry, f"{prefix}{name}/")
+                continue
+            if "offset" not in entry:
+                print(f"skipping unpacked {prefix}{name}", file=sys.stderr)
                 continue
             offset = base + int(entry["offset"])
             files[f"{prefix}{name}"] = blob[offset : offset + int(entry["size"])]
@@ -177,6 +189,21 @@ def split_call_arguments(source: str, start: int) -> list[str]:
         index = end + 1
 
 
+def _skip_space(source: str, index: int) -> int:
+    """Move past whatever blank space follows.
+
+    Args:
+        source: Text to scan.
+        index: Where to start.
+
+    Returns:
+        Index of the next character that is not blank space.
+    """
+    while index < len(source) and source[index] in " \t\r\n":
+        index += 1
+    return index
+
+
 def parse_options(source: str) -> dict[str, dict[str, Any]]:
     """Parse a handler's options object into the grammar of one command.
 
@@ -191,7 +218,10 @@ def parse_options(source: str) -> dict[str, dict[str, Any]]:
 
     Raises:
         ExtractionError: If the argument is neither an object literal nor
-            `null`.
+            `null`, or if a parameter is described by anything but an
+            object literal of its own. Seeking the next `{` past such a
+            parameter would read the following one's description as its
+            own and drop a parameter without saying so.
     """
     text = source.strip()
     if text == "null":
@@ -211,9 +241,19 @@ def parse_options(source: str) -> dict[str, dict[str, Any]]:
         if char in "\"'":
             key, index = read_js_string(text, index)
         else:
-            colon = text.index(":", index)
+            colon = text.find(":", index)
+            if colon == -1:
+                raise ExtractionError(f"a parameter without a colon: {text[index:60]}")
             key, index = text[index:colon].strip(), colon
-        index = text.index("{", index)
+        index = _skip_space(text, index)
+        if text[index : index + 1] != ":":
+            raise ExtractionError(f"parameter {key!r} names no description")
+        index = _skip_space(text, index + 1)
+        if text[index : index + 1] != "{":
+            raise ExtractionError(
+                f"parameter {key!r} is not described by an object literal: "
+                f"{text[index : index + 60]}"
+            )
         end = _scan(text, index + 1, "}")
         body = text[index + 1 : end]
         index = end + 1
@@ -285,6 +325,32 @@ def find_asar(explicit: str | None) -> Path:
     )
 
 
+def read_version(files: dict[str, bytes], path: Path) -> str:
+    """Read which Obsidian an archive holds.
+
+    The grammar is only good for the release it was read from, so the
+    table carries the version and this refuses an archive that cannot
+    name one.
+
+    Args:
+        files: Contents of the archive.
+        path: Where it came from, for the message.
+
+    Returns:
+        The version the archive declares.
+
+    Raises:
+        ExtractionError: If the archive names no version.
+    """
+    try:
+        version = json.loads(files["package.json"].decode())["version"]
+    except (KeyError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ExtractionError(f"{path} names no version in its package.json") from exc
+    if not isinstance(version, str):
+        raise ExtractionError(f"{path} names a version that is not a string")
+    return version
+
+
 def main() -> int:
     """Write the grammar of an installed Obsidian to standard output.
 
@@ -298,9 +364,9 @@ def main() -> int:
     try:
         path = find_asar(arguments.asar)
         files = read_asar(path)
+        version = read_version(files, path)
         if "app.js" not in files:
             raise ExtractionError(f"{path} holds no app.js")
-        version = json.loads(files["package.json"].decode())["version"]
         commands = extract_grammar(files["app.js"].decode(errors="replace"))
     except ExtractionError as exc:
         print(f"error: {exc}", file=sys.stderr)

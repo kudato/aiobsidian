@@ -2,29 +2,38 @@
 
 `tests/data/cli_grammar.json` is read out of an installed `obsidian.asar`
 by `tools/extract_cli_grammar.py`: every command the app registers, with
-the parameters and flags it declares. This decides, the way Obsidian's
-own dispatcher decides, whether a command line built by this library is
-one that app would accept.
+the parameters and flags it declares. This decides whether a command line
+built by this library is one that app would accept.
 
-The dispatcher is `handleCli` in the app bundle. What it does with
-`argv`, and what this therefore does:
+Two pieces of Obsidian read a command line, and this follows both.
+
+The main process takes it off the socket first. It reads `vault=` off the
+front — only off the front — and drops it before passing the rest on. An
+argument that spells `vault=` anywhere else is left where it is, and the
+vault becomes whichever one holds the working directory, or failing that
+whichever window was last in front.
+
+`handleCli` in the app bundle takes what is left:
 
 - the first argument names the command, the rest are `key=value` pairs,
   and a bare word is the key set to `"true"`;
 - a command it does not know is split at its last colon, and if the part
   before it is a command whose options carry the part after it, that
-  option is set instead — which is how `plugins:enabled` would work even
-  without a handler of its own;
-- a command that declares `format` also accepts one of that parameter's
-  values as a bare word, so `json` means `format=json`;
+  option is set instead — which is how `sync:on` reaches `sync`;
+- a command that declares `format` also answers to that parameter's
+  values by name, so `json` means `format=json`;
 - a parameter marked required must be there, or the command fails before
   the handler runs.
 
-What the dispatcher does *not* do is reject a parameter it has never
-heard of: it hands the handler everything it was given, and the handler
-reads the keys it knows. A misspelt parameter is therefore not an error
-at the CLI, it is silence — the command succeeds having ignored it. That
-is why this refuses one, and why the tests are worth having.
+Two of the checks here are deliberately stricter than the dispatcher,
+because the dispatcher's leniency is the whole problem. It does not
+reject a parameter it has never heard of: it hands the handler everything
+it was given, and the handler reads the keys it knows. Nor does it check
+a value against the ones the help text lists, or mind a flag arriving
+with a value — `counts=false` enables counts as readily as `counts` does,
+since the handler only asks whether the key is there. None of that is an
+error at the CLI. It is silence: the command succeeds having ignored what
+it was asked. So each is an error here.
 
 The table is what the app can register rather than what it has: a plugin
 registers its commands as it loads, so `sync:read` is in there whether or
@@ -41,10 +50,7 @@ from typing import Any
 
 _GRAMMAR_PATH = Path(__file__).parent / "data" / "cli_grammar.json"
 
-_GLOBAL_PARAMS = frozenset({"vault"})
-"""Parameters every command takes. `obsidian help` documents `vault` as
-the one option of the CLI itself rather than of any command, and the
-dispatcher never checks it against the handler's own."""
+_VAULT_PREFIX = "vault="
 
 
 class GrammarError(AssertionError):
@@ -69,18 +75,20 @@ class Option:
     required: bool
 
     @property
-    def choices(self) -> frozenset[str] | None:
+    def choices(self) -> tuple[str, ...] | None:
         """The values this option accepts, when it accepts a fixed set.
 
         A placeholder such as `<name>` stands for anything; alternatives
-        such as `json|tsv|csv` stand for themselves.
+        such as `json|tsv|csv` stand for themselves. Order is kept: the
+        dispatcher reads them in the order they are declared, and takes
+        the first it finds among the arguments.
 
         Returns:
             The accepted values, or `None` when anything goes.
         """
         if self.value is None or "<" in self.value:
             return None
-        return frozenset(self.value.split("|"))
+        return tuple(self.value.split("|"))
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,6 +167,44 @@ class Grammar:
         )
         return f"; it registers {', '.join(near)}" if near else ""
 
+    def check_argv(self, argv: list[str]) -> None:
+        """Check a whole command line, from the socket in.
+
+        The arguments as the app receives them, which is what the library
+        spawns without the binary. Where `vault=` sits decides whether the
+        command reaches the vault it names, so it is read here and not
+        taken on trust.
+
+        Args:
+            argv: Arguments the command was spawned with, binary aside.
+
+        Raises:
+            GrammarError: If Obsidian would refuse the command line, or
+                would accept it having quietly ignored part of it.
+        """
+        rest = list(argv)
+        if rest and rest[0].startswith(_VAULT_PREFIX):
+            rest.pop(0)
+        elif any(argument.startswith(_VAULT_PREFIX) for argument in rest):
+            raise GrammarError(
+                "vault= is read off the front of the command line and "
+                "nowhere else; anywhere later it reaches the command as a "
+                "parameter, and the vault is whichever one the working "
+                f"directory sits in: {' '.join(argv)}"
+            )
+        if not rest:
+            raise GrammarError("a command line names no command")
+
+        params: dict[str, str] = {}
+        flags: list[str] = []
+        for argument in rest[1:]:
+            name, found, value = argument.partition("=")
+            if found:
+                params[name] = value
+            else:
+                flags.append(name)
+        self.check(rest[0], params=params, flags=flags)
+
     def check(
         self,
         command: str,
@@ -209,7 +255,15 @@ class Grammar:
     def _apply_format_shorthand(
         options: dict[str, Option], given: dict[str, str | None]
     ) -> None:
-        """Read a bare `json` as `format=json`, as the dispatcher does.
+        """Read `json` as `format=json`, as the dispatcher does.
+
+        A command that declares `format` answers to that parameter's
+        values by their own names. The dispatcher walks them in the
+        order they are declared and takes the first that is there with
+        anything to say: a bare word, which it reads as `"true"`, or a
+        value of its own, which it then throws away in favour of the
+        name. Only an empty value is passed over. The `--json` spelling
+        it also accepts is not modelled, since nothing here sends one.
 
         Args:
             options: Options of the command being checked.
@@ -219,7 +273,7 @@ class Grammar:
         if choices is None or "format" in given:
             return
         for choice in choices:
-            if choice in given and given[choice] is None:
+            if choice in given and given[choice] != "":
                 del given[choice]
                 given["format"] = choice
                 return
@@ -246,8 +300,6 @@ class Grammar:
         """
         option = options.get(name)
         if option is None:
-            if name in _GLOBAL_PARAMS:
-                return
             declared = ", ".join(sorted(options)) or "nothing"
             raise GrammarError(
                 f"{command} has no parameter {name!r}, so Obsidian would "
@@ -256,8 +308,9 @@ class Grammar:
             )
         if option.value is None and value is not None:
             raise GrammarError(
-                f"{name} is a flag of {command}, and passing it as "
-                f"{name}={value!r} sets it to that string instead"
+                f"{name} is a flag of {command}: the handler asks whether it "
+                f"is there and not what it says, so {name}={value!r} turns it "
+                f"on whatever the value says"
             )
         if option.value is not None and value is None:
             raise GrammarError(

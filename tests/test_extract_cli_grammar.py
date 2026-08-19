@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import json
 import struct
+from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -21,6 +23,7 @@ from tools.extract_cli_grammar import (
     parse_options,
     read_asar,
     read_js_string,
+    read_version,
     split_call_arguments,
 )
 
@@ -36,21 +39,30 @@ BUNDLE = (
 )
 
 
-def _asar(files: dict[str, bytes]) -> bytes:
+def _asar(files: dict[str, bytes], *, unpacked: tuple[str, ...] = ()) -> bytes:
     """Pack files into an asar archive.
 
     Args:
-        files: Contents by archive path.
+        files: Contents by archive path. A path holding a `/` is packed
+            as the archive packs one, a directory at a time.
+        unpacked: Names to record as left outside the archive, the way
+            the packer records a native module.
 
     Returns:
         The archive as Obsidian ships one: four lengths, a JSON header,
         then every file end to end.
     """
-    header: dict[str, dict[str, dict[str, str]]] = {"files": {}}
+    header: dict[str, Any] = {"files": {}}
     body = b""
     for name, content in files.items():
-        header["files"][name] = {"offset": str(len(body)), "size": len(content)}
+        node = header
+        *folders, leaf = name.split("/")
+        for folder in folders:
+            node = node["files"].setdefault(folder, {"files": {}})
+        node["files"][leaf] = {"offset": str(len(body)), "size": len(content)}
         body += content
+    for name in unpacked:
+        header["files"][name] = {"size": 0, "unpacked": True}
     payload = json.dumps(header).encode()
     padding = -len(payload) % 4
     return (
@@ -130,10 +142,43 @@ def test_refuses_a_bundle_that_registers_nothing():
         extract_grammar("console.log('hello')")
 
 
+def test_refuses_options_whose_parameter_is_not_described():
+    # Seeking the next `{` would read the next parameter's description as
+    # this one's, and drop a parameter with nothing said about it.
+    with pytest.raises(ExtractionError, match="not described by an object literal"):
+        parse_options('{path:null,name:{value:"<name>"}}')
+
+
 def test_unpacks_an_archive(tmp_path):
     archive = tmp_path / "obsidian.asar"
     archive.write_bytes(_asar({"app.js": b"handlers", "package.json": b"{}"}))
     assert read_asar(archive) == {"app.js": b"handlers", "package.json": b"{}"}
+
+
+def test_unpacks_an_archive_holding_folders(tmp_path):
+    archive = tmp_path / "obsidian.asar"
+    archive.write_bytes(_asar({"app.js": b"handlers", "lib/i18n/en.js": b"words"}))
+    assert read_asar(archive) == {"app.js": b"handlers", "lib/i18n/en.js": b"words"}
+
+
+def test_skips_a_file_left_outside_the_archive(tmp_path):
+    # `app.asar` beside it carries native modules packed this way, so a
+    # mistaken --asar should say what it found rather than crash.
+    archive = tmp_path / "obsidian.asar"
+    archive.write_bytes(_asar({"app.js": b"handlers"}, unpacked=("binding.node",)))
+    assert read_asar(archive) == {"app.js": b"handlers"}
+
+
+def test_reads_the_version_the_archive_declares():
+    assert (
+        read_version({"package.json": b'{"version": "1.13.7"}'}, Path("x")) == "1.13.7"
+    )
+
+
+@pytest.mark.parametrize("package", [b"{}", b"not json", b'{"version": 113}'], ids=repr)
+def test_refuses_an_archive_that_names_no_version(package):
+    with pytest.raises(ExtractionError, match="version"):
+        read_version({"package.json": package}, Path("x"))
 
 
 def test_refuses_a_file_that_is_not_an_archive(tmp_path):

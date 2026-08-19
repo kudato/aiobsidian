@@ -1,4 +1,4 @@
-from unittest.mock import DEFAULT, AsyncMock, patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
@@ -46,41 +46,44 @@ async def client(mock_api):
         yield c
 
 
+class CheckedExecute(AsyncMock):
+    """An `_execute` that checks the command line before answering.
+
+    The mock stands in for the spawn, not for the command line: the
+    arguments still go through `_build_argv`, and what comes out is
+    checked against the grammar of the app itself. Both halves matter.
+    A mock answers a misspelt parameter as readily as a real one, and so
+    does the CLI — it ignores what it does not recognise. And where an
+    argument sits in the line decides what it means, which is a thing
+    only the built line can be asked.
+
+    Checking here rather than through `side_effect` keeps the check
+    whatever a test does with the answer: `side_effect` is how a test
+    raises from the CLI or answers a series of commands, and it would
+    otherwise take the check away with it.
+
+    Attributes:
+        cli: The client whose command lines these are.
+    """
+
+    def __call__(self, /, *args, **kwargs):
+        argv = self.cli._build_argv(
+            *args, **{name: v for name, v in kwargs.items() if name != "timeout"}
+        )
+        GRAMMAR.check_argv(argv[1:])
+        return super().__call__(*args, **kwargs)
+
+
 @pytest.fixture()
 def cli():
     """An `ObsidianCLI` that answers instead of spawning anything.
 
     `_execute` is replaced, so a test says what the CLI printed and
-    reads back what the command was asked. What it was asked is checked
-    against the grammar of the app itself on the way past: the mock
-    would answer a misspelt parameter as readily as a real one, and the
-    real CLI would too — it ignores what it does not recognise. Every
-    test that calls a resource method is therefore also a test that the
-    command line it produces is one Obsidian accepts.
-
-    Setting `side_effect` in a test replaces the check along with the
-    answer, which is what a test raising from the CLI wants.
+    reads back what the command was asked. Every test that calls a
+    resource method is therefore also a test that the command line it
+    produces is one Obsidian accepts — see `CheckedExecute`.
     """
     instance = ObsidianCLI("TestVault", binary="/usr/local/bin/obsidian")
-    instance._execute = AsyncMock(side_effect=_check_grammar)
+    instance._execute = CheckedExecute()
+    instance._execute.cli = instance
     return instance
-
-
-def _check_grammar(command, *, params=None, flags=None, output_format=None, **_):
-    """Check a command line, then let the mock answer as it was told.
-
-    Args:
-        command: CLI command name.
-        params: Parameters passed as `key=value`.
-        flags: Parameters passed as bare words.
-        output_format: Value of the `format` parameter, if any.
-
-    Returns:
-        The sentinel that tells the mock to use its own `return_value`.
-
-    Raises:
-        GrammarError: If Obsidian would refuse the command line, or
-            would accept it having ignored part of it.
-    """
-    GRAMMAR.check(command, params=params, flags=flags, output_format=output_format)
-    return DEFAULT

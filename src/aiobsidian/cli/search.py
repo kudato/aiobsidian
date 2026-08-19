@@ -40,6 +40,9 @@ class CLISearchResource(BaseCLIResource):
         Returns:
             Paths of the matching files. Use `context()` to see where in
             each file the query matched.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
         """
         params: dict[str, str] = {"query": query}
         if path is not None:

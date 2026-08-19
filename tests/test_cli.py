@@ -552,8 +552,8 @@ class TestRun:
 
         mock_exec.assert_awaited_once_with(
             "/usr/bin/obsidian",
-            "tags",
             "vault=TestVault",
+            "tags",
             "format=json",
             "path=note.md",
             "counts",
@@ -618,11 +618,28 @@ class TestExecute:
         assert result == "output"
         mock_exec.assert_awaited_once_with(
             "/usr/bin/obsidian",
-            "read",
             "vault=TestVault",
+            "read",
             "path=note.md",
             **SPAWN_KWARGS,
         )
+
+    async def test_the_vault_comes_before_the_command(self):
+        # Obsidian reads vault= off the front of the arguments and
+        # nowhere else. Behind the command it stays where it is, reaches
+        # the command as a parameter it has no use for, and the vault
+        # becomes whichever one holds the working directory — or, that
+        # failing, whichever window was last in front.
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+
+        argv = cli._build_argv("read", params={"path": "note.md"})
+
+        assert argv == [
+            "/usr/bin/obsidian",
+            "vault=TestVault",
+            "read",
+            "path=note.md",
+        ]
 
     async def test_output_format(self):
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
@@ -633,8 +650,8 @@ class TestExecute:
 
         mock_exec.assert_awaited_once_with(
             "/usr/bin/obsidian",
-            "tags",
             "vault=TestVault",
+            "tags",
             "format=json",
             **SPAWN_KWARGS,
         )
@@ -705,8 +722,8 @@ class TestExecute:
 
         mock_exec.assert_awaited_once_with(
             "/usr/bin/obsidian",
-            "create",
             "vault=TestVault",
+            "create",
             "path=note.md",
             "overwrite",
             **SPAWN_KWARGS,

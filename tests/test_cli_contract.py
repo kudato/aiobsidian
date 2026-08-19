@@ -11,8 +11,14 @@ every public method of every CLI resource at once:
   made here as everywhere else;
 - an empty answer produces the value named in the table below, rather
   than whatever falls out;
-- an answer of the wrong shape raises `CLIParseError` and nothing else,
-  and a method that returns instead returns what it says it returns;
+- an answer of a shape no command produces either raises `CLIParseError`
+  or comes back as the type the method promises — never as another type,
+  and never as some other exception. That is a floor rather than a
+  contract for each method: a method returning `str` promises little,
+  and one that reads a table can honestly find nothing in a line it
+  does not recognise. What it rules out is the shape reaching the caller
+  under a type that does not fit it, which is how three methods used to
+  hand back a mapping where the signature said list;
 - a failing command and a timeout reach the caller unchanged.
 
 `CALLS` names every method, and a test here fails when one is added

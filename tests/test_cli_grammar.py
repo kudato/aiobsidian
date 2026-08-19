@@ -18,7 +18,7 @@ GRAMMAR = Grammar.load()
 
 
 def test_names_the_obsidian_release_it_was_read_from():
-    assert GRAMMAR.obsidian.count(".") == 2
+    assert re.fullmatch(r"\d+\.\d+\.\d+", GRAMMAR.obsidian)
 
 
 def test_holds_the_commands_the_library_sends():
@@ -34,10 +34,26 @@ def test_accepts_a_command_line_the_library_builds():
     GRAMMAR.check("tags", params={"path": "notes/setup.md"}, flags=["counts"])
 
 
-def test_accepts_the_vault_every_command_is_given():
-    # `vault=` is the CLI's own option rather than any command's, and
-    # `_execute` puts it on every line it builds.
-    GRAMMAR.check("version", params={"vault": "TestVault"})
+def test_accepts_a_whole_command_line():
+    GRAMMAR.check_argv(["vault=Notes", "tags", "path=notes/setup.md", "counts"])
+
+
+def test_refuses_a_vault_behind_the_command():
+    # The main process reads `vault=` off the front of the arguments and
+    # nowhere else, so behind the command it selects nothing and the
+    # command runs against whichever vault Obsidian picked for itself.
+    with pytest.raises(GrammarError, match="off the front"):
+        GRAMMAR.check_argv(["tags", "vault=Notes"])
+
+
+def test_refuses_a_command_line_with_no_command():
+    with pytest.raises(GrammarError, match="names no command"):
+        GRAMMAR.check_argv(["vault=Notes"])
+
+
+def test_reads_a_bare_word_of_a_command_line_as_a_flag():
+    with pytest.raises(GrammarError, match="no parameter 'verbose'"):
+        GRAMMAR.check_argv(["vault=Notes", "read", "path=a.md", "verbose"])
 
 
 @pytest.mark.parametrize("command", ["task:create", "tags:rename", "note:read"])

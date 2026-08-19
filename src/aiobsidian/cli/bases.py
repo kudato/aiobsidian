@@ -75,6 +75,9 @@ class CLIBasesResource(BaseCLIResource):
 
         Returns:
             List of record objects.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
         """
         params: dict[str, str] = {"path": path}
         if view is not None:

@@ -234,13 +234,9 @@ class ObsidianCLI:
 
         effective_timeout = timeout if timeout is not None else self._timeout
 
-        args: list[str] = [self._binary, command, f"vault={self._vault}"]
-        if output_format is not None:
-            args.append(f"format={output_format}")
-        if params:
-            args.extend(f"{k}={v}" for k, v in params.items())
-        if flags:
-            args.extend(flags)
+        args = self._build_argv(
+            command, params=params, flags=flags, output_format=output_format
+        )
 
         # Counted from here, before the spawn can be awaited, so that a
         # concurrent aclose() knows a command exists that is not in
@@ -333,6 +329,43 @@ class ObsidianCLI:
             raise self._build_error(command, 0, stdout, stderr)
 
         return stdout
+
+    def _build_argv(
+        self,
+        command: str,
+        *,
+        params: dict[str, str] | None = None,
+        flags: list[str] | None = None,
+        output_format: str | None = None,
+    ) -> list[str]:
+        """Build the command line for one command.
+
+        `vault=` goes first, ahead of the command name. Obsidian reads
+        the vault off the front of the arguments and takes it off before
+        anything else sees them, and it looks nowhere else: given after
+        the command it is left in place and reaches the command as a
+        parameter, which every command ignores. The vault is then
+        whichever one holds the working directory, or failing that
+        whichever window was last in front — so the command runs, and
+        runs somewhere else.
+
+        Args:
+            command: CLI command name.
+            params: Key-value parameters passed as `key=value` arguments.
+            flags: Extra CLI flags.
+            output_format: Value for the `format=` parameter.
+
+        Returns:
+            The arguments to spawn, binary first.
+        """
+        argv = [self._binary, f"vault={self._vault}", command]
+        if output_format is not None:
+            argv.append(f"format={output_format}")
+        if params:
+            argv.extend(f"{key}={value}" for key, value in params.items())
+        if flags:
+            argv.extend(flags)
+        return argv
 
     @staticmethod
     def _signal(process: asyncio.subprocess.Process) -> None:
