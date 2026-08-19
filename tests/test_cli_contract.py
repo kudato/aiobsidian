@@ -28,7 +28,6 @@ the surface they are about.
 
 from __future__ import annotations
 
-import contextlib
 import inspect
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -302,6 +301,11 @@ def _returns(cli: ObsidianCLI, call: Call) -> Any:
 
 def test_every_public_method_is_called():
     cli = ObsidianCLI("TestVault", binary="/usr/local/bin/obsidian")
+    # Guards the check below: a resource or method that stopped being
+    # discovered would empty the comparison and pass by finding nothing.
+    assert len(_resource_names()) > 20
+    assert len(_public_methods(cli.vault)) > 10
+
     called = {(call.resource, call.method) for call in CALLS}
     missing = sorted(
         f"{resource}.{method}"
@@ -317,23 +321,17 @@ def test_every_public_method_is_called():
 
 
 @pytest.mark.parametrize("call", CALLS, ids=str)
-async def test_builds_a_command_line_obsidian_accepts(cli, call):
-    # The checking is the fixture's; this is what makes every method
-    # pass through it, whether or not a test elsewhere calls it.
-    cli._execute.return_value = ""
-    with contextlib.suppress(CLIParseError):
-        await call(cli)
-    assert cli._execute.await_count >= 1, f"{call} never reached the CLI"
-
-
-@pytest.mark.parametrize("call", CALLS, ids=str)
 async def test_empty_output(cli, call):
+    # The command line each of these builds is checked on the way past
+    # by the fixture, which is what makes every method pass through the
+    # grammar whether or not a test elsewhere calls it.
     cli._execute.return_value = ""
     if call.empty is CLIParseError:
         with pytest.raises(CLIParseError):
             await call(cli)
-        return
-    assert await call(cli) == call.empty
+    else:
+        assert await call(cli) == call.empty
+    assert cli._execute.await_count >= 1, f"{call} never reached the CLI"
 
 
 @pytest.mark.parametrize("output", UNEXPECTED_OUTPUT, ids=repr)

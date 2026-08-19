@@ -142,6 +142,22 @@ def test_refuses_a_bundle_that_registers_nothing():
         extract_grammar("console.log('hello')")
 
 
+def test_does_not_read_a_description_that_quotes_a_key():
+    # Read as a declaration, `value:` inside prose would say the
+    # parameter takes anything where it takes one of a listed few, and
+    # the grammar would then accept whatever it was checking.
+    options = parse_options(
+        '{format:{description:"one of value:\\"<any>\\", required:!0",'
+        'value:"json|tsv"}}'
+    )
+    assert options == {"format": {"value": "json|tsv", "required": False}}
+
+
+def test_refuses_a_value_that_is_not_written_out():
+    with pytest.raises(ExtractionError, match="expected a string literal"):
+        parse_options("{format:{value:FORMATS}}")
+
+
 def test_refuses_options_whose_parameter_is_not_described():
     # Seeking the next `{` would read the next parameter's description as
     # this one's, and drop a parameter with nothing said about it.

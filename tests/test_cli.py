@@ -656,6 +656,46 @@ class TestExecute:
             **SPAWN_KWARGS,
         )
 
+    async def test_an_unknown_vault_raises(self):
+        # Obsidian decides this before the command reaches a vault, in
+        # the process that owns them, so it answers with the sentence and
+        # not with the `Error: ` every other failure carries. Returned it
+        # would have been the note's content.
+        cli = ObsidianCLI("Wrok", binary="/usr/bin/obsidian")
+        process = _mock_process(b"Vault not found.\n")
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CLINotFoundError) as exc_info:
+                await cli._execute("read", params={"path": "note.md"})
+
+        assert exc_info.value.command == "read"
+        assert exc_info.value.stdout == "Vault not found.\n"
+
+    async def test_a_disabled_cli_raises(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(
+            b"Command line interface is not enabled. "
+            b"Please turn it on in Settings > General > Advanced.\n"
+        )
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CommandError) as exc_info:
+                await cli._execute("version")
+
+        assert exc_info.value.command == "version"
+        assert not isinstance(exc_info.value, CLINotFoundError)
+
+    async def test_a_note_that_merely_mentions_a_missing_vault_is_content(self):
+        # The sentence is the whole of the output when it is a failure,
+        # so a note that has more to say than that is a note.
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(b"Vault not found.\n\nIt was here yesterday.\n")
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            output = await cli._execute("read", params={"path": "note.md"})
+
+        assert output == "Vault not found.\n\nIt was here yesterday.\n"
+
     async def test_command_error(self):
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
 

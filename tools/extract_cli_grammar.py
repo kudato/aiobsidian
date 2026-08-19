@@ -44,7 +44,7 @@ _ASAR_CANDIDATES = (
 )
 
 _REGISTRATION = re.compile(r"\.register(?:Cli)?Handler\(")
-_VALUE = re.compile(r"""\bvalue:\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')""")
+_VALUE = re.compile(r"\bvalue:\s*")
 _REQUIRED = re.compile(r"\brequired:\s*(?:!0|true)\b")
 
 
@@ -117,6 +117,10 @@ def read_js_string(source: str, start: int) -> tuple[str, int]:
             share, which would be read wrong rather than not at all.
     """
     quote = source[start]
+    if quote not in "\"'`":
+        raise ExtractionError(
+            f"expected a string literal at {start}: {source[start : start + 60]}"
+        )
     index = start + 1
     chunks: list[str] = []
     while source[index] != quote:
@@ -258,13 +262,65 @@ def parse_options(source: str) -> dict[str, dict[str, Any]]:
         body = text[index + 1 : end]
         index = end + 1
 
-        option: dict[str, Any] = {}
-        value = _VALUE.search(body)
-        if value is not None:
-            option["value"] = read_js_string(value.group(1), 0)[0]
-        option["required"] = _REQUIRED.search(body) is not None
-        options[key] = option
+        options[key] = _parse_option(body)
     return options
+
+
+def _parse_option(body: str) -> dict[str, Any]:
+    """Read what one parameter's description says about it.
+
+    The keys are looked for outside the string literals rather than
+    anywhere in the text, so a description that quotes `value:` is a
+    description and not a declaration. Reading one as the other would
+    hand back a grammar that accepts anything where the parameter takes
+    one of a listed few — a table that passes every check by asking for
+    nothing.
+
+    Args:
+        body: The object literal's contents, braces aside.
+
+    Returns:
+        `value` when the parameter takes one, spelt as the help text
+        spells it, and `required` for one that must be given.
+
+    Raises:
+        ExtractionError: If `value` is not written out as a string.
+    """
+    outside = _blank_strings(body)
+    option: dict[str, Any] = {}
+    value = _VALUE.search(outside)
+    if value is not None:
+        option["value"] = read_js_string(body, value.end())[0]
+    option["required"] = _REQUIRED.search(outside) is not None
+    return option
+
+
+def _blank_strings(source: str) -> str:
+    """Blank out what every string literal holds, keeping the length.
+
+    What is left has the keys where they were and nothing that merely
+    reads like one, so an offset found in it is an offset into the
+    original. The quotes stay where they are, so a literal is still
+    something a search can stop at rather than a run of blank space to
+    be walked through.
+
+    Args:
+        source: Text to blank.
+
+    Returns:
+        The same text with the contents of every literal replaced by
+        spaces.
+    """
+    characters = list(source)
+    index = 0
+    while index < len(source):
+        if source[index] in "\"'`":
+            _, end = read_js_string(source, index)
+            characters[index + 1 : end - 1] = " " * (end - index - 2)
+            index = end
+            continue
+        index += 1
+    return "".join(characters)
 
 
 def extract_grammar(app_js: str) -> dict[str, dict[str, dict[str, Any]]]:

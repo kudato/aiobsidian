@@ -57,6 +57,19 @@ _ERROR_PREFIX = "Error: "
 _NOT_FOUND_PATTERN = re.compile(r"\bnot found\b", re.IGNORECASE)
 _UNKNOWN_COMMAND_PATTERN = re.compile(r'^Error: Command "[^"]*" not found')
 
+_VAULT_NOT_FOUND = "Vault not found."
+"""What Obsidian answers a `vault=` naming no vault it knows. It is
+decided before the command runs, in the process that owns the vaults
+rather than in the one that would answer, so it arrives as the whole of
+the output and without the `Error: ` every other failure carries."""
+
+_CLI_DISABLED = (
+    "Command line interface is not enabled. "
+    "Please turn it on in Settings > General > Advanced."
+)
+"""What Obsidian answers when the CLI is switched off in its settings.
+Printed the same way, and just as much a failure."""
+
 
 class ObsidianCLI:
     """Async wrapper for the Obsidian CLI.
@@ -195,6 +208,14 @@ class ObsidianCLI:
         consequence, reading a note whose first line starts with `Error: ` also
         raises instead of returning the text.
 
+        Two failures carry no such prefix, because they are decided before
+        the command reaches the vault: a `vault=` naming no vault Obsidian
+        knows, and a CLI switched off in the settings. Each answers with
+        one sentence and nothing else, so each is recognised as the whole
+        of the output rather than by a prefix — a note whose entire
+        content is that one sentence would be read as the failure it
+        spells.
+
         Cancelling a running command kills it and everything it started
         before the cancellation propagates, so no orphan keeps writing to the
         vault and `asyncio.timeout` around a call is safe. A cancellation
@@ -327,6 +348,12 @@ class ObsidianCLI:
 
         if stdout.startswith(_ERROR_PREFIX):
             raise self._build_error(command, 0, stdout, stderr)
+
+        answer = stdout.strip()
+        if answer == _VAULT_NOT_FOUND:
+            raise CLINotFoundError(command, 0, stderr, stdout)
+        if answer == _CLI_DISABLED:
+            raise CommandError(command, 0, stderr, stdout)
 
         return stdout
 

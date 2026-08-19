@@ -25,15 +25,18 @@ whichever window was last in front.
 - a parameter marked required must be there, or the command fails before
   the handler runs.
 
-Two of the checks here are deliberately stricter than the dispatcher,
+Five of the checks here are deliberately stricter than the dispatcher,
 because the dispatcher's leniency is the whole problem. It does not
 reject a parameter it has never heard of: it hands the handler everything
 it was given, and the handler reads the keys it knows. Nor does it check
-a value against the ones the help text lists, or mind a flag arriving
-with a value — `counts=false` enables counts as readily as `counts` does,
-since the handler only asks whether the key is there. None of that is an
-error at the CLI. It is silence: the command succeeds having ignored what
-it was asked. So each is an error here.
+a value against the ones the help text lists; nor mind a flag arriving
+with a value, since `counts=false` enables counts as readily as `counts`
+does — the handler only asks whether the key is there; nor mind a
+parameter arriving as a bare word, which it reads as the string `"true"`
+and hands over as the value. And a command line naming no command at all
+it answers with the help text. None of that is an error at the CLI. It is
+silence: the command succeeds having ignored what it was asked, or having
+answered something else. So each is an error here.
 
 The table is what the app can register rather than what it has: a plugin
 registers its commands as it loads, so `sync:read` is in there whether or
@@ -61,7 +64,7 @@ class GrammarError(AssertionError):
     """
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Option:
     """One parameter or flag of a command.
 
@@ -91,7 +94,7 @@ class Option:
         return tuple(self.value.split("|"))
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Grammar:
     """The commands one release of Obsidian registers.
 
@@ -118,7 +121,7 @@ class Grammar:
             obsidian=raw["obsidian"],
             commands={
                 command: {
-                    name: Option(option.get("value"), option["required"])
+                    name: Option(value=option.get("value"), required=option["required"])
                     for name, option in options.items()
                 }
                 for command, options in raw["commands"].items()
