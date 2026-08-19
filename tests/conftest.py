@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import DEFAULT, AsyncMock, patch
 
 import httpx
 import pytest
@@ -6,6 +6,10 @@ import respx
 
 from aiobsidian._cli import ObsidianCLI
 from aiobsidian._client import ObsidianClient
+
+from .grammar import Grammar
+
+GRAMMAR = Grammar.load()
 
 
 @pytest.fixture(autouse=True)
@@ -44,6 +48,39 @@ async def client(mock_api):
 
 @pytest.fixture()
 def cli():
+    """An `ObsidianCLI` that answers instead of spawning anything.
+
+    `_execute` is replaced, so a test says what the CLI printed and
+    reads back what the command was asked. What it was asked is checked
+    against the grammar of the app itself on the way past: the mock
+    would answer a misspelt parameter as readily as a real one, and the
+    real CLI would too — it ignores what it does not recognise. Every
+    test that calls a resource method is therefore also a test that the
+    command line it produces is one Obsidian accepts.
+
+    Setting `side_effect` in a test replaces the check along with the
+    answer, which is what a test raising from the CLI wants.
+    """
     instance = ObsidianCLI("TestVault", binary="/usr/local/bin/obsidian")
-    instance._execute = AsyncMock()
+    instance._execute = AsyncMock(side_effect=_check_grammar)
     return instance
+
+
+def _check_grammar(command, *, params=None, flags=None, output_format=None, **_):
+    """Check a command line, then let the mock answer as it was told.
+
+    Args:
+        command: CLI command name.
+        params: Parameters passed as `key=value`.
+        flags: Parameters passed as bare words.
+        output_format: Value of the `format` parameter, if any.
+
+    Returns:
+        The sentinel that tells the mock to use its own `return_value`.
+
+    Raises:
+        GrammarError: If Obsidian would refuse the command line, or
+            would accept it having ignored part of it.
+    """
+    GRAMMAR.check(command, params=params, flags=flags, output_format=output_format)
+    return DEFAULT
