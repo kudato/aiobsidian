@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from ..models import Tag
 from ._base import BaseCLIResource
 
@@ -31,13 +33,15 @@ class CLITagsResource(BaseCLIResource):
     async def list(
         self,
         *,
-        sort: str | None = None,
+        sort: Literal["count"] | None = None,
         path: str | None = None,
     ) -> list[Tag]:
         """List all tags in the vault.
 
         Args:
-            sort: Sort order (e.g. ``"count"`` to sort by frequency).
+            sort: ``"count"`` to sort by frequency. The CLI reads that
+                one word and sorts by name for anything else, so there is
+                nothing else to pass.
             path: Restrict to the tags of this one file. The CLI refuses
                 a folder: there is no way to scope the listing to one.
 

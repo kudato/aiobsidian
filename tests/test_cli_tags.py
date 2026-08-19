@@ -48,15 +48,6 @@ async def test_list_sorted(cli):
     )
 
 
-async def test_list_empty_sort(cli):
-    cli._execute.return_value = json.dumps(TAGS)
-    result = await cli.tags.list(sort="")
-    assert result == PARSED_TAGS
-    cli._execute.assert_awaited_once_with(
-        "tags", params={"sort": ""}, flags=["counts"], output_format="json"
-    )
-
-
 async def test_list_with_path(cli):
     cli._execute.return_value = json.dumps(TAGS)
     result = await cli.tags.list(path="notes/setup.md")
