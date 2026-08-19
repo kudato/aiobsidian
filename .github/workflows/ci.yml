@@ -23,13 +23,13 @@ jobs:
         run: uv audit --frozen --no-dev --no-group docs --preview-features audit
 
       - name: Lint
-        run: uv run ruff check src/ tests/
+        run: uv run ruff check src/ tests/ tools/
 
       - name: Format check
-        run: uv run ruff format --check src/ tests/
+        run: uv run ruff format --check src/ tests/ tools/
 
       - name: Type check
-        run: uv run mypy src/ tests/typing_examples.py
+        run: uv run mypy src/ tools/ tests/typing_examples.py
 
       - name: Tests
         run: uv run pytest --cov=aiobsidian --cov-report=term-missing --cov-report=xml

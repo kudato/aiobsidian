@@ -1,0 +1,1242 @@
+{
+  "commands": {
+    "__commands": {},
+    "__completions": {},
+    "__files": {},
+    "aliases": {
+      "active": {
+        "required": false
+      },
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "total": {
+        "required": false
+      },
+      "verbose": {
+        "required": false
+      }
+    },
+    "append": {
+      "content": {
+        "required": true,
+        "value": "<text>"
+      },
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "inline": {
+        "required": false
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      }
+    },
+    "backlinks": {
+      "counts": {
+        "required": false
+      },
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "format": {
+        "required": false,
+        "value": "json|tsv|csv"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "total": {
+        "required": false
+      }
+    },
+    "base:create": {
+      "content": {
+        "required": false,
+        "value": "<text>"
+      },
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "name": {
+        "required": false,
+        "value": "<name>"
+      },
+      "newtab": {
+        "required": false
+      },
+      "open": {
+        "required": false
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "view": {
+        "required": false,
+        "value": "<name>"
+      }
+    },
+    "base:query": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "format": {
+        "required": false,
+        "value": "json|csv|tsv|md|paths"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "view": {
+        "required": false,
+        "value": "<name>"
+      }
+    },
+    "base:views": {},
+    "bases": {},
+    "bookmark": {
+      "file": {
+        "required": false,
+        "value": "<path>"
+      },
+      "folder": {
+        "required": false,
+        "value": "<path>"
+      },
+      "search": {
+        "required": false,
+        "value": "<query>"
+      },
+      "subpath": {
+        "required": false,
+        "value": "<subpath>"
+      },
+      "title": {
+        "required": false,
+        "value": "<title>"
+      },
+      "url": {
+        "required": false,
+        "value": "<url>"
+      }
+    },
+    "bookmarks": {
+      "format": {
+        "required": false,
+        "value": "json|tsv|csv"
+      },
+      "total": {
+        "required": false
+      },
+      "verbose": {
+        "required": false
+      }
+    },
+    "command": {
+      "id": {
+        "required": true,
+        "value": "<command-id>"
+      }
+    },
+    "commands": {
+      "filter": {
+        "required": false,
+        "value": "<prefix>"
+      }
+    },
+    "create": {
+      "content": {
+        "required": false,
+        "value": "<text>"
+      },
+      "name": {
+        "required": false,
+        "value": "<name>"
+      },
+      "newtab": {
+        "required": false
+      },
+      "open": {
+        "required": false
+      },
+      "overwrite": {
+        "required": false
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "template": {
+        "required": false,
+        "value": "<name>"
+      }
+    },
+    "daily": {
+      "paneType": {
+        "required": false,
+        "value": "tab|split|window"
+      }
+    },
+    "daily:append": {
+      "content": {
+        "required": true,
+        "value": "<text>"
+      },
+      "inline": {
+        "required": false
+      },
+      "open": {
+        "required": false
+      },
+      "paneType": {
+        "required": false,
+        "value": "tab|split|window"
+      }
+    },
+    "daily:path": {},
+    "daily:prepend": {
+      "content": {
+        "required": true,
+        "value": "<text>"
+      },
+      "inline": {
+        "required": false
+      },
+      "open": {
+        "required": false
+      },
+      "paneType": {
+        "required": false,
+        "value": "tab|split|window"
+      }
+    },
+    "daily:read": {},
+    "deadends": {
+      "all": {
+        "required": false
+      },
+      "total": {
+        "required": false
+      }
+    },
+    "delete": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "permanent": {
+        "required": false
+      }
+    },
+    "dev:cdp": {
+      "method": {
+        "required": true,
+        "value": "<CDP.method>"
+      },
+      "params": {
+        "required": false,
+        "value": "<json>"
+      }
+    },
+    "dev:console": {
+      "clear": {
+        "required": false
+      },
+      "level": {
+        "required": false,
+        "value": "log|warn|error|info|debug"
+      },
+      "limit": {
+        "required": false,
+        "value": "<n>"
+      }
+    },
+    "dev:css": {
+      "prop": {
+        "required": false,
+        "value": "<name>"
+      },
+      "selector": {
+        "required": true,
+        "value": "<css>"
+      }
+    },
+    "dev:debug": {
+      "off": {
+        "required": false
+      },
+      "on": {
+        "required": false
+      }
+    },
+    "dev:dom": {
+      "all": {
+        "required": false
+      },
+      "attr": {
+        "required": false,
+        "value": "<name>"
+      },
+      "css": {
+        "required": false,
+        "value": "<prop>"
+      },
+      "inner": {
+        "required": false
+      },
+      "selector": {
+        "required": true,
+        "value": "<css>"
+      },
+      "text": {
+        "required": false
+      },
+      "total": {
+        "required": false
+      }
+    },
+    "dev:errors": {
+      "clear": {
+        "required": false
+      }
+    },
+    "dev:mobile": {
+      "off": {
+        "required": false
+      },
+      "on": {
+        "required": false
+      }
+    },
+    "dev:screenshot": {
+      "path": {
+        "required": false,
+        "value": "<filename>"
+      }
+    },
+    "devtools": {},
+    "diff": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "filter": {
+        "required": false,
+        "value": "local|sync"
+      },
+      "from": {
+        "required": false,
+        "value": "<n>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "to": {
+        "required": false,
+        "value": "<n>"
+      }
+    },
+    "eval": {
+      "code": {
+        "required": true,
+        "value": "<javascript>"
+      }
+    },
+    "file": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      }
+    },
+    "files": {
+      "ext": {
+        "required": false,
+        "value": "<extension>"
+      },
+      "folder": {
+        "required": false,
+        "value": "<path>"
+      },
+      "total": {
+        "required": false
+      }
+    },
+    "folder": {
+      "info": {
+        "required": false,
+        "value": "files|folders|size"
+      },
+      "path": {
+        "required": true,
+        "value": "<path>"
+      }
+    },
+    "folders": {
+      "folder": {
+        "required": false,
+        "value": "<path>"
+      },
+      "total": {
+        "required": false
+      }
+    },
+    "help": {
+      "<command>": {
+        "required": false
+      }
+    },
+    "history": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      }
+    },
+    "history:list": {},
+    "history:open": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      }
+    },
+    "history:read": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "version": {
+        "required": false,
+        "value": "<n>"
+      }
+    },
+    "history:restore": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "version": {
+        "required": true,
+        "value": "<n>"
+      }
+    },
+    "hotkey": {
+      "id": {
+        "required": true,
+        "value": "<command-id>"
+      },
+      "verbose": {
+        "required": false
+      }
+    },
+    "hotkeys": {
+      "all": {
+        "required": false
+      },
+      "format": {
+        "required": false,
+        "value": "json|tsv|csv"
+      },
+      "total": {
+        "required": false
+      },
+      "verbose": {
+        "required": false
+      }
+    },
+    "links": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "total": {
+        "required": false
+      }
+    },
+    "move": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "to": {
+        "required": true,
+        "value": "<path>"
+      }
+    },
+    "open": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "newtab": {
+        "required": false
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      }
+    },
+    "orphans": {
+      "all": {
+        "required": false
+      },
+      "total": {
+        "required": false
+      }
+    },
+    "outline": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "format": {
+        "required": false,
+        "value": "tree|md|json"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "total": {
+        "required": false
+      }
+    },
+    "plugin": {
+      "id": {
+        "required": true,
+        "value": "<plugin-id>"
+      }
+    },
+    "plugin:disable": {
+      "filter": {
+        "required": false,
+        "value": "core|community"
+      },
+      "id": {
+        "required": true,
+        "value": "<id>"
+      }
+    },
+    "plugin:enable": {
+      "filter": {
+        "required": false,
+        "value": "core|community"
+      },
+      "id": {
+        "required": true,
+        "value": "<id>"
+      }
+    },
+    "plugin:install": {
+      "enable": {
+        "required": false
+      },
+      "id": {
+        "required": true,
+        "value": "<id>"
+      }
+    },
+    "plugin:reload": {
+      "id": {
+        "required": true,
+        "value": "<id>"
+      }
+    },
+    "plugin:uninstall": {
+      "id": {
+        "required": true,
+        "value": "<id>"
+      }
+    },
+    "plugins": {
+      "filter": {
+        "required": false,
+        "value": "core|community"
+      },
+      "format": {
+        "required": false,
+        "value": "json|tsv|csv"
+      },
+      "versions": {
+        "required": false
+      }
+    },
+    "plugins:enabled": {
+      "filter": {
+        "required": false,
+        "value": "core|community"
+      },
+      "format": {
+        "required": false,
+        "value": "json|tsv|csv"
+      },
+      "versions": {
+        "required": false
+      }
+    },
+    "plugins:restrict": {
+      "off": {
+        "required": false
+      },
+      "on": {
+        "required": false
+      }
+    },
+    "prepend": {
+      "content": {
+        "required": true,
+        "value": "<text>"
+      },
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "inline": {
+        "required": false
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      }
+    },
+    "properties": {
+      "active": {
+        "required": false
+      },
+      "counts": {
+        "required": false
+      },
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "format": {
+        "required": false,
+        "value": "yaml|json|tsv"
+      },
+      "name": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "sort": {
+        "required": false,
+        "value": "count"
+      },
+      "total": {
+        "required": false
+      }
+    },
+    "property:read": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "name": {
+        "required": true,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      }
+    },
+    "property:remove": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "name": {
+        "required": true,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      }
+    },
+    "property:set": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "name": {
+        "required": true,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "type": {
+        "required": false,
+        "value": "text|list|number|checkbox|date|datetime"
+      },
+      "value": {
+        "required": true,
+        "value": "<value>"
+      }
+    },
+    "publish:add": {
+      "changed": {
+        "required": false
+      },
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      }
+    },
+    "publish:list": {
+      "total": {
+        "required": false
+      }
+    },
+    "publish:open": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      }
+    },
+    "publish:remove": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      }
+    },
+    "publish:site": {},
+    "publish:status": {
+      "changed": {
+        "required": false
+      },
+      "deleted": {
+        "required": false
+      },
+      "new": {
+        "required": false
+      },
+      "total": {
+        "required": false
+      }
+    },
+    "random": {
+      "folder": {
+        "required": false,
+        "value": "<path>"
+      },
+      "newtab": {
+        "required": false
+      }
+    },
+    "random:read": {
+      "folder": {
+        "required": false,
+        "value": "<path>"
+      }
+    },
+    "read": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      }
+    },
+    "recents": {
+      "total": {
+        "required": false
+      }
+    },
+    "reload": {},
+    "rename": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "name": {
+        "required": true,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      }
+    },
+    "restart": {},
+    "search": {
+      "case": {
+        "required": false
+      },
+      "format": {
+        "required": false,
+        "value": "text|json"
+      },
+      "limit": {
+        "required": false,
+        "value": "<n>"
+      },
+      "path": {
+        "required": false,
+        "value": "<folder>"
+      },
+      "query": {
+        "required": true,
+        "value": "<text>"
+      },
+      "total": {
+        "required": false
+      }
+    },
+    "search:context": {
+      "case": {
+        "required": false
+      },
+      "format": {
+        "required": false,
+        "value": "text|json"
+      },
+      "limit": {
+        "required": false,
+        "value": "<n>"
+      },
+      "path": {
+        "required": false,
+        "value": "<folder>"
+      },
+      "query": {
+        "required": true,
+        "value": "<text>"
+      }
+    },
+    "search:open": {
+      "query": {
+        "required": false,
+        "value": "<text>"
+      }
+    },
+    "snippet:disable": {
+      "name": {
+        "required": true,
+        "value": "<name>"
+      }
+    },
+    "snippet:enable": {
+      "name": {
+        "required": true,
+        "value": "<name>"
+      }
+    },
+    "snippets": {},
+    "snippets:enabled": {},
+    "sync": {
+      "off": {
+        "required": false
+      },
+      "on": {
+        "required": false
+      }
+    },
+    "sync:deleted": {
+      "total": {
+        "required": false
+      }
+    },
+    "sync:history": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "total": {
+        "required": false
+      }
+    },
+    "sync:open": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      }
+    },
+    "sync:read": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "version": {
+        "required": true,
+        "value": "<n>"
+      }
+    },
+    "sync:restore": {
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "version": {
+        "required": true,
+        "value": "<n>"
+      }
+    },
+    "sync:status": {},
+    "tab:open": {
+      "file": {
+        "required": false,
+        "value": "<path>"
+      },
+      "group": {
+        "required": false,
+        "value": "<id>"
+      },
+      "view": {
+        "required": false,
+        "value": "<type>"
+      }
+    },
+    "tabs": {
+      "ids": {
+        "required": false
+      }
+    },
+    "tag": {
+      "name": {
+        "required": true,
+        "value": "<tag>"
+      },
+      "total": {
+        "required": false
+      },
+      "verbose": {
+        "required": false
+      }
+    },
+    "tags": {
+      "active": {
+        "required": false
+      },
+      "counts": {
+        "required": false
+      },
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "format": {
+        "required": false,
+        "value": "json|tsv|csv"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "sort": {
+        "required": false,
+        "value": "count"
+      },
+      "total": {
+        "required": false
+      }
+    },
+    "task": {
+      "daily": {
+        "required": false
+      },
+      "done": {
+        "required": false
+      },
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "line": {
+        "required": false,
+        "value": "<n>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "ref": {
+        "required": false,
+        "value": "<path:line>"
+      },
+      "status": {
+        "required": false,
+        "value": "\"<char>\""
+      },
+      "todo": {
+        "required": false
+      },
+      "toggle": {
+        "required": false
+      }
+    },
+    "tasks": {
+      "active": {
+        "required": false
+      },
+      "daily": {
+        "required": false
+      },
+      "done": {
+        "required": false
+      },
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "format": {
+        "required": false,
+        "value": "json|tsv|csv"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "status": {
+        "required": false,
+        "value": "\"<char>\""
+      },
+      "todo": {
+        "required": false
+      },
+      "total": {
+        "required": false
+      },
+      "verbose": {
+        "required": false
+      }
+    },
+    "template:insert": {
+      "name": {
+        "required": true,
+        "value": "<template>"
+      }
+    },
+    "template:read": {
+      "name": {
+        "required": true,
+        "value": "<template>"
+      },
+      "resolve": {
+        "required": false
+      },
+      "title": {
+        "required": false,
+        "value": "<title>"
+      }
+    },
+    "templates": {
+      "total": {
+        "required": false
+      }
+    },
+    "theme": {
+      "name": {
+        "required": false,
+        "value": "<name>"
+      }
+    },
+    "theme:install": {
+      "enable": {
+        "required": false
+      },
+      "name": {
+        "required": true,
+        "value": "<name>"
+      }
+    },
+    "theme:set": {
+      "name": {
+        "required": true,
+        "value": "<name>"
+      }
+    },
+    "theme:uninstall": {
+      "name": {
+        "required": true,
+        "value": "<name>"
+      }
+    },
+    "themes": {
+      "versions": {
+        "required": false
+      }
+    },
+    "unique": {
+      "content": {
+        "required": false,
+        "value": "<text>"
+      },
+      "name": {
+        "required": false,
+        "value": "<text>"
+      },
+      "open": {
+        "required": false
+      },
+      "paneType": {
+        "required": false,
+        "value": "tab|split|window"
+      }
+    },
+    "unresolved": {
+      "counts": {
+        "required": false
+      },
+      "format": {
+        "required": false,
+        "value": "json|tsv|csv"
+      },
+      "total": {
+        "required": false
+      },
+      "verbose": {
+        "required": false
+      }
+    },
+    "vault": {
+      "info": {
+        "required": false,
+        "value": "name|path|files|folders|size"
+      }
+    },
+    "vaults": {
+      "total": {
+        "required": false
+      },
+      "verbose": {
+        "required": false
+      }
+    },
+    "version": {},
+    "web": {
+      "newtab": {
+        "required": false
+      },
+      "url": {
+        "required": true,
+        "value": "<url>"
+      }
+    },
+    "wordcount": {
+      "characters": {
+        "required": false
+      },
+      "file": {
+        "required": false,
+        "value": "<name>"
+      },
+      "path": {
+        "required": false,
+        "value": "<path>"
+      },
+      "words": {
+        "required": false
+      }
+    },
+    "workspace": {
+      "ids": {
+        "required": false
+      }
+    },
+    "workspace:delete": {
+      "name": {
+        "required": true,
+        "value": "<name>"
+      }
+    },
+    "workspace:load": {
+      "name": {
+        "required": true,
+        "value": "<name>"
+      }
+    },
+    "workspace:save": {
+      "name": {
+        "required": false,
+        "value": "<name>"
+      }
+    },
+    "workspaces": {
+      "total": {
+        "required": false
+      }
+    }
+  },
+  "obsidian": "1.13.7"
+}

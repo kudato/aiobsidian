@@ -22,17 +22,35 @@ Thank you for your interest in contributing! This guide will help you get starte
 ### Running checks
 
 ```bash
-uv run ruff check src/ tests/          # lint
-uv run ruff format --check src/ tests/ # format check
-uv run mypy src/                       # type check
-uv run pytest -v                       # tests
+uv run ruff check src/ tests/ tools/          # lint
+uv run ruff format --check src/ tests/ tools/ # format check
+uv run mypy src/ tools/                       # type check
+uv run pytest -v                              # tests
 ```
 
 ### Auto-formatting
 
 ```bash
-uv run ruff format src/ tests/
+uv run ruff format src/ tests/ tools/
 ```
+
+### Refreshing the CLI grammar
+
+`tests/data/cli_grammar.json` lists every command an Obsidian release
+registers, with the parameters and flags each declares. The CLI tests
+check the command lines they build against it, so a parameter the app
+does not take fails a test rather than being silently ignored by the app.
+
+It is read out of an installed Obsidian, and CI has none, so refreshing
+it is a local step — run it when a new Obsidian release comes out, and
+commit the result with the version it names:
+
+```bash
+uv run python tools/extract_cli_grammar.py > tests/data/cli_grammar.json
+```
+
+A command line the app no longer accepts then shows up as a failing test
+instead of as a bug report.
 
 ### Running docs locally
 
@@ -54,9 +72,9 @@ uv run mkdocs serve
 4. Ensure all checks pass:
 
    ```bash
-   uv run ruff check src/ tests/
-   uv run ruff format --check src/ tests/
-   uv run mypy src/
+   uv run ruff check src/ tests/ tools/
+   uv run ruff format --check src/ tests/ tools/
+   uv run mypy src/ tools/
    uv run pytest -v
    ```
 
@@ -128,6 +146,9 @@ src/aiobsidian/
 │   ├── open.py         # Open files in UI
 │   └── system.py       # Server status
 └── models/             # Pydantic response models
+
+tools/
+└── extract_cli_grammar.py  # Reads the CLI grammar out of obsidian.asar
 ```
 
 ## Releasing (maintainers)
