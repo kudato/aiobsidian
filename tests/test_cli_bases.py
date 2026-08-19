@@ -77,6 +77,15 @@ async def test_query(cli):
     )
 
 
+async def test_query_of_something_that_is_not_a_list_of_records(cli):
+    # Valid JSON of the wrong shape used to come back as it arrived,
+    # typed as the records it is not.
+    cli._execute.return_value = json.dumps(["Task 1", "Task 2"])
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.bases.query("databases/tasks.base")
+    assert exc_info.value.command == "base:query"
+
+
 async def test_query_empty_view(cli):
     cli._execute.return_value = json.dumps(RECORDS)
     result = await cli.bases.query("databases/tasks.base", view="")

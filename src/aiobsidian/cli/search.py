@@ -50,8 +50,7 @@ class CLISearchResource(BaseCLIResource):
         output = await self._cli._execute(
             "search", params=params, flags=flags, output_format="json"
         )
-        result: list[str] = self._parse_json("search", output)
-        return result
+        return self._parse_json_strings("search", output)
 
     async def context(
         self,

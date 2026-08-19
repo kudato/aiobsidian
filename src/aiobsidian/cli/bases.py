@@ -82,8 +82,7 @@ class CLIBasesResource(BaseCLIResource):
         output = await self._cli._execute(
             "base:query", params=params, output_format="json"
         )
-        result: list[dict[str, Any]] = self._parse_json("base:query", output)
-        return result
+        return self._parse_json_objects("base:query", output)
 
     async def list(self) -> list[str]:
         """List all base files in the vault.

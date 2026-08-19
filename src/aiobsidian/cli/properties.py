@@ -32,8 +32,7 @@ class CLIPropertiesResource(BaseCLIResource):
         output = await self._cli._execute(
             "properties", params={"path": path}, output_format="json"
         )
-        result: dict[str, Any] = self._parse_json("properties", output, empty={})
-        return result
+        return self._parse_json_object("properties", output)
 
     async def read(self, path: str, property_name: str) -> PropertyValue:
         """Read a single property from a note.

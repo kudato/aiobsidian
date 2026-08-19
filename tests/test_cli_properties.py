@@ -5,6 +5,7 @@ import json
 import pytest
 
 from aiobsidian import PropertyType
+from aiobsidian._exceptions import CLIParseError
 
 
 async def test_list(cli):
@@ -21,6 +22,15 @@ async def test_list_without_properties(cli):
     cli._execute.return_value = "No frontmatter found.\n"
     result = await cli.properties.list("note.md")
     assert result == {}
+
+
+async def test_list_of_something_that_is_not_a_note_s_properties(cli):
+    # Valid JSON of the wrong shape used to come back as it arrived,
+    # typed as the mapping it is not.
+    cli._execute.return_value = json.dumps(["title", "rating"])
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.properties.list("note.md")
+    assert exc_info.value.command == "properties"
 
 
 async def test_read(cli):
