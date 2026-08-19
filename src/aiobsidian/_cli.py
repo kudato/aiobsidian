@@ -57,18 +57,24 @@ _ERROR_PREFIX = "Error: "
 _NOT_FOUND_PATTERN = re.compile(r"\bnot found\b", re.IGNORECASE)
 _UNKNOWN_COMMAND_PATTERN = re.compile(r'^Error: Command "[^"]*" not found')
 
-_VAULT_NOT_FOUND = "Vault not found."
-"""What Obsidian answers a `vault=` naming no vault it knows. It is
-decided before the command runs, in the process that owns the vaults
-rather than in the one that would answer, so it arrives as the whole of
-the output and without the `Error: ` every other failure carries."""
+_MISSING_PARAMETER_PREFIX = "Missing required parameter: "
+"""How a handler reports a parameter it cannot do without. Most raise it,
+and a raised failure is printed with the `Error: ` above; `command`,
+`template:insert` and `history:restore` return it instead, so it arrives
+as ordinary output and is read here by its prefix."""
 
-_CLI_DISABLED = (
-    "Command line interface is not enabled. "
-    "Please turn it on in Settings > General > Advanced."
+_UNPREFIXED_FAILURES = frozenset(
+    {
+        "Vault not found.",
+        "Command line interface is not enabled. "
+        "Please turn it on in Settings > General > Advanced.",
+    }
 )
-"""What Obsidian answers when the CLI is switched off in its settings.
-Printed the same way, and just as much a failure."""
+"""What Obsidian answers a `vault=` naming no vault it knows, and what it
+answers with the CLI switched off in its settings. Both are decided
+before the command reaches a vault, in the process that owns the vaults
+rather than in the one that would answer, so both arrive as the whole of
+the output with no prefix to know them by."""
 
 
 class ObsidianCLI:
@@ -203,18 +209,20 @@ class ObsidianCLI:
         """Execute an Obsidian CLI command.
 
         The Obsidian CLI exits with status `0` even when a command fails and
-        prints the failure as `Error: ...` on standard output. Output starting
-        with that prefix is therefore treated as a failure and raised. As a
-        consequence, reading a note whose first line starts with `Error: ` also
-        raises instead of returning the text.
+        prints most failures as `Error: ...` on standard output. Output
+        starting with that prefix is therefore treated as a failure and
+        raised. As a consequence, reading a note whose first line starts with
+        `Error: ` also raises instead of returning the text.
 
-        Two failures carry no such prefix, because they are decided before
-        the command reaches the vault: a `vault=` naming no vault Obsidian
-        knows, and a CLI switched off in the settings. Each answers with
-        one sentence and nothing else, so each is recognised as the whole
-        of the output rather than by a prefix — a note whose entire
-        content is that one sentence would be read as the failure it
-        spells.
+        Not every failure carries it. A handler that reports a parameter it
+        cannot do without by returning its usage rather than raising prints
+        `Missing required parameter: ...`, which is read the same way, by
+        the prefix. And two failures are decided before the command reaches
+        a vault at all, in the process that owns the vaults: a `vault=`
+        naming none it knows, and a CLI switched off in the settings. Each
+        of those answers with one sentence and nothing else, so each is
+        recognised as the whole of the output — a note whose entire content
+        is one of those two sentences is read as the failure it spells.
 
         Cancelling a running command kills it and everything it started
         before the cancellation propagates, so no orphan keeps writing to the
@@ -346,13 +354,10 @@ class ObsidianCLI:
         if stderr:
             logger.warning("CLI stderr for %r: %s", command, stderr)
 
-        if stdout.startswith(_ERROR_PREFIX):
+        if stdout.startswith((_ERROR_PREFIX, _MISSING_PARAMETER_PREFIX)):
             raise self._build_error(command, 0, stdout, stderr)
 
-        answer = stdout.strip()
-        if answer == _VAULT_NOT_FOUND:
-            raise CLINotFoundError(command, 0, stderr, stdout)
-        if answer == _CLI_DISABLED:
+        if stdout.strip() in _UNPREFIXED_FAILURES:
             raise CommandError(command, 0, stderr, stdout)
 
         return stdout

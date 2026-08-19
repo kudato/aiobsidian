@@ -46,6 +46,13 @@ def test_refuses_a_vault_behind_the_command():
         GRAMMAR.check_argv(["tags", "vault=Notes"])
 
 
+def test_refuses_a_command_line_that_names_no_vault():
+    # Obsidian runs it, against a vault of its own choosing. Leaving it
+    # out is the same bug as putting it in the wrong place.
+    with pytest.raises(GrammarError, match="off the front"):
+        GRAMMAR.check_argv(["read", "path=a.md"])
+
+
 def test_refuses_a_command_line_with_no_command():
     with pytest.raises(GrammarError, match="names no command"):
         GRAMMAR.check_argv(["vault=Notes"])

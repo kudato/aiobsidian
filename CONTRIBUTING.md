@@ -22,10 +22,10 @@ Thank you for your interest in contributing! This guide will help you get starte
 ### Running checks
 
 ```bash
-uv run ruff check src/ tests/ tools/          # lint
-uv run ruff format --check src/ tests/ tools/ # format check
-uv run mypy src/ tools/                       # type check
-uv run pytest -v                              # tests
+uv run ruff check src/ tests/ tools/               # lint
+uv run ruff format --check src/ tests/ tools/      # format check
+uv run mypy src/ tools/ tests/typing_examples.py   # type check
+uv run pytest -v                                   # tests
 ```
 
 ### Auto-formatting
@@ -74,7 +74,7 @@ uv run mkdocs serve
    ```bash
    uv run ruff check src/ tests/ tools/
    uv run ruff format --check src/ tests/ tools/
-   uv run mypy src/ tools/
+   uv run mypy src/ tools/ tests/typing_examples.py
    uv run pytest -v
    ```
 

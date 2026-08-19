@@ -665,11 +665,15 @@ class TestExecute:
         process = _mock_process(b"Vault not found.\n")
 
         with patch("asyncio.create_subprocess_exec", return_value=process):
-            with pytest.raises(CLINotFoundError) as exc_info:
+            with pytest.raises(CommandError) as exc_info:
                 await cli._execute("read", params={"path": "note.md"})
 
         assert exc_info.value.command == "read"
         assert exc_info.value.stdout == "Vault not found.\n"
+        # Not a missing resource: `except NotFoundError` is what a caller
+        # writes around one note, and a vault it cannot reach would
+        # answer that for every note in it.
+        assert not isinstance(exc_info.value, CLINotFoundError)
 
     async def test_a_disabled_cli_raises(self):
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
@@ -684,6 +688,21 @@ class TestExecute:
 
         assert exc_info.value.command == "version"
         assert not isinstance(exc_info.value, CLINotFoundError)
+
+    async def test_a_returned_usage_message_raises(self):
+        # `command`, `template:insert` and `history:restore` report a
+        # parameter they cannot do without by returning the usage rather
+        # than raising it, so it arrives with no `Error: ` on it.
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(
+            b"Missing required parameter: id\nUsage: command id=<command-id>\n"
+        )
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CommandError) as exc_info:
+                await cli._execute("command", params={"id": ""})
+
+        assert exc_info.value.command == "command"
 
     async def test_a_note_that_merely_mentions_a_missing_vault_is_content(self):
         # The sentence is the whole of the output when it is a failure,

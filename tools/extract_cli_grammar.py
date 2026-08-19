@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import struct
 import sys
@@ -40,12 +41,12 @@ _ASAR_CANDIDATES = (
     "/Applications/Obsidian.app/Contents/Resources/obsidian.asar",
     "/opt/Obsidian/resources/obsidian.asar",
     "/usr/lib/obsidian/resources/obsidian.asar",
+    # The Windows installer is per-user by default.
+    R"{LOCALAPPDATA}\Obsidian\resources\obsidian.asar",
     R"C:\Program Files\Obsidian\resources\obsidian.asar",
 )
 
 _REGISTRATION = re.compile(r"\.register(?:Cli)?Handler\(")
-_VALUE = re.compile(r"\bvalue:\s*")
-_REQUIRED = re.compile(r"\brequired:\s*(?:!0|true)\b")
 
 
 class ExtractionError(Exception):
@@ -269,12 +270,11 @@ def parse_options(source: str) -> dict[str, dict[str, Any]]:
 def _parse_option(body: str) -> dict[str, Any]:
     """Read what one parameter's description says about it.
 
-    The keys are looked for outside the string literals rather than
-    anywhere in the text, so a description that quotes `value:` is a
-    description and not a declaration. Reading one as the other would
-    hand back a grammar that accepts anything where the parameter takes
-    one of a listed few — a table that passes every check by asking for
-    nothing.
+    Walked key by key rather than searched, so a description quoting
+    `value:` stays a description, and a `required` written some way this
+    cannot read is refused rather than read as `false`. Either mistake
+    would hand back a grammar that asks for less than the app does, and
+    a table that asks for nothing passes every check made against it.
 
     Args:
         body: The object literal's contents, braces aside.
@@ -284,43 +284,99 @@ def _parse_option(body: str) -> dict[str, Any]:
         spells it, and `required` for one that must be given.
 
     Raises:
-        ExtractionError: If `value` is not written out as a string.
+        ExtractionError: If the body is not a run of `key: value` pairs,
+            if `value` is not written out as a string, or if `required`
+            is written as anything but a boolean.
     """
-    outside = _blank_strings(body)
-    option: dict[str, Any] = {}
-    value = _VALUE.search(outside)
-    if value is not None:
-        option["value"] = read_js_string(body, value.end())[0]
-    option["required"] = _REQUIRED.search(outside) is not None
-    return option
+    option: dict[str, Any] = {"required": False}
+    index = 0
+    while True:
+        index = _skip_space(body, index)
+        if index >= len(body):
+            return option
+        if body[index] == ",":
+            index += 1
+            continue
+        key, index = _read_key(body, index)
+        index = _skip_space(body, index)
+        if body[index : index + 1] != ":":
+            raise ExtractionError(f"{key!r} of a parameter says nothing")
+        index = _skip_space(body, index + 1)
+        if key == "value":
+            option["value"], index = read_js_string(body, index)
+            continue
+        end = _skip_value(body, index)
+        if key == "required":
+            option["required"] = _read_bool(body[index:end].strip())
+        index = end
 
 
-def _blank_strings(source: str) -> str:
-    """Blank out what every string literal holds, keeping the length.
-
-    What is left has the keys where they were and nothing that merely
-    reads like one, so an offset found in it is an offset into the
-    original. The quotes stay where they are, so a literal is still
-    something a search can stop at rather than a run of blank space to
-    be walked through.
+def _read_key(source: str, index: int) -> tuple[str, int]:
+    """Read the name a key is written under, quoted or bare.
 
     Args:
-        source: Text to blank.
+        source: Text to read from.
+        index: Index of the key's first character.
 
     Returns:
-        The same text with the contents of every literal replaced by
-        spaces.
+        The name and the index just past it.
+
+    Raises:
+        ExtractionError: If the key is not followed by a colon.
     """
-    characters = list(source)
-    index = 0
+    if source[index] in "\"'":
+        return read_js_string(source, index)
+    colon = source.find(":", index)
+    if colon == -1:
+        raise ExtractionError(f"a key with no colon after it: {source[index:60]}")
+    return source[index:colon].strip(), colon
+
+
+def _skip_value(source: str, index: int) -> int:
+    """Move past one value of whatever shape.
+
+    Args:
+        source: Text to scan.
+        index: Index of the value's first character.
+
+    Returns:
+        Index of the comma that ends it, or the end of the text.
+    """
+    depth = 0
     while index < len(source):
-        if source[index] in "\"'`":
-            _, end = read_js_string(source, index)
-            characters[index + 1 : end - 1] = " " * (end - index - 2)
-            index = end
+        char = source[index]
+        if char in "\"'`":
+            _, index = read_js_string(source, index)
             continue
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+        elif char == "," and depth == 0:
+            return index
         index += 1
-    return "".join(characters)
+    return index
+
+
+def _read_bool(literal: str) -> bool:
+    """Read a boolean as the bundle spells one.
+
+    Minified code writes `true` as `!0` and `false` as `!1`.
+
+    Args:
+        literal: The value as written.
+
+    Returns:
+        What it says.
+
+    Raises:
+        ExtractionError: If it says neither.
+    """
+    if literal in ("!0", "true"):
+        return True
+    if literal in ("!1", "false"):
+        return False
+    raise ExtractionError(f"a boolean written as {literal!r}, which this cannot read")
 
 
 def extract_grammar(app_js: str) -> dict[str, dict[str, dict[str, Any]]]:
@@ -372,7 +428,12 @@ def find_asar(explicit: str | None) -> Path:
         if not path.is_file():
             raise ExtractionError(f"{path} does not exist")
         return path
+    local = os.environ.get("LOCALAPPDATA")
     for candidate in _ASAR_CANDIDATES:
+        if "{LOCALAPPDATA}" in candidate:
+            if local is None:
+                continue
+            candidate = candidate.format(LOCALAPPDATA=local)
         path = Path(candidate)
         if path.is_file():
             return path

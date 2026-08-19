@@ -213,10 +213,16 @@ UNEXPECTED_OUTPUT = (
     '{"tag": "#python"}',
     "Obsidian is starting up, please wait.",
     "one\ttwo\tthree\tfour\tfive",
+    "No base files found in vault\n",
+    "No views defined in base file\n",
+    "No version history found for notes/setup.md\n",
 )
 """Answers no command documents: blank space, JSON cut short, JSON of
 the wrong shape, prose where a table was expected, and a row with more
-columns than any table has."""
+columns than any table has. Then three the CLI really prints — the
+empty-result lines it writes without the full stop the rest of them
+end in, and which every method has to survive whether or not it is the
+one that prints them."""
 
 
 def _resource_names() -> list[str]:

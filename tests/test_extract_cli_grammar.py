@@ -153,9 +153,32 @@ def test_does_not_read_a_description_that_quotes_a_key():
     assert options == {"format": {"value": "json|tsv", "required": False}}
 
 
+@pytest.mark.parametrize(
+    "written",
+    [
+        '{format:{"value":"json|tsv","required":!0}}',
+        '{format:{value : "json|tsv", required : !0}}',
+    ],
+    ids=["quoted keys", "spaced colons"],
+)
+def test_reads_a_parameter_however_its_keys_are_written(written):
+    assert parse_options(written) == {"format": {"value": "json|tsv", "required": True}}
+
+
 def test_refuses_a_value_that_is_not_written_out():
     with pytest.raises(ExtractionError, match="expected a string literal"):
         parse_options("{format:{value:FORMATS}}")
+
+
+def test_refuses_a_required_it_cannot_read():
+    # Read as `false`, a required parameter would stop being one, and the
+    # grammar would pass a command line the CLI refuses.
+    with pytest.raises(ExtractionError, match="boolean written as"):
+        parse_options('{name:{value:"<tag>",required:e}}')
+
+
+def test_reads_a_required_that_is_written_false():
+    assert parse_options("{name:{required:!1}}") == {"name": {"required": False}}
 
 
 def test_refuses_options_whose_parameter_is_not_described():

@@ -11,7 +11,17 @@ from .._exceptions import CLIParseError
 if TYPE_CHECKING:
     from .._cli import ObsidianCLI
 
-_EMPTY_RESULT_PATTERN = re.compile(r"^No [^\n]+\.$")
+_EMPTY_RESULT_PATTERN = re.compile(
+    r"^No [^\n]+\.$"
+    r"|^No base files found in vault$"
+    r"|^No views defined in base file$"
+    r"|^No version history found for [^\n]+$"
+)
+"""The one line the CLI prints instead of an empty listing. Nearly all of
+them are a sentence and end like one, and matching the full stop is what
+keeps a note called `No idea.md` from reading as one. Three do not have
+it, so they are named: leaving them out had `bases.list()` hand back the
+sentence as a path."""
 _ESCAPE_BOUNDARY_PATTERN = re.compile(r"(?<=\\)(?=[nt])")
 
 

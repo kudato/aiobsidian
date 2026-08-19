@@ -178,6 +178,13 @@ async def test_status_without_the_status_field(cli):
         await cli.sync.status()
 
 
+async def test_history_of_a_file_with_none(cli):
+    # Another empty-result line printed without a full stop, and this one
+    # names the file, so it cannot be matched as a whole either.
+    cli._execute.return_value = "No version history found for notes/todo.md\n"
+    assert await cli.sync.history("notes/todo.md") == []
+
+
 async def test_history(cli):
     cli._execute.return_value = HISTORY
     result = await cli.sync.history("notes/todo.md")

@@ -178,23 +178,29 @@ class Grammar:
         command reaches the vault it names, so it is read here and not
         taken on trust.
 
+        Obsidian itself runs a line that names no vault, against whichever
+        one holds the working directory or was last in front. This refuses
+        one: a client built for a named vault that does not name it has
+        the same bug as one that names it too late, and would pass every
+        other check here.
+
         Args:
             argv: Arguments the command was spawned with, binary aside.
 
         Raises:
-            GrammarError: If Obsidian would refuse the command line, or
-                would accept it having quietly ignored part of it.
+            GrammarError: If Obsidian would refuse the command line, would
+                accept it having quietly ignored part of it, or would run
+                it against a vault nobody asked for.
         """
         rest = list(argv)
-        if rest and rest[0].startswith(_VAULT_PREFIX):
-            rest.pop(0)
-        elif any(argument.startswith(_VAULT_PREFIX) for argument in rest):
+        if not rest or not rest[0].startswith(_VAULT_PREFIX):
             raise GrammarError(
                 "vault= is read off the front of the command line and "
-                "nowhere else; anywhere later it reaches the command as a "
-                "parameter, and the vault is whichever one the working "
-                f"directory sits in: {' '.join(argv)}"
+                "nowhere else, so it belongs there and this line does not "
+                "have it there; the vault would be whichever one the "
+                f"working directory sits in: {' '.join(argv)}"
             )
+        rest.pop(0)
         if not rest:
             raise GrammarError("a command line names no command")
 

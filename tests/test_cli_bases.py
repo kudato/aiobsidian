@@ -20,6 +20,18 @@ async def test_list(cli):
     cli._execute.assert_awaited_once_with("bases")
 
 
+async def test_list_without_any(cli):
+    # The one empty-result line the CLI prints without the full stop the
+    # rest of them end in. Read as a listing it was a path.
+    cli._execute.return_value = "No base files found in vault\n"
+    assert await cli.bases.list() == []
+
+
+async def test_query_of_a_base_with_no_views(cli):
+    cli._execute.return_value = "No views defined in base file\n"
+    assert await cli.bases.query("databases/tasks.base") == []
+
+
 async def test_views(cli):
     cli._execute.return_value = "All\ttable\nActive\tcards\n"
     result = await cli.bases.views()
