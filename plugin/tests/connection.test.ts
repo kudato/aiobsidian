@@ -336,6 +336,10 @@ describe("Connection", { skip: process.platform === "win32" }, () => {
     target.send({ jsonrpc: "2.0", id: 2, method: "huge", params: {} });
     const failure = errorOf(await target.next());
     assert.equal(failure.code, CODES.messageTooLarge);
+    // spec.md §2 says the sender checks first because only the sender can say which
+    // call this was and what to do instead. A caller with several answers outstanding
+    // learns nothing from a refusal that names neither.
+    assert.match(failure.message, /huge/);
     assert.match(failure.message, /pages/);
   });
 

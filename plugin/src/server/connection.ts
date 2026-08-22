@@ -106,6 +106,18 @@ export class Connection {
   readonly #reader: LineReader;
   readonly #running = new Map<RequestId, AbortController>();
   readonly #closeHandlers: (() => void)[] = [];
+  /**
+   * What this connection answers without a registry, and without a session.
+   *
+   * A table rather than a branch, so "what does this connection answer" is a value and
+   * not a shape of control flow. `answers` reads it back, and that is what the contract
+   * test compares against `methods.json` — including these, which sit before the
+   * authentication check and are therefore the ones it most matters to check.
+   */
+  readonly #builtIn: ReadonlyMap<
+    string,
+    (id: RequestId, params: Record<string, unknown>) => void
+  >;
 
   #authenticated = false;
   #closing = false;
@@ -121,6 +133,14 @@ export class Connection {
     this.#registry = options.registry;
     this.#describe = options.describe;
     this.#limits = { ...DEFAULT_LIMITS, ...options.limits };
+    this.#builtIn = new Map([
+      [
+        "session.hello",
+        (id: RequestId, params: Record<string, unknown>): void => {
+          this.#hello(id, params);
+        },
+      ],
+    ]);
 
     this.#reader = new LineReader({
       maxBytes: this.#limits.maxMessageBytes,
@@ -182,6 +202,19 @@ export class Connection {
   /** Whether this connection is taking anything new from the peer right now. */
   get reading(): boolean {
     return !this.closed && !this.#draining;
+  }
+
+  /**
+   * Every method name this connection will answer, from both of the places it looks.
+   *
+   * The contract test reads this off a connection the plugin actually built, rather
+   * than off a registry the test assembled — a registry compared with itself agrees
+   * with itself, and says nothing about what a peer can reach. Both sources are here
+   * because the built-in half is answered before the handshake, which makes it the
+   * half that matters.
+   */
+  get answers(): string[] {
+    return [...this.#builtIn.keys(), ...this.#registry.names()].sort();
   }
 
   /** Register a callback for when this connection is gone. */
@@ -262,8 +295,14 @@ export class Connection {
 
     const { id, method, params } = message.request;
 
-    if (method === "session.hello") {
-      this.#hello(id, params);
+    // One table, consulted once. What the connection answers by itself has to be a
+    // value some test can read back, because the alternative — a branch here — is a
+    // method served, reachable before the handshake, and invisible to everything that
+    // compares the registry against the contract. Nothing may be answered above this
+    // line.
+    const builtIn = this.#builtIn.get(method);
+    if (builtIn !== undefined) {
+      builtIn(id, params);
       return;
     }
     if (!this.#authenticated) {

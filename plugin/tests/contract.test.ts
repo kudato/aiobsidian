@@ -2,41 +2,46 @@
  * The plugin against the contract.
  *
  * `protocol/methods.json` is the shared file, so nothing here restates what it says —
- * these tests read it and check that the plugin agrees. A method registered but not in
- * the contract is undocumented; a live method in the contract but not registered is a
- * promise the plugin does not keep. Both are failures here rather than at a caller.
+ * these tests read it and check that the plugin agrees. A method the plugin answers and
+ * the contract does not name is undocumented; a live method in the contract the plugin
+ * does not answer is a promise it does not keep. Both are failures here rather than at a
+ * caller.
+ *
+ * What is under test is a **connection the plugin built**, not a registry assembled
+ * here. Earlier rounds of this test compared a registry with one the test made to match,
+ * which agrees with itself no matter what a peer can actually reach — and in particular
+ * said nothing about the methods the connection answers before the handshake, which are
+ * the ones where being wrong hands a stranger the vault's token.
  */
 
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import net from "node:net";
+import os from "node:os";
 import path from "node:path";
-import { describe, it } from "node:test";
+import { after, afterEach, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import type { App } from "obsidian";
 
-import { buildRegistry } from "../src/api/index.ts";
+import { type ApiContext, buildRegistry } from "../src/api/index.ts";
 import { CODES } from "../src/protocol/codes.ts";
 import { MAX_MESSAGE_BYTES } from "../src/protocol/framing.ts";
 import { PROTOCOL_MAJOR, PROTOCOL_MINOR, SUPPORTED_MAJORS } from "../src/protocol/version.ts";
-import { DEFAULT_LIMITS } from "../src/server/connection.ts";
+import { clientProof } from "../src/server/auth.ts";
+import { type Connection, DEFAULT_LIMITS } from "../src/server/connection.ts";
+import { Sessions } from "../src/server/sessions.ts";
 import { MAX_CONNECTIONS } from "../src/server/socket.ts";
-import { DEFAULT_SETTINGS } from "../src/settings.ts";
+import { DEFAULT_SETTINGS, type Settings } from "../src/settings.ts";
 
 interface Contract {
   readonly protocol: { readonly major: number; readonly minor: number };
   readonly errors: Record<string, { readonly code: number }>;
-  readonly methods: Record<string, { readonly status: string; readonly domain: string }>;
-  readonly notifications: Record<string, { readonly status: string }>;
-}
-
-/** A source file split into the part that runs and the strings it holds. */
-interface Source {
-  readonly file: string;
-  /** The file with every comment blanked out, so a grep cannot match one. */
-  readonly code: string;
-  /** The contents of every string and template literal in it. */
-  readonly literals: readonly string[];
+  readonly methods: Record<string, { readonly status: string }>;
+  readonly notifications: Record<
+    string,
+    { readonly status: string; readonly direction: string }
+  >;
 }
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -44,94 +49,168 @@ const root = path.join(here, "..", "..");
 const contract = JSON.parse(
   await fs.readFile(path.join(root, "protocol", "methods.json"), "utf8"),
 ) as Contract;
-const sources = await readSources(path.join(root, "plugin", "src"));
 
-/**
- * Read one TypeScript file the way a grep over it ought to see it.
- *
- * A test that greps raw source is a test a comment can satisfy — and one a comment can
- * also break, by mentioning a name the code never sends. So the file is walked once,
- * comments are replaced by spaces (offsets stay put, and nothing accidentally joins),
- * and every string literal is collected separately.
- */
-function scan(text: string): { code: string; literals: string[] } {
-  const code: string[] = [];
-  const literals: string[] = [];
-  let index = 0;
-  while (index < text.length) {
-    const two = text.slice(index, index + 2);
-    if (two === "//") {
-      const end = text.indexOf("\n", index);
-      const stop = end === -1 ? text.length : end;
-      code.push(" ".repeat(stop - index));
-      index = stop;
-      continue;
-    }
-    if (two === "/*") {
-      const end = text.indexOf("*/", index + 2);
-      const stop = end === -1 ? text.length : end + 2;
-      code.push(text.slice(index, stop).replace(/[^\n]/g, " "));
-      index = stop;
-      continue;
-    }
-    const quote = text[index];
-    if (quote === '"' || quote === "'" || quote === "`") {
-      const start = index;
-      let literal = "";
-      index += 1;
-      while (index < text.length && text[index] !== quote) {
-        if (text[index] === "\\") {
-          literal += text[index + 1] ?? "";
-          index += 2;
-          continue;
-        }
-        literal += text[index];
-        index += 1;
-      }
-      index += 1;
-      literals.push(literal);
-      code.push(text.slice(start, index));
-      continue;
-    }
-    code.push(text[index] as string);
-    index += 1;
-  }
-  return { code: code.join(""), literals };
-}
+const scratch = await fs.mkdtemp(path.join(os.tmpdir(), "aio-contract-"));
+const TOKEN = Buffer.alloc(32, 7);
 
-/** Every `.ts` file under a directory, scanned. */
-async function readSources(directory: string): Promise<Source[]> {
-  const entries = await fs.readdir(directory, { withFileTypes: true });
-  const found: Source[] = [];
-  for (const entry of entries) {
-    const full = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      found.push(...(await readSources(full)));
-    } else if (entry.name.endsWith(".ts")) {
-      const { code, literals } = scan(await fs.readFile(full, "utf8"));
-      found.push({ file: path.relative(root, full), code, literals });
-    }
-  }
-  return found;
-}
-
-function source(relative: string): Source {
-  const found = sources.find((candidate) => candidate.file === relative);
-  assert.ok(found, `${relative} is not there any more; this test is about it`);
-  return found;
-}
-
-/**
- * Everything the plugin should have in its registry.
- *
- * The `session` domain is not in it: the connection answers `session.hello` itself,
- * before there is an authenticated session to dispatch on.
- */
-function expectedMethods(): string[] {
+function methodsWithStatus(status: string): string[] {
   return Object.entries(contract.methods)
-    .filter(([, method]) => method.status === "live" && method.domain !== "session")
+    .filter(([, method]) => method.status === status)
     .map(([name]) => name)
     .sort();
+}
+
+/**
+ * A context the way a domain will really see one.
+ *
+ * `app` is a stub, which is the point of the rule `buildRegistry` states: a domain that
+ * registered conditionally on something in here would register nothing under this
+ * context, and the comparison below would agree that all is well.
+ */
+function context(settings: Settings = DEFAULT_SETTINGS): ApiContext {
+  return { app: {} as App, settings: () => settings };
+}
+
+const servers: net.Server[] = [];
+const clients: net.Socket[] = [];
+
+afterEach(async () => {
+  for (const client of clients.splice(0)) {
+    client.destroy();
+  }
+  await Promise.all(
+    servers.splice(0).map(
+      (server) =>
+        new Promise<void>((resolve) => {
+          server.close(() => {
+            resolve();
+          });
+        }),
+    ),
+  );
+});
+
+after(async () => {
+  await fs.rm(scratch, { recursive: true, force: true });
+});
+
+let counter = 0;
+
+interface Peer {
+  readonly sessions: Sessions;
+  readonly connection: Connection;
+  next(within?: number): Promise<Record<string, unknown>>;
+  send(message: unknown): void;
+  /** Send `session.hello` with a valid proof and read the answer. */
+  handshake(nonce: string): Promise<Record<string, unknown>>;
+}
+
+/**
+ * A client attached to a `Sessions` built the way the plugin builds one.
+ *
+ * Deliberately not a `Connection` constructed here: `Sessions` is where the registry
+ * comes from, and a test that builds its own connection would be testing the thing it
+ * assembled rather than the thing that serves.
+ */
+async function peer(settings: Settings = DEFAULT_SETTINGS): Promise<Peer> {
+  counter += 1;
+  const socketPath = path.join(scratch, `case-${counter}.sock`);
+
+  const sessions = new Sessions({
+    token: TOKEN,
+    context: context(settings),
+    describe: () => ({
+      plugin_version: "0.1.0",
+      obsidian_version: "1.13.1",
+      vault: { id: "0123456789abcdef", name: "Notes", path: "/Users/ada/Notes" },
+    }),
+  });
+
+  let accepted: ((connection: Connection) => void) | null = null;
+  const ready = new Promise<Connection>((resolve) => {
+    accepted = resolve;
+  });
+  const server = net.createServer((socket) => {
+    accepted?.(sessions.accept(socket));
+  });
+  servers.push(server);
+  await new Promise<void>((resolve) => server.listen(socketPath, resolve));
+
+  const client = net.connect(socketPath);
+  clients.push(client);
+  await new Promise((resolve, reject) => {
+    client.once("connect", resolve);
+    client.once("error", reject);
+  });
+
+  const queue: Record<string, unknown>[] = [];
+  const waiting: ((message: Record<string, unknown>) => void)[] = [];
+  let buffer = "";
+  client.on("data", (chunk: Buffer) => {
+    buffer += chunk.toString("utf8");
+    for (;;) {
+      const newline = buffer.indexOf("\n");
+      if (newline === -1) {
+        return;
+      }
+      const line = buffer.slice(0, newline);
+      buffer = buffer.slice(newline + 1);
+      if (line.trim().length === 0) {
+        continue;
+      }
+      const message = JSON.parse(line) as Record<string, unknown>;
+      const waiter = waiting.shift();
+      if (waiter === undefined) {
+        queue.push(message);
+      } else {
+        waiter(message);
+      }
+    }
+  });
+
+  const next = (within = 2_000): Promise<Record<string, unknown>> =>
+    new Promise((resolve, reject) => {
+      const pending = queue.shift();
+      if (pending !== undefined) {
+        resolve(pending);
+        return;
+      }
+      const timer = setTimeout(() => {
+        reject(new Error("the server said nothing"));
+      }, within);
+      waiting.push((message) => {
+        clearTimeout(timer);
+        resolve(message);
+      });
+    });
+
+  const send = (message: unknown): void => {
+    client.write(`${JSON.stringify(message)}\n`);
+  };
+
+  return {
+    sessions,
+    connection: await ready,
+    next,
+    send,
+    handshake: async (nonce: string) => {
+      send({
+        jsonrpc: "2.0",
+        id: "hello",
+        method: "session.hello",
+        params: {
+          protocol: [PROTOCOL_MAJOR],
+          proof: clientProof(TOKEN, Buffer.from(nonce, "hex")).toString("hex"),
+        },
+      });
+      return next();
+    },
+  };
+}
+
+function errorCode(message: Record<string, unknown>): number | null {
+  const error = message["error"] as { code?: number } | undefined;
+  return error?.code ?? null;
 }
 
 describe("the plugin against protocol/methods.json", () => {
@@ -151,52 +230,114 @@ describe("the plugin against protocol/methods.json", () => {
     assert.deepEqual({ ...CODES }, fromContract);
   });
 
-  it("registers exactly the methods the contract calls live", () => {
-    // The registry the server is actually given, not one assembled here to match: a
-    // method registered and undocumented has to fail, and it cannot if the test builds
-    // its own.
-    const registry = buildRegistry({ app: {} as App, settings: () => DEFAULT_SETTINGS });
-    assert.deepEqual(registry.names(), expectedMethods());
+  it("answers exactly the methods the contract calls live", async () => {
+    // Read off a live connection, both halves of it: the registry `Sessions` built and
+    // the methods the connection answers before there is a session at all. The second
+    // half is the one a test that stops at the registry never sees.
+    const { connection } = await peer();
+    assert.deepEqual(connection.answers, methodsWithStatus("live"));
   });
 
-  it("hands out a registry nothing can add to afterwards", () => {
-    // The check above compares a registry built here against the contract, and the one
-    // the plugin serves is built the same way — which makes the two the same set only
-    // while neither can be added to after it is built.
-    const registry = buildRegistry({ app: {} as App, settings: () => DEFAULT_SETTINGS });
+  it("answers nothing the contract only plans", async () => {
+    // The same set from the other side, over the wire, after a real handshake: a
+    // planned method has to be methodNotFound and not some half-built answer.
+    const { next, handshake, send } = await peer();
+    const challenge = await next();
+    const nonce = (challenge["params"] as { nonce: string }).nonce;
+    await handshake(nonce);
+
+    for (const name of methodsWithStatus("planned")) {
+      send({ jsonrpc: "2.0", id: name, method: name, params: {} });
+      const answer = await next();
+      assert.equal(answer["id"], name);
+      assert.equal(errorCode(answer), CODES.methodNotFound, `${name} answers something`);
+    }
+  });
+
+  it("answers nothing but the handshake before the handshake", async () => {
+    // spec.md §3 calls this an invariant rather than an accident of today's method
+    // list, so it is checked against the whole list rather than against today's.
+    const probes = [...Object.keys(contract.methods), "session.diagnostics"].filter(
+      (name) => name !== "session.hello",
+    );
+    for (const name of probes) {
+      const { next, send } = await peer();
+      const challenge = await next();
+      assert.equal(challenge["method"], "session.challenge");
+
+      send({ jsonrpc: "2.0", id: 1, method: name, params: {} });
+      const answer = await next();
+      assert.equal(
+        errorCode(answer),
+        CODES.unauthenticated,
+        `${name} answered an unproven peer`,
+      );
+      assert.equal(answer["result"], undefined, `${name} told an unproven peer something`);
+    }
+  });
+
+  it("registers the same methods whatever the context says", () => {
+    // The rule `buildRegistry` states, checked rather than trusted: a domain that
+    // registered only when a capability is on would be invisible to every test above,
+    // because their context is a stub and every such condition takes its off-branch.
+    const off = buildRegistry(context({ ...DEFAULT_SETTINGS, serve: false })).names();
+    const on = buildRegistry(context({ ...DEFAULT_SETTINGS, serve: true })).names();
+    assert.deepEqual(off, on);
+  });
+
+  it("hands out a registry nothing can add to or replace afterwards", () => {
+    const registry = buildRegistry(context());
+    assert.throws(() => {
+      registry.add("files.sneaky", () => null);
+    }, /sealed/);
     assert.throws(
       () => {
-        registry.add("files.sneaky", () => null);
+        (registry as unknown as { get: unknown }).get = () => () => null;
       },
-      /sealed/,
-      "a method could be served without the contract ever hearing of it",
+      TypeError,
+      "a replacement lookup would serve a method the name list never mentions",
     );
   });
 
-  it("builds its registry in exactly one place", () => {
-    // And that place is the one the test above calls. Anywhere else and the comparison
-    // is against a registry nothing serves.
-    const builders = sources
-      .filter((candidate) => candidate.code.includes("new MethodRegistry("))
-      .map((candidate) => candidate.file);
-    assert.deepEqual(builders, [path.join("plugin", "src", "api", "index.ts")]);
-    assert.match(source(path.join("plugin", "src", "main.ts")).code, /buildRegistry\(/);
-  });
+  it("sends the notifications the contract calls live, and no others", async () => {
+    // Observed, not grepped for: a name spelled right in the source and never sent is
+    // exactly the failure a source scan cannot tell from success.
+    const { sessions, next } = await peer();
+    const seen = new Set<string>();
 
-  it("names every notification the contract calls live", () => {
-    // Nothing dispatches these through a registry, so the names live in the source as
-    // string literals. Reading them out of it is what makes a rename on one side fail
-    // here rather than at a client. Only literals count: a comment naming one proves
-    // nothing, and blanking comments out is what keeps it from proving anything.
+    const challenge = await next();
+    seen.add(challenge["method"] as string);
+
+    sessions.closeAll("stopped");
+    const goodbye = await next();
+    seen.add(goodbye["method"] as string);
+    assert.equal((goodbye["params"] as { reason: string }).reason, "stopped");
+
     const live = Object.entries(contract.notifications)
-      .filter(([, notification]) => notification.status === "live")
+      .filter(
+        ([, notification]) =>
+          notification.status === "live" && notification.direction === "vault to client",
+      )
       .map(([name]) => name)
       .sort();
-    const known = new Set(Object.keys(contract.notifications));
-    const spoken = new Set(
-      sources.flatMap((candidate) => candidate.literals).filter((text) => known.has(text)),
-    );
-    assert.deepEqual([...spoken].sort(), live);
+    assert.deepEqual([...seen].sort(), live);
+  });
+
+  it("acts on the one notification the contract has a client send", async () => {
+    // `rpc.cancel` is client to vault, so the way to observe it is its effect: the
+    // withdrawal has to come back as an answer rather than as silence.
+    const { next, handshake, send } = await peer();
+    const challenge = await next();
+    const nonce = (challenge["params"] as { nonce: string }).nonce;
+    await handshake(nonce);
+
+    // No method is registered yet, so a request cannot be left running to withdraw.
+    // What can be checked is that the vault takes the notification and says nothing
+    // back, which is what JSON-RPC asks of a notification it cannot act on.
+    send({ jsonrpc: "2.0", method: "rpc.cancel", params: { id: 404 } });
+    send({ jsonrpc: "2.0", id: "after", method: "files.read", params: {} });
+    const answer = await next();
+    assert.equal(answer["id"], "after", "the cancellation drew an answer of its own");
   });
 
   it("caps a frame at the 16 MiB the specification names", () => {

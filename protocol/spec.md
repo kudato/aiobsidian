@@ -2,9 +2,11 @@
 
 Version 1.0.
 
-This is what the AIO plugin speaks on its socket, and what `aiobsidian` speaks to it.
-It is written down so that a third implementation — another language, a shell script, a
-different editor — can be written against it without reading either side's source.
+This is what the AIO plugin speaks on its socket, and what `aiobsidian` is being built to
+speak to it. It is written down so that a third implementation — another language, a
+shell script, a different editor — can be written against it without reading either
+side's source. Where this document uses the present tense about a client, it is stating
+what a client must do, not reporting that one already does.
 
 The machine-readable half is [`methods.json`](methods.json): every method, its
 parameters, its result, its errors, and the protocol version. The plugin is tested
@@ -40,7 +42,8 @@ derived rather than borrowed. The only place Obsidian's id appears is the
 `obsidian://open?vault=<id>` URL used to start a vault that is not running.
 
 Several connections to one vault are normal and expected. Two scripts must both work.
-Requests, subscriptions and cancellation are all per-connection.
+Requests, subscriptions, upload handles and cancellation are all per-connection, and
+none of them outlives the socket they were made on.
 
 ---
 
@@ -81,8 +84,15 @@ Binary is paged: `files.read_binary` returns one range at a time, read with a ra
 `fs.read` so the vault holds one chunk and not the file. Binary writes are transactional
 — `files.upload_begin` → `files.upload_chunk`… → `files.upload_commit` — writing to a
 temporary file inside the vault's config directory, under an unpredictable name, and
-renaming it into place on commit. An abandoned upload is deleted and the vault never saw
-it.
+renaming it into place on commit. The rename is what makes the commit atomic, and it is
+atomic only because both sides of it are on one filesystem, which is why the scratch file
+lives there and not in the system's temporary directory.
+
+**A handle belongs to the connection that opened it.** Closing the connection aborts
+every upload open on it and deletes its scratch file, exactly as `files.upload_abort`
+would have; so does unloading the plugin. Nothing survives to be resumed on a later
+connection, and an abandoned upload is deleted rather than left behind. A hole in that
+promise would be a growing pile of unnameable files inside the user's vault.
 
 ---
 
@@ -196,16 +206,22 @@ Every method in `methods.json` carries a `mutates` flag, and it decides two thin
 cancellation does to a running call, and what a broken connection says about one. So it
 has to mean something exact.
 
-> **`mutates` is true when the method changes something another method would report
-> differently afterwards, on any connection.**
+> **`mutates` is true when the method changes durable state** — anything that outlives
+> the connection it was changed on.
 
-Writing a note is a mutation; so is moving the cursor, because `editor.get` answers
-differently after it. Reading anything is not. Neither is state that belongs to one
-connection and dies with it — `events.subscribe`, `session.hello` — because no method
-reports it at all. Nor is the plugin's own scratch: `files.upload_begin` and
-`files.upload_chunk` write to a temporary file under an unpredictable name outside the
-vault, which nothing can address until `files.upload_commit` renames it into place, and
-that commit is the mutation.
+Writing a note is a mutation; so is moving the cursor, because the cursor is Obsidian's
+and stays where it was put after the client that put it there has gone. So is every step
+of a binary upload, including `files.upload_begin` and `files.upload_abort`: the
+temporary file is a real file on disk, and a `files.upload_chunk` whose answer never
+arrived may or may not have appended its bytes — which is exactly what §11 has to be able
+to say.
+
+Reading is not a mutation. Neither is **state that belongs to one connection and dies
+with it**: `session.hello` authenticates that connection and no other, `events.subscribe`
+and `events.unsubscribe` add and remove a subscription that closing the socket would have
+removed anyway, and an upload handle names a temporary file but is itself only a name on
+this connection. That is the whole exception, and it is an exception about lifetime — not
+about whether some method happens to report the change.
 
 ### Cancellation
 
@@ -213,6 +229,12 @@ A client withdraws a request by sending `rpc.cancel` with its id. The answer sti
 arrives — as a `cancelled` error — so nothing waits forever. It is the client's own
 withdrawal that produces it: **the vault never sends `cancelled` for a request nobody
 withdrew**, so the error always lands inside the call that asked for it.
+
+The other half of that rule binds the client, and §7 depends on it just as much:
+**`rpc.cancel` is sent only when the caller's own task was cancelled.** A library that
+sent it for a timeout of its own, or to tidy up, would raise `asyncio.CancelledError`
+into a task nobody cancelled — a `BaseException` past every `except Exception` its caller
+wrote. A client-side timeout fails with a client-side error.
 
 The vault drops the request if it is still queued. If it is already running: reads and
 queries stop at their next await point; **single mutations do not** — they run to
@@ -230,16 +252,23 @@ It is enforced in review of `methods.json`, and a proposed method that would nee
 mutations is a wrong method.
 
 So: **a cancelled mutation either applied in full or did not apply at all, at the path
-it was asked about.** Cancelled is not the same as "did not happen" — a caller that
-needs to know must re-read.
+it was asked about.**
 
-The promise is about that path and no other, because one of these methods reaches
-further than its own arguments and cannot promise more. `files.move` renames one file
-atomically, and then Obsidian rewrites the links that pointed at it, note by note, on
-its own schedule — work that is not part of the rename, not covered by the law above,
-and not something a plugin can make atomic. The move either happened or did not; the
-link rewrite is Obsidian's, and a crash in the middle of it leaves some notes updated
-and some not.
+The promise is about that path and no other, and it is a promise **about a file**. Two
+kinds of method reach further than that, and neither can promise more:
+
+- **A method addressing a folder** is that method repeated over a tree. Copying a folder
+  is N creates, deleting one is N deletes, and `files.create_folder` is one call per
+  missing level. Obsidian has no call that makes a tree atomic, so `files.copy`,
+  `files.delete` and `files.create_folder` say in their own summaries that an
+  interruption leaves the tree half-done. The law above is not repealed for them: each
+  step is still one vault call, and there is still no half-written file.
+- **`files.move`** renames one file atomically, and then Obsidian rewrites the links that
+  pointed at it, note by note, on its own schedule — work that is not part of the rename
+  and not something a plugin can make atomic. The move either happened or did not; a
+  crash in the middle of the rewrite leaves some notes updated and some not.
+
+Cancelled is not the same as "did not happen" — a caller that needs to know must re-read.
 
 ### Compare-and-set
 
@@ -287,6 +316,14 @@ subscription has a bounded queue; on overflow the oldest events are dropped and 
 event says how many were missed. **The gap is delivered in the stream, in order**, so the
 decision to re-read state is made where the events are read.
 
+`seq` is what makes that exact. It counts from 1 within a subscription, never repeats,
+and **numbers every event the subscription produced, including the ones it dropped** — so
+a jump in it is itself the news that events were lost. The `gap` event is an event like
+any other and takes **the next number after the run it reports**, which is what keeps it
+ordered against everything still queued behind it. Dropping 5 through 9 out of a queue
+therefore reads on the wire as `…4`, then `gap` at 10 with `missed: 5`, then 11. A client
+can check the count against the numbers, and the two always agree.
+
 No debouncing. A socket handles the volume a human generates, and silently thinning a
 stream is worse than reporting a gap.
 
@@ -315,8 +352,11 @@ a type rather than on the wording of a message. Adding a failure means adding a 
 the table, not a special case at a call site.
 
 Several codes may share a class, but only where the caller would do the same thing about
-them: `ProtocolError` covers four ways of not speaking this protocol, and there is one
-answer to all of them. Where the answers differ, the classes do. `forbidden` means a
+them: `ProtocolError` covers `parseError`, `invalidRequest` and `methodNotFound` — three
+ways of not speaking this protocol, with one answer to all of them. Where the answers
+differ, the classes do. `messageTooLarge` has its own, because it is an ordinary outcome
+with an ordinary answer — read the thing in pages — and not a sign that either side is
+failing to speak the protocol. `forbidden` means a
 person has to turn a switch on and no amount of retrying substitutes; `tooManyRequests`
 means wait for the answers already asked for; `internalError` means file a bug. Folding
 those three together would leave the two a program most needs to tell apart catchable
@@ -472,6 +512,6 @@ protocol major the client does not speak, or a `server_proof` that does not veri
 3. Read the token file; compute `HMAC-SHA256(token, nonce)`.
 4. Send `session.hello` with the majors you implement and that proof.
 5. Verify `server_proof` **before** sending anything else.
-6. Send requests with monotonic ids; read lines; match responses by id; treat a line
-   with a `method` and no `id` as a notification.
+6. Send requests with ids you never reuse; read lines; match responses by id; treat a
+   line with a `method` and no `id` as a notification.
 7. On `session.goodbye`, stop; on a closed socket with pending calls, fail them.

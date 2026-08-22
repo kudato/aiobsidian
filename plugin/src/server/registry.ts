@@ -35,16 +35,16 @@ export class MethodRegistry {
   #sealed = false;
 
   /**
-   * Refuse every later registration.
+   * Refuse every later registration, and every later change to this object.
    *
-   * What the contract test compares is a registry built by `buildRegistry()`; what the
-   * plugin serves is one built the same way. The two are the same set only while
-   * nobody adds to the registry afterwards — and a registration the test cannot see is
-   * exactly a method served and undocumented. Sealing is what turns that from a thing
-   * reviewers have to notice into a thing that throws.
+   * A registration the contract test cannot see is a method served and undocumented,
+   * so `add` stops working. `Object.freeze` is the other half: without it the object
+   * accepts a replacement `get`, which would serve a method the name list never
+   * mentions — sealed registration and an unsealed object is a promise only half kept.
    */
   seal(): void {
     this.#sealed = true;
+    Object.freeze(this);
   }
 
   /**

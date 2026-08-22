@@ -3,7 +3,6 @@ import path from "node:path";
 
 import { apiVersion, FileSystemAdapter, Notice, Plugin } from "obsidian";
 
-import { buildRegistry } from "./api/index.ts";
 import { ServeError } from "./lib/errors.ts";
 import {
   currentEnvironment,
@@ -149,7 +148,7 @@ export default class AioPlugin extends Plugin {
 
     const sessions = new Sessions({
       token,
-      registry: buildRegistry({ app: this.app, settings: () => this.settings }),
+      context: { app: this.app, settings: () => this.settings },
       describe: () => ({
         plugin_version: this.manifest.version,
         obsidian_version: apiVersion,

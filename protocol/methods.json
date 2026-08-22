@@ -1,5 +1,5 @@
 {
-  "note": "The wire contract. The plugin is tested against this file: it asserts that it registered exactly the methods marked live, and that its codes and bounds are these. The Python tests check this file's own consistency, and will check the client against it when the socket transport lands. Prose lives in spec.md; this file is what the tests read.",
+  "note": "The wire contract. The plugin is tested against this file: a connection it built is asked what it answers, and that has to be exactly the methods marked live. The Python tests check this file's own consistency, and will check the client against it when the socket transport lands. Prose lives in spec.md; this file is what the tests read.",
   "protocol": {
     "major": 1,
     "minor": 0
@@ -67,8 +67,8 @@
     },
     "messageTooLarge": {
       "code": 1008,
-      "exception": "ProtocolError",
-      "doc": "A line longer than the frame cap, in either direction. A result over the cap names the paged alternative."
+      "exception": "MessageTooLargeError",
+      "doc": "A line longer than the frame cap, in either direction. Its own class and not ProtocolError, because it is an ordinary outcome with an ordinary answer — read the thing in pages — and not a sign that one of the two is failing to speak this protocol. A result over the cap names the method and the paged alternative."
     },
     "tooManyRequests": {
       "code": 1009,
@@ -259,7 +259,7 @@
     "files.delete": {
       "status": "planned",
       "domain": "files",
-      "summary": "Delete a file or folder, to the trash by default.",
+      "summary": "Delete a file or folder, to the trash by default. Deleting a folder is that delete repeated over a tree, which no Obsidian call makes atomic: interrupted, part of the tree is gone and part is not.",
       "mutates": true,
       "gated": false,
       "gates": [],
@@ -311,7 +311,7 @@
     "files.copy": {
       "status": "planned",
       "domain": "files",
-      "summary": "Copy a file or folder.",
+      "summary": "Copy a file or folder. Copying a folder is that copy repeated over a tree, which no Obsidian call makes atomic: interrupted, it leaves a partial copy behind.",
       "mutates": true,
       "gated": false,
       "gates": [],
@@ -337,7 +337,7 @@
     "files.create_folder": {
       "status": "planned",
       "domain": "files",
-      "summary": "Create a folder, and every folder above it that is missing.",
+      "summary": "Create a folder, and every folder above it that is missing. Creating a chain is one call per level, which no Obsidian call makes atomic: interrupted, the levels already made stay made.",
       "mutates": true,
       "gated": false,
       "gates": [],
@@ -466,8 +466,8 @@
     "files.upload_begin": {
       "status": "planned",
       "domain": "files",
-      "summary": "Open a transactional binary write. Nothing appears at the path until it commits, so alreadyExists here is an early courtesy and not a promise: the path is checked again under the lock at commit, where the answer counts.",
-      "mutates": false,
+      "summary": "Open a transactional binary write. Nothing appears at the path until it commits, so alreadyExists here is an early courtesy and not a promise: the path is checked again under the lock at commit, where the answer counts. The handle belongs to the connection that opened it and dies with it, and the temporary file goes with it.",
+      "mutates": true,
       "gated": false,
       "gates": [],
       "unstable": false,
@@ -493,8 +493,8 @@
     "files.upload_chunk": {
       "status": "planned",
       "domain": "files",
-      "summary": "Add bytes to an open upload.",
-      "mutates": false,
+      "summary": "Add bytes to an open upload. Not idempotent and not resumable: a chunk whose answer never arrived may or may not have been appended, and the only safe move is to abort the upload and start again.",
+      "mutates": true,
       "gated": false,
       "gates": [],
       "unstable": false,
@@ -540,7 +540,7 @@
       "status": "planned",
       "domain": "files",
       "summary": "Throw an upload away. The vault never saw it.",
-      "mutates": false,
+      "mutates": true,
       "gated": false,
       "gates": [],
       "unstable": false,
@@ -1332,7 +1332,7 @@
         "seq": {
           "type": "integer",
           "required": true,
-          "doc": "Counts from 1 within the subscription, gaps included."
+          "doc": "Counts from 1 within the subscription and never repeats. It numbers every event the subscription produced, dropped ones included, so a jump in it means events were lost — and a gap event takes the next number after the run it reports, which keeps it in order with everything still queued behind it."
         },
         "event": {
           "type": "Event",
@@ -1506,7 +1506,7 @@
       "fields": {
         "missed": {
           "type": "integer",
-          "doc": "How many events were dropped, counted in this subscription's own sequence numbers."
+          "doc": "How many events were dropped: exactly the count of sequence numbers between the last one delivered and this event's own."
         }
       },
       "subscribable": false

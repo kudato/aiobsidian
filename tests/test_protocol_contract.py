@@ -42,6 +42,7 @@ _EXCEPTIONS = frozenset(
         "CancelledError",
         "ConflictError",
         "ForbiddenError",
+        "MessageTooLargeError",
         "NotFoundError",
         "OperationError",
         "ProtocolError",
@@ -387,12 +388,13 @@ def test_a_gap_is_the_one_event_nobody_asks_for(contract: dict[str, Any]) -> Non
 
 def test_a_bounded_number_says_both_of_its_bounds(contract: dict[str, Any]) -> None:
     """Half a range is a number a client still cannot check before it sends it."""
-    for name, method in contract["methods"].items():
-        for parameter, spec in method["params"].items():
-            declared = {"minimum", "maximum"}.intersection(spec)
-            assert declared in (set(), {"minimum", "maximum"}), (
-                f"{name}.{parameter} declares {sorted(declared)} and not the other"
-            )
+    for section in ("methods", "notifications"):
+        for name, entry in contract[section].items():
+            for parameter, spec in entry["params"].items():
+                declared = {"minimum", "maximum"}.intersection(spec)
+                assert declared in (set(), {"minimum", "maximum"}), (
+                    f"{name}.{parameter} declares {sorted(declared)} and not the other"
+                )
 
 
 def test_the_event_queue_is_bounded(contract: dict[str, Any]) -> None:
