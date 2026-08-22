@@ -578,13 +578,32 @@ describe("Connection", { skip: process.platform === "win32" }, () => {
   });
 
   it("drops the id rather than answering with a frame over the cap", async () => {
-    // The cap binds this side too, and a conforming client discards a line over it. An
-    // id long enough to be the bulk of the reply cannot be echoed back inside one.
-    const target = await peer({ limits: { maxMessageBytes: 4_096 } });
+    // The cap binds this side too, and a conforming client discards a line over it. A
+    // refusal carries less around the id than a request does, but not by much, so an id
+    // that only just fit on the way in cannot be echoed back inside one.
+    const cap = 1_024;
+    const target = await peer({ limits: { maxMessageBytes: cap } });
     await target.next();
-    target.send({ jsonrpc: "2.0", id: "x".repeat(4_000), method: "nope", params: {} });
+    target.send({ jsonrpc: "2.0", id: "x".repeat(cap - 50), method: "", params: {} });
     const answer = await target.next();
     assert.equal(answer["id"], null);
-    assert.ok(Buffer.byteLength(JSON.stringify(answer), "utf8") <= 4_096);
+    assert.ok(Buffer.byteLength(JSON.stringify(answer), "utf8") <= cap);
+  });
+
+  it("cuts the words of a refusal before it gives up the id", async () => {
+    // Dropping the id is not enough when the message is the bulk: a refusal quotes the
+    // method name back, and the caller picks that too. Nor is it what should go — an id
+    // this short costs the frame nothing, and it is what the answer is for.
+    const cap = 4_096;
+    const target = await peer({ limits: { maxMessageBytes: cap } });
+    await greet(target);
+    // As long a name as the inbound cap will carry, which is what makes the refusal
+    // quoting it back the thing that does not fit.
+    target.send({ jsonrpc: "2.0", id: 2, method: "n".repeat(cap - 60), params: {} });
+    const answer = await target.next();
+    assert.equal(answer["id"], 2);
+    assert.equal(errorOf(answer).code, CODES.methodNotFound);
+    assert.ok(Buffer.byteLength(JSON.stringify(answer), "utf8") <= cap);
+    assert.match(errorOf(answer).message, /…$/);
   });
 });

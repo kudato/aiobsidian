@@ -101,7 +101,9 @@ describe("LineReader", () => {
     // peer picks that. The pieces are folded as they pile up; this is what says the
     // folding does not lose or reorder anything.
     const { lines, reader } = collector(64 * 1024);
-    const text = "x".repeat(5_000);
+    // Every byte distinct within its neighbourhood, so a fold that reordered or dropped
+    // one would show; a run of the same character would hide both.
+    const text = Array.from({ length: 5_000 }, (_, index) => index.toString(36)).join("-");
     for (const byte of Buffer.from(text)) {
       reader.push(Buffer.from([byte]));
     }

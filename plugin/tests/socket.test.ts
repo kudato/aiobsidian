@@ -191,40 +191,61 @@ describe("SocketServer", { skip: process.platform === "win32" }, () => {
   });
 
   it("lets a parting word reach the peer before it stops", async () => {
-    // Stopping is where a client most needs to be told why, and a goodbye written a
-    // moment earlier is still in the write buffer: destroying the socket would throw
-    // away the one message this path exists to deliver.
+    // Stopping is where a client most needs to be told why, and destroying the socket
+    // throws away whatever has not flushed. A goodbye small enough to sit in the
+    // kernel's buffer would arrive either way and prove nothing, so the peer is held
+    // back until there is more queued in this process than a `destroy()` could deliver.
+    const size = 4 * 1024 * 1024;
     const socketPath = fresh();
     const server = build(socketPath, {
       onConnection: (socket) => {
-        socket.write("goodbye\n");
-        socket.end();
+        socket.write(Buffer.alloc(size, 0x61));
       },
     });
     await server.start();
 
     const client = await connect(socketPath);
-    const said = new Promise<string>((resolve) => {
-      client.once("data", (chunk: Buffer) => {
-        resolve(chunk.toString("utf8"));
+    client.pause();
+    let heard = 0;
+    const said = new Promise<void>((resolve) => {
+      client.on("data", (chunk: Buffer) => {
+        heard += chunk.length;
+        if (heard >= size) {
+          resolve();
+        }
       });
     });
-    await server.stop();
-    assert.equal(await said, "goodbye\n");
+
+    const stopping = server.stop();
+    client.resume();
+    await stopping;
+    await said;
+    assert.equal(heard, size);
     client.destroy();
   });
 
   it("takes over from a socket its own previous load left answering", async () => {
     // `onunload` cannot be awaited, so the handle from the last load may still be
     // accepting when the next one looks. One glance would refuse to serve a vault that
-    // nothing else wants; a second glance a moment later finds it gone.
+    // nothing else wants; a second glance a moment later finds it gone. The owner has
+    // to be a process that dies without unlinking, or the path is already clear by the
+    // first glance and the second one is never taken.
     const socketPath = fresh();
-    const first = build(socketPath);
-    await first.start();
-    void first.stop();
+    const child = spawn(process.execPath, [
+      "-e",
+      `require("net").createServer().listen(${JSON.stringify(socketPath)}, () => console.log("up"))`,
+    ]);
+    await new Promise((resolve) => child.stdout.once("data", resolve));
+    // Subscribed before the kill: the child outlives neither the retry window nor the
+    // listener, and an `exit` already past is one that never arrives.
+    const gone = new Promise((resolve) => child.once("exit", resolve));
 
-    const second = build(socketPath);
-    await second.start();
-    assert.equal(second.listening, true);
+    const server = build(socketPath);
+    const starting = server.start();
+    // Inside the retry window, so the first probe finds it live and the second does not.
+    setTimeout(() => child.kill("SIGKILL"), 50);
+    await starting;
+    assert.equal(server.listening, true);
+    await gone;
   });
 });

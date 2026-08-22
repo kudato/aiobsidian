@@ -439,9 +439,11 @@ export class Connection {
    * Answer with a refusal, shedding whatever it takes to stay inside the frame cap.
    *
    * The cap binds this side too, and a line over it is one a conforming client
-   * discards — so an answer that cannot be made to fit must lose its id rather than
-   * be written oversized. Losing the id costs the caller the correlation; writing the
-   * frame costs it the answer, and tells it nothing.
+   * discards, so an answer that cannot be made to fit is no answer at all. Every part
+   * of a refusal can be the caller's own doing — it chooses the id, and it chooses the
+   * method name the message quotes back at it — so each is shed in turn, cheapest
+   * first: the data, then the words, and the correlation only when the id is itself
+   * what will not fit. The code is never given up.
    */
   #sendError(id: RequestId | null, code: Code, message: string, data?: unknown): void {
     const error: Record<string, unknown> = { code, message };
@@ -452,16 +454,53 @@ export class Connection {
     try {
       encoded = JSON.stringify({ jsonrpc: "2.0", id, error });
     } catch {
-      encoded = JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } });
+      encoded = this.#frame(id, code, message);
     }
     if (this.#overCap(encoded)) {
-      encoded = JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } });
+      encoded = this.#frame(id, code, message);
     }
-    // The id is the caller's own, and a caller may choose a long one.
     if (this.#overCap(encoded)) {
-      encoded = JSON.stringify({ jsonrpc: "2.0", id: null, error: { code, message } });
+      encoded = this.#frame(id, code, this.#shorten(id, code, message));
+    }
+    if (this.#overCap(encoded)) {
+      encoded = this.#frame(null, code, this.#shorten(null, code, message));
     }
     this.#write(encoded);
+  }
+
+  #frame(id: RequestId | null, code: Code, message: string): string {
+    return JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } });
+  }
+
+  /**
+   * Cut a message down until the frame carrying it fits.
+   *
+   * Escaping and multi-byte characters make the encoded length no simple function of
+   * the character count, so the frame is measured rather than estimated, and the longest
+   * prefix that passes is searched for rather than guessed at. What survives is marked
+   * as cut, so the caller can tell a short message from a shortened one.
+   *
+   * Args:
+   *     id: The id the frame will carry, which is the rest of its budget.
+   *     code: The error code the frame will carry, which is never shed.
+   *     message: The text to shorten.
+   *
+   * Returns:
+   *     The longest prefix of the message that fits, with an ellipsis; the empty
+   *     string if not even that does, which is the floor the envelope itself sets.
+   */
+  #shorten(id: RequestId | null, code: Code, message: string): string {
+    let kept = 0;
+    let high = message.length;
+    while (kept < high) {
+      const mid = Math.ceil((kept + high) / 2);
+      if (this.#overCap(this.#frame(id, code, `${clip(message, mid)}…`))) {
+        high = mid - 1;
+      } else {
+        kept = mid;
+      }
+    }
+    return kept === 0 ? "" : `${clip(message, kept)}…`;
   }
 
   #overCap(encoded: string): boolean {
@@ -564,4 +603,19 @@ function highest(values: readonly number[]): number {
     }
   }
   return best;
+}
+
+/**
+ * The first `count` units of a string, never splitting a character in half.
+ *
+ * A cut between the halves of a surrogate pair leaves a lone surrogate, and a lone
+ * surrogate is a string no encoder can turn into well-formed UTF-8: `JSON.stringify`
+ * escapes it, and a strict parser on the other side is entitled to reject the frame.
+ * Dropping the orphan costs one character of a message already being shortened.
+ */
+function clip(text: string, count: number): string {
+  const cut = text.slice(0, count);
+  const last = cut.charCodeAt(cut.length - 1);
+  // A high surrogate at the end had its pair on the other side of the cut.
+  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
 }
