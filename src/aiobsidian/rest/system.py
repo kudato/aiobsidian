@@ -15,9 +15,12 @@ class SystemResource(BaseResource):
         Returns:
             A `ServerStatus` object with authentication state and
             version information.
+
+        Raises:
+            APIParseError: If the body is not a status record.
         """
         response = await self._client.request("GET", "/")
-        return ServerStatus.model_validate(response.json())
+        return self._parse_as(response, ServerStatus)
 
     async def openapi(self) -> str:
         """Get the OpenAPI specification of the REST API.

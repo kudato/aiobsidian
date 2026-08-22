@@ -1,4 +1,6 @@
 import asyncio
+import sys
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -65,6 +67,26 @@ async def test_client_raises_api_error(mock_api, client):
     mock_api.post("/commands/bad/").respond(500, json={"message": "Internal error"})
     with pytest.raises(APIStatusError):
         await client.request("POST", "/commands/bad/")
+
+
+async def test_client_without_httpx_names_the_extra():
+    # `httpx` is optional, so the guidance has to arrive before any
+    # request does: at construction.
+    with patch.dict(sys.modules, {"httpx": None}):
+        with pytest.raises(ImportError, match=r"pip install aiobsidian\[rest\]"):
+            ObsidianClient("key")
+
+
+async def test_client_verify_ssl_defaults_off_for_the_self_signed_plugin():
+    with patch("httpx.AsyncClient") as transport:
+        ObsidianClient("key")
+    assert transport.call_args.kwargs["verify"] is False
+
+
+async def test_client_verify_ssl_reaches_the_transport():
+    with patch("httpx.AsyncClient") as transport:
+        ObsidianClient("key", verify_ssl=True)
+    assert transport.call_args.kwargs["verify"] is True
 
 
 async def test_client_bearer_token():

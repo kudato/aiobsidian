@@ -86,6 +86,8 @@ class VaultResource(ContentResource):
 
         Raises:
             APINotFoundError: If the file does not exist.
+            APIParseError: If a JSON content type was asked for and the
+                body does not fit it.
         """
         return await self._get_content(
             f"{self._BASE_URL}/{self._encode_path(path)}", content_type
@@ -211,8 +213,11 @@ class VaultResource(ContentResource):
 
         Returns:
             Names of the entries, relative to `folder`.
+
+        Raises:
+            APIParseError: If the body is not the listing envelope.
         """
         encoded = self._encode_path(folder)
         trailing = f"{encoded}/" if encoded else ""
         response = await self._client.request("GET", f"{self._BASE_URL}/{trailing}")
-        return _Listing.model_validate(response.json()).files
+        return self._parse_as(response, _Listing).files

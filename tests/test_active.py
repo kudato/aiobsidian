@@ -3,7 +3,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from aiobsidian._exceptions import NotFoundError
+from aiobsidian._exceptions import APIParseError, NotFoundError
 from aiobsidian._types import ContentType, PatchOperation, TargetType
 from aiobsidian.models.vault import DocumentMap, NoteJson
 
@@ -37,6 +37,13 @@ async def test_read_note_json(mock_api, client):
 
     assert isinstance(result, NoteJson)
     assert result.path == "active.md"
+
+
+async def test_read_note_json_that_is_no_note(mock_api, client):
+    mock_api.get("/active/").respond(200, json="busy")
+
+    with pytest.raises(APIParseError):
+        await client.active.read(content_type=ContentType.NOTE_JSON)
 
 
 async def test_write(mock_api, client):

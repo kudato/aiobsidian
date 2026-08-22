@@ -6,7 +6,7 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from aiobsidian._exceptions import AuthenticationError, NotFoundError
+from aiobsidian._exceptions import APIParseError, AuthenticationError, NotFoundError
 from aiobsidian._types import ContentType, PatchOperation, TargetType
 from aiobsidian.models.vault import DocumentMap, NoteJson
 
@@ -49,12 +49,16 @@ async def test_read_note_json(mock_api, client):
 
 async def test_read_note_json_with_a_fraction_of_a_millisecond(mock_api, client):
     # Obsidian rounds the file system record before the plugin ever sees
-    # it, so a fraction is not a moment it keeps.
+    # it, so a fraction is not a moment it keeps. The refusal arrives as
+    # APIParseError — the model's ValidationError as its cause — since a
+    # body the model refuses is a body the endpoint did not promise.
     stat = {**NOTE_JSON["stat"], "ctime": 1786836399339.5}
     mock_api.get("/vault/hello.md").respond(200, json={**NOTE_JSON, "stat": stat})
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(APIParseError) as exc_info:
         await client.vault.read("hello.md", content_type=ContentType.NOTE_JSON)
+
+    assert isinstance(exc_info.value.__cause__, ValidationError)
 
 
 async def test_read_note_json_with_a_moment_that_names_no_zone(mock_api, client):
@@ -64,7 +68,7 @@ async def test_read_note_json_with_a_moment_that_names_no_zone(mock_api, client)
     stat = {**NOTE_JSON["stat"], "ctime": "2026-08-15T23:26:39"}
     mock_api.get("/vault/hello.md").respond(200, json={**NOTE_JSON, "stat": stat})
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(APIParseError):
         await client.vault.read("hello.md", content_type=ContentType.NOTE_JSON)
 
 
@@ -154,6 +158,24 @@ async def test_list_subdirectory(mock_api, client):
     result = await client.vault.list("folder")
 
     assert result == ["sub.md"]
+
+
+async def test_list_without_the_envelope(mock_api, client):
+    mock_api.get("/vault/").respond(200, json={"paths": []})
+
+    with pytest.raises(APIParseError):
+        await client.vault.list()
+
+
+async def test_read_note_json_carrying_an_error_object(mock_api, client):
+    # A 200 whose body is an error object is not a note, and says so as
+    # APIParseError rather than as a raw pydantic ValidationError.
+    mock_api.get("/vault/hello.md").respond(
+        200, json={"errorCode": 40149, "message": "Unknown error"}
+    )
+
+    with pytest.raises(APIParseError):
+        await client.vault.read("hello.md", content_type=ContentType.NOTE_JSON)
 
 
 async def test_read_not_found(mock_api, client):

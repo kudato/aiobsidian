@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from aiobsidian._exceptions import APIStatusError
+from aiobsidian._exceptions import APIParseError, APIStatusError
 from aiobsidian.models.search import SearchResult
 
 SIMPLE_RESULTS = [
@@ -106,6 +106,31 @@ async def test_jsonlogic_null_result(mock_api, client):
     results = await client.search.jsonlogic({"var": "frontmatter.missing"})
 
     assert results[0].result is None
+
+
+async def test_simple_search_answering_no_list(mock_api, client):
+    # Valid JSON of another shape used to escape as a raw pydantic
+    # ValidationError on whatever iterating the body yielded.
+    mock_api.post("/search/simple/").respond(200, json={"results": []})
+
+    with pytest.raises(APIParseError):
+        await client.search.simple("hello")
+
+
+async def test_jsonlogic_search_answering_no_list(mock_api, client):
+    mock_api.post("/search/").respond(200, json={"error": "bad query"})
+
+    with pytest.raises(APIParseError):
+        await client.search.jsonlogic({"glob": ["*.md"]})
+
+
+async def test_simple_search_with_a_row_that_is_no_result(mock_api, client):
+    # A list, but of the wrong thing: the row refusal is its own branch,
+    # apart from the body-is-no-list one the tests above take.
+    mock_api.post("/search/simple/").respond(200, json=[{"score": 0.9}])
+
+    with pytest.raises(APIParseError):
+        await client.search.simple("hello")
 
 
 async def test_simple_search_server_error(mock_api, client):

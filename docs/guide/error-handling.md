@@ -18,10 +18,11 @@ ObsidianError                   # Base exception for all aiobsidian errors
     ├── APIStatusError          # The server answered with status >= 400
     │   ├── AuthenticationError # 401 Unauthorized
     │   └── APINotFoundError    # 404 Not Found
-    └── APIRequestError         # No usable response came back
-        ├── APIConnectionError  # The server could not be reached
-        ├── APITimeoutError     # The request took too long
-        └── APIProtocolError    # The exchange broke down
+    ├── APIRequestError         # No usable response came back
+    │   ├── APIConnectionError  # The server could not be reached
+    │   ├── APITimeoutError     # The request took too long
+    │   └── APIProtocolError    # The exchange broke down
+    └── APIParseError           # A success answer that could not be read
 ```
 
 `CLIError` and `APIError` are the two transport roots: catching either one
@@ -178,6 +179,17 @@ The underlying `httpx` exception is available as `__cause__` and never escapes
 on its own — `httpx` is an optional dependency, so catching it would mean
 importing a package the caller may not have installed.
 
+### When a success answer cannot be read
+
+A response can arrive whole, with a success status, and still not be what the
+endpoint documents: not JSON, JSON of another shape, or a `200 OK` whose body
+is an error object. Reading it raises `APIParseError`, which carries the raw
+`body` — the REST counterpart of `CLIParseError` — instead of letting a
+`KeyError` or a pydantic `ValidationError` escape the `ObsidianError`
+hierarchy. Its `__cause__` is what said the shape was wrong: the JSON decode
+error, or the pydantic `ValidationError` — no `httpx` exception is involved,
+since the exchange itself held.
+
 ### Attributes
 
 | Exception | Attributes |
@@ -189,6 +201,7 @@ importing a package the caller may not have installed.
 | `APIConnectionError` | `method`, `url`, `detail` |
 | `APITimeoutError` | `method`, `url`, `detail` |
 | `APIProtocolError` | `method`, `url`, `detail` |
+| `APIParseError` | `method`, `url`, `body` |
 
 ### Upgrading from 0.4.0
 

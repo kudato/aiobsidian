@@ -39,3 +39,5 @@
 ::: aiobsidian.APITimeoutError
 
 ::: aiobsidian.APIProtocolError
+
+::: aiobsidian.APIParseError
