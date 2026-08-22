@@ -481,4 +481,156 @@ describe("Connection", { skip: process.platform === "win32" }, () => {
     await new Promise((resolve) => setTimeout(resolve, 90));
     assert.equal(target.connection.closed, false);
   });
+
+  it("refuses a protocol list too long to walk, rather than dying on it", async () => {
+    // `Math.max(...list)` passes every element as an argument, so a long enough list
+    // overflowed the argument stack — a RangeError thrown out of the socket's own data
+    // handler, which in Obsidian's renderer is the whole application. Reachable before
+    // anything is proved, since negotiation deliberately comes first. The assertion
+    // that matters most is not the code below: it is that this process is still here
+    // to make it.
+    const target = await peer();
+    await target.next();
+    target.send({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.hello",
+      params: { protocol: new Array(300_000).fill(2), proof: "00" },
+    });
+    assert.equal(errorOf(await target.next()).code, CODES.invalidParams);
+  });
+
+  it("still negotiates a list of a sensible length", async () => {
+    const target = await peer();
+    const hello = await greet(target, { protocol: [PROTOCOL_MAJOR, 99] });
+    assert.equal((hello["result"] as { protocol: { major: number } }).protocol.major, PROTOCOL_MAJOR);
+  });
+
+  it("stops reading from a peer that is behind on what it asked for", async () => {
+    // An unflushed write is held in this process, so a peer that asks and never reads
+    // spends the vault's memory rather than its own. Reading stops until it catches
+    // up, which is what keeps it from asking for more while it is behind.
+    const registry = new MethodRegistry();
+    registry.add("files.read", () => "x".repeat(200_000));
+    const target = await peer({ registry, limits: { idleTimeoutMs: 60_000 } });
+    await greet(target);
+
+    target.client.pause();
+    for (let id = 10; id < 30; id += 1) {
+      target.send({ jsonrpc: "2.0", id, method: "files.read", params: {} });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Every request that arrived was answered into the buffer, and then reading
+    // stopped rather than the buffer growing for as long as the peer cared to ask.
+    assert.equal(target.connection.reading, false);
+
+    target.client.resume();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    assert.equal(target.connection.reading, true);
+  });
+
+  it("hangs up on a peer whose queue passes the ceiling", async () => {
+    const registry = new MethodRegistry();
+    registry.add("files.read", () => "x".repeat(200_000));
+    const target = await peer({ registry, limits: { maxQueuedBytes: 64 * 1024 } });
+    await greet(target);
+
+    target.client.pause();
+    for (let id = 10; id < 30; id += 1) {
+      target.send({ jsonrpc: "2.0", id, method: "files.read", params: {} });
+    }
+    // Not `ended()`: a paused peer does not see the hang-up until it reads again, and
+    // never reading is the whole premise of this one.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    assert.equal(target.connection.closed, true);
+  });
+
+  it("answers nothing more once it has refused a proof", async () => {
+    // `end()` shuts the writing half only, so a peer that never sends its own FIN went
+    // on being read — and its methods went on running — for the whole linger, with the
+    // answers thrown away. A refusal has to be final, not advisory.
+    let ran = false;
+    const registry = new MethodRegistry();
+    registry.add("files.write", () => {
+      ran = true;
+      return null;
+    });
+    const target = await peer({ registry });
+    const challenge = await target.next();
+    const nonce = Buffer.from((challenge["params"] as { nonce: string }).nonce, "hex");
+    target.send({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.hello",
+      params: { protocol: [PROTOCOL_MAJOR], proof: clientProof(Buffer.alloc(32, 9), nonce).toString("hex") },
+    });
+    assert.equal(errorOf(await target.next()).code, CODES.unauthenticated);
+
+    target.send({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "session.hello",
+      params: { protocol: [PROTOCOL_MAJOR], proof: clientProof(TOKEN, nonce).toString("hex") },
+    });
+    target.send({ jsonrpc: "2.0", id: 3, method: "files.write", params: {} });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(ran, false, "a refused connection ran a method");
+  });
+
+  it("drops the id rather than answering with a frame over the cap", async () => {
+    // The cap binds this side too, and a conforming client discards a line over it. A
+    // refusal carries less around the id than a request does, but not by much, so an id
+    // that only just fit on the way in cannot be echoed back inside one.
+    const cap = 1_024;
+    const target = await peer({ limits: { maxMessageBytes: cap } });
+    await target.next();
+    target.send({ jsonrpc: "2.0", id: "x".repeat(cap - 50), method: "", params: {} });
+    const answer = await target.next();
+    // The window between a request that still fits and a reply that no longer does is
+    // thirteen bytes wide. A request a little longer is refused as oversize instead,
+    // and that refusal carries no id either — so the code is what says which path ran.
+    assert.equal(errorOf(answer).code, CODES.invalidRequest);
+    assert.equal(answer["id"], null);
+    assert.ok(Buffer.byteLength(JSON.stringify(answer), "utf8") <= cap);
+  });
+
+  it("cuts the words of a refusal before it gives up the id", async () => {
+    // Dropping the id is not enough when the message is the bulk: a refusal quotes the
+    // method name back, and the caller picks that too. Nor is it what should go — an id
+    // this short costs the frame nothing, and it is what the answer is for.
+    const cap = 4_096;
+    const target = await peer({ limits: { maxMessageBytes: cap } });
+    await greet(target);
+    // As long a name as the inbound cap will carry, which is what makes the refusal
+    // quoting it back the thing that does not fit.
+    const name = "n".repeat(cap - 60);
+    target.send({ jsonrpc: "2.0", id: 2, method: name, params: {} });
+    const answer = await target.next();
+    assert.equal(answer["id"], 2);
+    assert.equal(errorOf(answer).code, CODES.methodNotFound);
+    assert.ok(Buffer.byteLength(JSON.stringify(answer), "utf8") <= cap);
+    // A prefix of what it would have said, and shorter than it: a mark on its own would
+    // be satisfied by a message that was never cut at all.
+    const said = errorOf(answer).message;
+    const whole = `no method named ${name}`;
+    assert.ok(said.length < whole.length, "nothing was cut");
+    assert.equal(said.at(-1), "…");
+    assert.ok(whole.startsWith(said.slice(0, -1)), "what survived is not what it said");
+  });
+
+  it("stays inside the cap when the words it quotes end mid-character", async () => {
+    // A half of a surrogate pair costs three bytes as UTF-8 and six once escaped, so a
+    // message measured with the orphan dropped is not the message that goes out with it
+    // kept. The caller picks the method name, so it picks where the cut lands.
+    const cap = 400;
+    const target = await peer({ limits: { maxMessageBytes: cap } });
+    await greet(target);
+    // Wedged against the cap on purpose: the whole message fits once the orphan is
+    // dropped and does not fit once it is escaped, which is the only gap this can
+    // fall through. The request is 372 bytes, so the reader accepts it whole.
+    target.send({ jsonrpc: "2.0", id: "i", method: `${"n".repeat(316)}\ud800`, params: {} });
+    const answer = await target.next();
+    assert.equal(errorOf(answer).code, CODES.methodNotFound);
+    assert.ok(Buffer.byteLength(JSON.stringify(answer), "utf8") <= cap);
+  });
 });

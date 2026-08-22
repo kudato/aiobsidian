@@ -13,6 +13,9 @@ export const MAX_MESSAGE_BYTES = 16 * 1024 * 1024;
 /** The line delimiter. */
 const LF = 0x0a;
 
+/** How many pieces of one line are held before they are folded into a single buffer. */
+const MAX_PIECES = 1_024;
+
 export interface LineReaderOptions {
   /** The cap on one line, not counting the delimiter. */
   readonly maxBytes: number;
@@ -41,7 +44,12 @@ export class LineReader {
     this.#options = options;
   }
 
-  /** Bytes held for the line being assembled. */
+  /**
+   * Bytes counted for the line being assembled.
+   *
+   * Held, until the line goes over the cap; counted and dropped after that, which is
+   * what the number keeps reporting while the rest of an oversized line arrives.
+   */
   get buffered(): number {
     return this.#length;
   }
@@ -67,6 +75,7 @@ export class LineReader {
         if (rest > 0) {
           this.#pieces.push(chunk.subarray(start));
           this.#length += rest;
+          this.#coalesce();
         }
         return;
       }
@@ -97,6 +106,21 @@ export class LineReader {
         this.#options.onLine(line);
       }
     }
+  }
+
+  /**
+   * Fold the held pieces into one buffer once there are too many.
+   *
+   * The cap bounds a line's bytes; it does not bound how many views those bytes are
+   * split across, and the peer decides that by choosing how it writes. One byte per
+   * packet would otherwise cost far more in view objects than the payload it carries,
+   * and hand `Buffer.concat` a list as long as the line.
+   */
+  #coalesce(): void {
+    if (this.#pieces.length < MAX_PIECES) {
+      return;
+    }
+    this.#pieces = [Buffer.concat(this.#pieces, this.#length)];
   }
 
   #reset(): void {

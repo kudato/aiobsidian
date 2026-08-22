@@ -7,7 +7,11 @@ import path from "node:path";
 import { after, afterEach, describe, it } from "node:test";
 
 import { ServeError } from "../src/lib/errors.ts";
-import { SocketServer, type SocketServerOptions } from "../src/server/socket.ts";
+import {
+  PROBE_RETRY_MS,
+  SocketServer,
+  type SocketServerOptions,
+} from "../src/server/socket.ts";
 
 const scratch = await fs.mkdtemp(path.join(os.tmpdir(), "aio-sock-"));
 await fs.chmod(scratch, 0o700);
@@ -188,5 +192,73 @@ describe("SocketServer", { skip: process.platform === "win32" }, () => {
     await fs.chmod(directory, 0o755);
     const server = build(path.join(directory, "x.sock"), { directory });
     assert.equal((await refusal(server)).code, "unsafe-directory");
+  });
+
+  it("lets a parting word reach the peer before it stops", async () => {
+    // Stopping is where a client most needs to be told why, and destroying the socket
+    // throws away whatever has not flushed. A goodbye small enough to sit in the
+    // kernel's buffer would arrive either way and prove nothing, so the peer is held
+    // back until there is more queued in this process than a `destroy()` could deliver.
+    const size = 4 * 1024 * 1024;
+    const socketPath = fresh();
+    const server = build(socketPath, {
+      onConnection: (socket) => {
+        socket.write(Buffer.alloc(size, 0x61));
+      },
+    });
+    await server.start();
+
+    const client = await connect(socketPath);
+    client.pause();
+    let heard = 0;
+    const said = new Promise<void>((resolve) => {
+      client.on("data", (chunk: Buffer) => {
+        heard += chunk.length;
+        if (heard >= size) {
+          resolve();
+        }
+      });
+    });
+
+    const stopping = server.stop();
+    client.resume();
+    await stopping;
+    // Raced against a deadline: `node --test` sets no timeout of its own, so a
+    // regression here would hang the job rather than fail it, and a hang says nothing
+    // about how many bytes went missing. Four mebibytes cross a unix socket in about
+    // four milliseconds, so this waits three orders of magnitude longer than it needs.
+    await Promise.race([said, new Promise((resolve) => setTimeout(resolve, 5_000))]);
+    assert.equal(heard, size);
+    client.destroy();
+  });
+
+  it("takes over from a socket its own previous load left answering", async () => {
+    // `onunload` cannot be awaited, so the handle from the last load may still be
+    // accepting when the next one looks. One glance would refuse to serve a vault that
+    // nothing else wants; a second glance a moment later finds it gone. The owner has
+    // to be a process that dies without unlinking, or the path is already clear by the
+    // first glance and the second one is never taken.
+    const socketPath = fresh();
+    const child = spawn(process.execPath, [
+      "-e",
+      `require("net").createServer().listen(${JSON.stringify(socketPath)}, () => console.log("up"))`,
+    ]);
+    await new Promise((resolve) => child.stdout.once("data", resolve));
+    // Subscribed before the kill: the child outlives neither the retry window nor the
+    // listener, and an `exit` already past is one that never arrives.
+    const gone = new Promise((resolve) => child.once("exit", resolve));
+
+    const server = build(socketPath);
+    const began = performance.now();
+    const starting = server.start();
+    // Inside the retry window, so the first probe finds it live and the second does not.
+    setTimeout(() => child.kill("SIGKILL"), 50);
+    await starting;
+    assert.equal(server.listening, true);
+    // Starting this slowly is only possible by way of the second look. Without it the
+    // test would still pass on a first probe that happened to find the path clear, and
+    // say nothing about the branch it is named for.
+    assert.ok(performance.now() - began >= PROBE_RETRY_MS, "the second probe never happened");
+    await gone;
   });
 });
