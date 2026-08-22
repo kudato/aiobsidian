@@ -1,5 +1,12 @@
 # CLAUDE.md
 
+## Obsidian API
+
+- The plugin and the library use only Obsidian's **documented public plugin API** — what the [TypeScript API reference](https://docs.obsidian.md/Reference/TypeScript+API/) declares. Nothing else: no `app.commands`, no `app.plugins`, no `Vault.getConfig()`, no undocumented event name, no member reached through a cast
+- A documented method whose accepted arguments are undocumented is undocumented too
+- A feature that needs an undocumented member is rebuilt on documented ones, or it is removed from the contract — never shipped behind a flag. A warning is not consent, and a switch does not make an internal stable
+- Prefer the Vault API over the Adapter API, and the Adapter API over Node `fs`; Node is for the socket and the token and nothing else
+
 ## Git
 
 - Open every pull request against `main`, never against another branch; keep dependent work local until what it needs is merged
