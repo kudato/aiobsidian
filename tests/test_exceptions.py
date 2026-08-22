@@ -160,13 +160,17 @@ class TestMessages:
         )
 
     def test_a_partial_write_says_where_the_parts_are(self):
+        # "wrote", not "left": the counter counts what landed, and the
+        # message must read in that direction and no other.
         error = PartialWriteError("append", path="notes/a.md", written=2, total=3)
         assert str(error) == (
-            "Command 'append' left 2 of 3 content parts at 'notes/a.md'"
+            "Command 'append' wrote 2 of 3 content parts to 'notes/a.md' before failing"
         )
 
     def test_a_partial_write_without_a_path_only_counts(self):
         # The periodic-note commands find their own file, so there is no
         # path to name.
         error = PartialWriteError("daily:append", path=None, written=1, total=2)
-        assert str(error) == "Command 'daily:append' left 1 of 2 content parts"
+        assert str(error) == (
+            "Command 'daily:append' wrote 1 of 2 content parts before failing"
+        )
