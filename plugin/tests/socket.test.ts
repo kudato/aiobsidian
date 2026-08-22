@@ -1,0 +1,264 @@
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import fs from "node:fs/promises";
+import net from "node:net";
+import os from "node:os";
+import path from "node:path";
+import { after, afterEach, describe, it } from "node:test";
+
+import { ServeError } from "../src/lib/errors.ts";
+import {
+  PROBE_RETRY_MS,
+  SocketServer,
+  type SocketServerOptions,
+} from "../src/server/socket.ts";
+
+const scratch = await fs.mkdtemp(path.join(os.tmpdir(), "aio-sock-"));
+await fs.chmod(scratch, 0o700);
+
+const running: SocketServer[] = [];
+const listeners: net.Server[] = [];
+
+afterEach(async () => {
+  await Promise.all(running.splice(0).map((server) => server.stop()));
+  await Promise.all(
+    listeners.splice(0).map(
+      (server) =>
+        new Promise<void>((resolve) => {
+          server.close(() => {
+            resolve();
+          });
+        }),
+    ),
+  );
+});
+
+after(async () => {
+  await fs.rm(scratch, { recursive: true, force: true });
+});
+
+let counter = 0;
+
+function fresh(): string {
+  counter += 1;
+  return path.join(scratch, `case-${counter}.sock`);
+}
+
+function build(socketPath: string, overrides: Partial<SocketServerOptions> = {}): SocketServer {
+  const server = new SocketServer({
+    socketPath,
+    directory: scratch,
+    onConnection: () => {},
+    ...overrides,
+  });
+  running.push(server);
+  return server;
+}
+
+async function connect(socketPath: string): Promise<net.Socket> {
+  const socket = net.connect(socketPath);
+  await new Promise((resolve, reject) => {
+    socket.once("connect", resolve);
+    socket.once("error", reject);
+  });
+  return socket;
+}
+
+/** Wait for a condition the event loop is about to make true. */
+async function eventually(predicate: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (predicate()) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.fail("the condition never became true");
+}
+
+async function refusal(server: SocketServer): Promise<ServeError> {
+  try {
+    await server.start();
+  } catch (error) {
+    assert.ok(error instanceof ServeError);
+    return error;
+  }
+  return assert.fail("the server started when it should have refused");
+}
+
+describe("SocketServer", { skip: process.platform === "win32" }, () => {
+  it("listens on a socket no other account can reach", async () => {
+    const socketPath = fresh();
+    await build(socketPath).start();
+    const stats = await fs.lstat(socketPath);
+    assert.ok(stats.isSocket());
+    assert.equal(stats.mode & 0o777, 0o600);
+  });
+
+  it("hands every connection on and counts it", async () => {
+    const socketPath = fresh();
+    const accepted: net.Socket[] = [];
+    const counts: number[] = [];
+    const server = build(socketPath, {
+      onConnection: (socket) => accepted.push(socket),
+      onConnectionsChanged: (count) => counts.push(count),
+    });
+    await server.start();
+
+    const client = await connect(socketPath);
+    await eventually(() => accepted.length === 1);
+    assert.equal(server.connectionCount, 1);
+
+    client.destroy();
+    await eventually(() => server.connectionCount === 0);
+    assert.deepEqual(counts, [1, 0]);
+  });
+
+  it("takes the socket with it when it stops", async () => {
+    const socketPath = fresh();
+    const server = build(socketPath);
+    await server.start();
+    await server.stop();
+    assert.equal(server.listening, false);
+    await assert.rejects(fs.lstat(socketPath), { code: "ENOENT" });
+  });
+
+  it("drops open connections when it stops", async () => {
+    const socketPath = fresh();
+    const server = build(socketPath);
+    await server.start();
+    const client = await connect(socketPath);
+    const closed = new Promise((resolve) => client.once("close", resolve));
+    await server.stop();
+    await closed;
+  });
+
+  it("starting twice is starting once", async () => {
+    const socketPath = fresh();
+    const server = build(socketPath);
+    await server.start();
+    await server.start();
+    assert.equal(server.listening, true);
+  });
+
+  it("refuses to bind over a socket someone is serving", async () => {
+    const socketPath = fresh();
+    const other = net.createServer();
+    listeners.push(other);
+    await new Promise<void>((resolve) => other.listen(socketPath, resolve));
+
+    const error = await refusal(build(socketPath));
+    assert.equal(error.code, "address-in-use");
+    // The other server is still there, which is the point: an unconditional unlink
+    // would have deleted a live socket and left its owner serving nothing.
+    assert.ok((await fs.lstat(socketPath)).isSocket());
+  });
+
+  it("clears a socket whose owner was killed", async () => {
+    const socketPath = fresh();
+    const child = spawn(process.execPath, [
+      "-e",
+      `require("net").createServer().listen(${JSON.stringify(socketPath)}, () => console.log("up"))`,
+    ]);
+    await new Promise((resolve) => child.stdout.once("data", resolve));
+    child.kill("SIGKILL");
+    await new Promise((resolve) => child.once("exit", resolve));
+    assert.ok((await fs.lstat(socketPath)).isSocket());
+
+    const server = build(socketPath);
+    await server.start();
+    assert.equal(server.listening, true);
+  });
+
+  it("refuses a path holding something that is not a socket, and leaves it there", async () => {
+    // Darwin refuses to connect to a regular file with ENOTSOCK and Linux with
+    // ECONNREFUSED, so the error code cannot be what decides whether to unlink.
+    const socketPath = fresh();
+    await fs.writeFile(socketPath, "not yours to delete");
+    const error = await refusal(build(socketPath));
+    assert.equal(error.code, "listen-failed");
+    assert.match(error.message, /not a socket/);
+    assert.equal(await fs.readFile(socketPath, "utf8"), "not yours to delete");
+  });
+
+  it("refuses a directory in the socket's place", async () => {
+    const socketPath = fresh();
+    await fs.mkdir(socketPath);
+    assert.match((await refusal(build(socketPath))).message, /not a socket/);
+  });
+
+  it("refuses when the directory is open to other accounts", async () => {
+    const directory = path.join(scratch, "open");
+    await fs.mkdir(directory, { recursive: true });
+    await fs.chmod(directory, 0o755);
+    const server = build(path.join(directory, "x.sock"), { directory });
+    assert.equal((await refusal(server)).code, "unsafe-directory");
+  });
+
+  it("lets a parting word reach the peer before it stops", async () => {
+    // Stopping is where a client most needs to be told why, and destroying the socket
+    // throws away whatever has not flushed. A goodbye small enough to sit in the
+    // kernel's buffer would arrive either way and prove nothing, so the peer is held
+    // back until there is more queued in this process than a `destroy()` could deliver.
+    const size = 4 * 1024 * 1024;
+    const socketPath = fresh();
+    const server = build(socketPath, {
+      onConnection: (socket) => {
+        socket.write(Buffer.alloc(size, 0x61));
+      },
+    });
+    await server.start();
+
+    const client = await connect(socketPath);
+    client.pause();
+    let heard = 0;
+    const said = new Promise<void>((resolve) => {
+      client.on("data", (chunk: Buffer) => {
+        heard += chunk.length;
+        if (heard >= size) {
+          resolve();
+        }
+      });
+    });
+
+    const stopping = server.stop();
+    client.resume();
+    await stopping;
+    // Raced against a deadline: `node --test` sets no timeout of its own, so a
+    // regression here would hang the job rather than fail it, and a hang says nothing
+    // about how many bytes went missing. Four mebibytes cross a unix socket in about
+    // four milliseconds, so this waits three orders of magnitude longer than it needs.
+    await Promise.race([said, new Promise((resolve) => setTimeout(resolve, 5_000))]);
+    assert.equal(heard, size);
+    client.destroy();
+  });
+
+  it("takes over from a socket its own previous load left answering", async () => {
+    // `onunload` cannot be awaited, so the handle from the last load may still be
+    // accepting when the next one looks. One glance would refuse to serve a vault that
+    // nothing else wants; a second glance a moment later finds it gone. The owner has
+    // to be a process that dies without unlinking, or the path is already clear by the
+    // first glance and the second one is never taken.
+    const socketPath = fresh();
+    const child = spawn(process.execPath, [
+      "-e",
+      `require("net").createServer().listen(${JSON.stringify(socketPath)}, () => console.log("up"))`,
+    ]);
+    await new Promise((resolve) => child.stdout.once("data", resolve));
+    // Subscribed before the kill: the child outlives neither the retry window nor the
+    // listener, and an `exit` already past is one that never arrives.
+    const gone = new Promise((resolve) => child.once("exit", resolve));
+
+    const server = build(socketPath);
+    const began = performance.now();
+    const starting = server.start();
+    // Inside the retry window, so the first probe finds it live and the second does not.
+    setTimeout(() => child.kill("SIGKILL"), 50);
+    await starting;
+    assert.equal(server.listening, true);
+    // Starting this slowly is only possible by way of the second look. Without it the
+    // test would still pass on a first probe that happened to find the path clear, and
+    // say nothing about the branch it is named for.
+    assert.ok(performance.now() - began >= PROBE_RETRY_MS, "the second probe never happened");
+    await gone;
+  });
+});
