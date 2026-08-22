@@ -189,4 +189,42 @@ describe("SocketServer", { skip: process.platform === "win32" }, () => {
     const server = build(path.join(directory, "x.sock"), { directory });
     assert.equal((await refusal(server)).code, "unsafe-directory");
   });
+
+  it("lets a parting word reach the peer before it stops", async () => {
+    // Stopping is where a client most needs to be told why, and a goodbye written a
+    // moment earlier is still in the write buffer: destroying the socket would throw
+    // away the one message this path exists to deliver.
+    const socketPath = fresh();
+    const server = build(socketPath, {
+      onConnection: (socket) => {
+        socket.write("goodbye\n");
+        socket.end();
+      },
+    });
+    await server.start();
+
+    const client = await connect(socketPath);
+    const said = new Promise<string>((resolve) => {
+      client.once("data", (chunk: Buffer) => {
+        resolve(chunk.toString("utf8"));
+      });
+    });
+    await server.stop();
+    assert.equal(await said, "goodbye\n");
+    client.destroy();
+  });
+
+  it("takes over from a socket its own previous load left answering", async () => {
+    // `onunload` cannot be awaited, so the handle from the last load may still be
+    // accepting when the next one looks. One glance would refuse to serve a vault that
+    // nothing else wants; a second glance a moment later finds it gone.
+    const socketPath = fresh();
+    const first = build(socketPath);
+    await first.start();
+    void first.stop();
+
+    const second = build(socketPath);
+    await second.start();
+    assert.equal(second.listening, true);
+  });
 });

@@ -37,10 +37,28 @@ export interface ConnectionLimits {
   readonly idleTimeoutMs: number;
   /** How many requests may be running at once on one connection. */
   readonly maxInFlight: number;
+  /**
+   * How many bytes may sit unwritten for a peer that has stopped reading.
+   *
+   * A socket write that does not flush is buffered in this process, so a peer that
+   * asks and never reads is spending Obsidian's memory rather than its own. Past this
+   * the connection is dropped: one full-sized answer may queue, a stream of them may
+   * not.
+   */
+  readonly maxQueuedBytes: number;
 }
 
 /** How long a hang-up waits for the peer to close its own half. */
 const LINGER_MS = 1_000;
+
+/**
+ * How many protocol majors a client may offer.
+ *
+ * A client implements a handful. The cap is here because the list arrives before the
+ * handshake and is walked before anything has been proved, so its length is a number
+ * a stranger chooses.
+ */
+const MAX_OFFERED_MAJORS = 32;
 
 export const DEFAULT_LIMITS: ConnectionLimits = {
   maxMessageBytes: MAX_MESSAGE_BYTES,
@@ -49,6 +67,7 @@ export const DEFAULT_LIMITS: ConnectionLimits = {
   handshakeTimeoutMs: 5_000,
   idleTimeoutMs: 30 * 60_000,
   maxInFlight: 32,
+  maxQueuedBytes: 2 * MAX_MESSAGE_BYTES,
 };
 
 export interface ConnectionOptions {
@@ -91,6 +110,8 @@ export class Connection {
   #authenticated = false;
   #closing = false;
   #closed = false;
+  /** Reading is paused until the peer catches up with what has been written. */
+  #draining = false;
   #handshakeTimer: ReturnType<typeof setTimeout> | null = null;
   #idleTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -117,9 +138,19 @@ export class Connection {
       },
     });
 
+    // Everything reachable from here runs inside Obsidian's renderer, on the same
+    // thread as the editor: a throw that escapes a `data` handler is an uncaught
+    // exception in the user's application, not a failed request. Nothing below is
+    // meant to throw — this is what makes that a bug report instead of a crash.
     this.#socket.on("data", (chunk: Buffer) => {
-      this.#touch();
-      this.#reader.push(chunk);
+      try {
+        this.#touch();
+        this.#reader.push(chunk);
+      } catch (error) {
+        console.error("AIO: a connection failed while being read", error);
+        this.#sendError(null, CODES.internalError, "the vault failed while reading this connection");
+        this.close();
+      }
     });
     this.#socket.once("close", () => {
       this.#onClosed();
@@ -146,6 +177,11 @@ export class Connection {
 
   get closed(): boolean {
     return this.#closed || this.#closing;
+  }
+
+  /** Whether this connection is taking anything new from the peer right now. */
+  get reading(): boolean {
+    return !this.closed && !this.#draining;
   }
 
   /** Register a callback for when this connection is gone. */
@@ -176,6 +212,11 @@ export class Connection {
       return;
     }
     this.#closing = true;
+    // `end()` shuts the writing half only. A peer that opened the connection with
+    // `allowHalfOpen` and never sends its own FIN would otherwise go on being read —
+    // and go on being answered — for the whole linger, which would make a refusal
+    // advisory rather than final.
+    this.#socket.pause();
     this.#socket.end();
     const linger = setTimeout(() => {
       this.#socket.destroy();
@@ -187,6 +228,11 @@ export class Connection {
   }
 
   #onLine(line: Buffer): void {
+    // Whatever is still in the reader when a connection is refused belongs to a
+    // conversation that is over.
+    if (this.closed) {
+      return;
+    }
     const text = line.toString("utf8").trim();
     if (text.length === 0) {
       return;
@@ -308,25 +354,27 @@ export class Connection {
     if (
       !Array.isArray(offered) ||
       offered.length === 0 ||
-      !offered.every((major) => typeof major === "number")
+      offered.length > MAX_OFFERED_MAJORS ||
+      !offered.every((major) => typeof major === "number" && Number.isFinite(major))
     ) {
       this.#sendError(
         id,
         CODES.invalidParams,
-        "protocol must be a non-empty list of the majors the client implements",
+        `protocol must be a list of between 1 and ${MAX_OFFERED_MAJORS} majors the client implements`,
       );
       return;
     }
 
-    const major = negotiate(offered as number[]);
+    const majors = offered as number[];
+    const major = negotiate(majors);
     if (major === null) {
-      const older = Math.max(...(offered as number[])) < Math.max(...SUPPORTED_MAJORS);
+      const older = highest(majors) < highest(SUPPORTED_MAJORS);
       this.#sendError(
         id,
         CODES.unsupportedProtocol,
         `this vault speaks protocol ${SUPPORTED_MAJORS.join(", ")} and the client speaks ` +
-          `${(offered as number[]).join(", ")}; update the ${older ? "client" : "plugin"}`,
-        { server: SUPPORTED_MAJORS, client: offered },
+          `${majors.join(", ")}; update the ${older ? "client" : "plugin"}`,
+        { server: SUPPORTED_MAJORS, client: majors },
       );
       this.close();
       return;
@@ -387,6 +435,14 @@ export class Connection {
     this.#write(encoded);
   }
 
+  /**
+   * Answer with a refusal, shedding whatever it takes to stay inside the frame cap.
+   *
+   * The cap binds this side too, and a line over it is one a conforming client
+   * discards — so an answer that cannot be made to fit must lose its id rather than
+   * be written oversized. Losing the id costs the caller the correlation; writing the
+   * frame costs it the answer, and tells it nothing.
+   */
   #sendError(id: RequestId | null, code: Code, message: string, data?: unknown): void {
     const error: Record<string, unknown> = { code, message };
     if (data !== undefined) {
@@ -398,22 +454,63 @@ export class Connection {
     } catch {
       encoded = JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } });
     }
-    if (Buffer.byteLength(encoded, "utf8") > this.#limits.maxMessageBytes) {
+    if (this.#overCap(encoded)) {
       encoded = JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } });
     }
+    // The id is the caller's own, and a caller may choose a long one.
+    if (this.#overCap(encoded)) {
+      encoded = JSON.stringify({ jsonrpc: "2.0", id: null, error: { code, message } });
+    }
     this.#write(encoded);
+  }
+
+  #overCap(encoded: string): boolean {
+    return Buffer.byteLength(encoded, "utf8") > this.#limits.maxMessageBytes;
   }
 
   #send(message: Record<string, unknown>): void {
     this.#write(JSON.stringify(message));
   }
 
+  /**
+   * Write one line, and stop reading while the peer is behind.
+   *
+   * A write that does not flush is held in this process, so a peer that asks and never
+   * reads spends Obsidian's memory rather than its own — and every refusal is itself an
+   * answer, so this is reachable before a single thing has been proved. Two things
+   * bound it: reading stops until the queue drains, which is what keeps the peer from
+   * asking for more while it is behind, and a queue past the ceiling ends the
+   * connection rather than growing.
+   */
   #write(encoded: string): void {
     if (this.closed || this.#socket.destroyed) {
       return;
     }
-    this.#socket.write(`${encoded}\n`);
+    const flushed = this.#socket.write(`${encoded}\n`);
     this.#touch();
+    if (flushed) {
+      return;
+    }
+    if (this.#socket.writableLength > this.#limits.maxQueuedBytes) {
+      this.close();
+      return;
+    }
+    this.#holdOff();
+  }
+
+  /** Stop reading until what has been written gets through. */
+  #holdOff(): void {
+    if (this.#draining) {
+      return;
+    }
+    this.#draining = true;
+    this.#socket.pause();
+    this.#socket.once("drain", () => {
+      this.#draining = false;
+      if (!this.closed) {
+        this.#socket.resume();
+      }
+    });
   }
 
   /** Restart the idle clock. Any byte in either direction counts as being alive. */
@@ -450,4 +547,21 @@ export class Connection {
     }
     this.#closeHandlers.length = 0;
   }
+}
+
+/**
+ * The largest of a list, folded rather than spread.
+ *
+ * `Math.max(...list)` passes every element as an argument, and a list long enough
+ * overflows the argument stack — which, on a list a stranger sends, is a `RangeError`
+ * thrown out of a socket handler in Obsidian's renderer.
+ */
+function highest(values: readonly number[]): number {
+  let best = Number.NEGATIVE_INFINITY;
+  for (const value of values) {
+    if (value > best) {
+      best = value;
+    }
+  }
+  return best;
 }

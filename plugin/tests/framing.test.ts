@@ -95,4 +95,17 @@ describe("LineReader", () => {
     assert.deepEqual(oversize, []);
     assert.deepEqual(lines, ["12345678"]);
   });
+
+  it("assembles a line the peer sent one byte at a time", () => {
+    // The cap bounds the bytes of a line, not how many pieces they arrive in, and the
+    // peer picks that. The pieces are folded as they pile up; this is what says the
+    // folding does not lose or reorder anything.
+    const { lines, reader } = collector(64 * 1024);
+    const text = "x".repeat(5_000);
+    for (const byte of Buffer.from(text)) {
+      reader.push(Buffer.from([byte]));
+    }
+    reader.push(Buffer.from("\n"));
+    assert.deepEqual(lines, [text]);
+  });
 });

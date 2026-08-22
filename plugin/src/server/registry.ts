@@ -9,6 +9,11 @@ export interface CallContext {
    *
    * A method that can run long must observe it and stop: until it settles, its id
    * holds one of the connection's in-flight slots and the caller has no answer.
+   *
+   * A listener on this signal must not throw. It is called synchronously from the
+   * socket's own handler, inside Obsidian's renderer, and Node turns a throwing abort
+   * listener into an uncaught exception — which ends the user's application rather
+   * than the request. Fail by resolving or rejecting the method instead.
    */
   readonly signal: AbortSignal;
 }

@@ -7,6 +7,19 @@ import { ensureRuntimeDirectory } from "./directory.ts";
 /** How long a probe waits for an answer before deciding the socket is alive. */
 const PROBE_TIMEOUT_MS = 1_000;
 
+/** How long a stop waits for peers to close their own half before dropping them. */
+const STOP_LINGER_MS = 1_000;
+
+/**
+ * How long to wait before asking a second time whether a socket is really alive.
+ *
+ * A plugin being disabled and enabled again is the ordinary case here: `onunload`
+ * cannot be awaited, so the handle from the previous load may still be answering when
+ * the next one probes, and a single look would refuse to serve a vault nothing else
+ * wants. Something genuinely listening is still listening on the second look.
+ */
+const PROBE_RETRY_MS = 250;
+
 /** What a connect probe found at a socket path. */
 type Occupant =
   /** Nothing is there. */
@@ -120,20 +133,41 @@ export class SocketServer {
     const server = this.#server;
     this.#server = null;
 
-    for (const socket of this.#connections) {
-      socket.destroy();
-    }
-    this.#connections.clear();
-    this.#options.onConnectionsChanged?.(0);
-
     if (server === null) {
+      for (const socket of this.#connections) {
+        socket.destroy();
+      }
+      this.#connections.clear();
+      this.#options.onConnectionsChanged?.(0);
       return;
     }
-    await new Promise<void>((resolve) => {
+
+    // `end()` rather than `destroy()`: a session that has just been told why it is
+    // being hung up on still has that goodbye in its write buffer, and destroying the
+    // socket throws it away — worst for a client slow to read, which is the one the
+    // explanation is most use to.
+    for (const socket of this.#connections) {
+      socket.end();
+    }
+
+    const closed = new Promise<void>((resolve) => {
       server.close(() => {
         resolve();
       });
     });
+    // A peer under no obligation to close its own half must not hold the vault's
+    // teardown open.
+    const linger = setTimeout(() => {
+      for (const socket of this.#connections) {
+        socket.destroy();
+      }
+    }, STOP_LINGER_MS);
+    linger.unref?.();
+    await closed;
+    clearTimeout(linger);
+
+    this.#connections.clear();
+    this.#options.onConnectionsChanged?.(0);
   }
 
   #accept(socket: net.Socket): void {
@@ -203,7 +237,16 @@ function listen(server: net.Server, socketPath: string): Promise<void> {
  *         not a socket.
  */
 async function clearDeadSocket(socketPath: string): Promise<void> {
-  const occupant = await probe(socketPath);
+  let occupant = await probe(socketPath);
+  if (occupant === "live") {
+    // Possibly the handle from this plugin's own previous load, which `onunload` had
+    // no way to await. Ask once more before refusing to serve the vault.
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, PROBE_RETRY_MS);
+      timer.unref?.();
+    });
+    occupant = await probe(socketPath);
+  }
   if (occupant === "absent") {
     return;
   }
