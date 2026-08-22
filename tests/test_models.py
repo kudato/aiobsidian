@@ -242,9 +242,12 @@ CASES = (
     ),
     Case(
         SearchResult,
-        {"filename": "games/elden-ring.md"},
+        # What a JsonLogic query really answers for a null evaluation:
+        # a filename and an explicit null, with the simple-search
+        # fields absent — which is what exercises their defaults.
+        {"filename": "games/elden-ring.md", "result": None},
         {"score": None, "matches": None, "result": None},
-        label="defaults",
+        label="null-result",
     ),
     Case(
         ServerStatus,
@@ -266,13 +269,15 @@ CASES = (
             "status": "synced",
             "vault": "Main",
             "device": "MacBook",
+            # The sizes as Obsidian really rounds them: two decimals,
+            # unit attached.
             "vault size": "4.06 KB",
-            "account usage": "1.2 MB / 10 GB",
+            "account usage": "1.20 MB / 10.00 GB",
         },
         {
             "vault_size": "4.06 KB",
-            "account_used": "1.2 MB",
-            "account_limit": "10 GB",
+            "account_used": "1.20 MB",
+            "account_limit": "10.00 GB",
         },
         label="whole",
     ),
@@ -327,6 +332,10 @@ def test_every_public_model_has_a_case():
         f"add {', '.join(missing)} to CASES: until then nothing checks their "
         f"aliases, defaults or round-trips directly"
     )
+    # And the other direction: a case for a model the package stopped
+    # exporting would quietly go on certifying something private.
+    stray = sorted(covered - set(aiobsidian.models.__all__))
+    assert not stray, f"CASES names models the package does not export: {stray}"
 
 
 @pytest.mark.parametrize("case", CASES, ids=str)
@@ -509,11 +518,27 @@ class TestSyncStatus:
                 }
             )
 
-    def test_a_quota_reported_by_halves_is_refused(self):
-        # The three sizes come of one request, so some without the rest
-        # is a record Sync cannot report.
-        with pytest.raises(ValidationError, match="whole or not at all"):
-            SyncStatus.model_validate({"status": "synced", "vault size": "4.06 KB"})
+    # A quota reported by halves is refused too, and that stays pinned
+    # by test_cli_sync.py's own direct model test, parametrized over the
+    # combinations — no second copy here to fall out of step.
+
+
+class TestNoteJson:
+    def test_reads_its_stat_through(self):
+        # The nested record goes through the same moments rule the
+        # FileStat case pins, checked through the wrapper so a NoteJson
+        # that stopped passing it on would be noticed.
+        read = NoteJson.model_validate(
+            {
+                "content": "# Hello",
+                "frontmatter": {},
+                "tags": [],
+                "path": "notes/hello.md",
+                "stat": {"ctime": _CTIME, "mtime": _MTIME, "size": 42},
+            }
+        )
+        assert read.stat.created == _CREATED
+        assert read.stat.modified == _MODIFIED
 
 
 class TestDocumentMap:
