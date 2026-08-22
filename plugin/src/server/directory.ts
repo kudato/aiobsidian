@@ -18,12 +18,18 @@ const SHARED_BITS = 0o077;
  *
  * Args:
  *     directory: The directory sockets are created in.
+ *     verifyOwnership: Whether the owner and mode mean anything. False on Windows,
+ *         where the mode `lstat` reports is a fiction, there is no uid, and the
+ *         profile's ACL is the real control.
  *
  * Raises:
  *     ServeError: The directory belongs to another user, is reachable by other
  *         accounts, is not a directory, or could not be created.
  */
-export async function ensureRuntimeDirectory(directory: string): Promise<void> {
+export async function ensureRuntimeDirectory(
+  directory: string,
+  verifyOwnership: boolean,
+): Promise<void> {
   try {
     await fs.mkdir(directory, { recursive: true, mode: 0o700 });
   } catch (cause) {
@@ -41,6 +47,9 @@ export async function ensureRuntimeDirectory(directory: string): Promise<void> {
 
   if (!stats.isDirectory()) {
     throw new ServeError("unsafe-directory", `${directory} is not a directory`);
+  }
+  if (!verifyOwnership) {
+    return;
   }
 
   const uid = process.getuid?.();
