@@ -28,12 +28,14 @@ class CLIPropertiesResource(BaseCLIResource):
             Dictionary of property names to their values, carrying the
             types the frontmatter declares: numbers as numbers, checkboxes
             as booleans, lists as lists.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
         """
         output = await self._cli._execute(
             "properties", params={"path": path}, output_format="json"
         )
-        result: dict[str, Any] = self._parse_json("properties", output, empty={})
-        return result
+        return self._parse_json_object("properties", output)
 
     async def read(self, path: str, property_name: str) -> PropertyValue:
         """Read a single property from a note.

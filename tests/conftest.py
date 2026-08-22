@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -6,6 +8,10 @@ import respx
 
 from aiobsidian._cli import ObsidianCLI
 from aiobsidian._client import ObsidianClient
+
+from .grammar import Grammar
+
+GRAMMAR = Grammar.load()
 
 
 @pytest.fixture(autouse=True)
@@ -42,8 +48,44 @@ async def client(mock_api):
         yield c
 
 
+class CheckedExecute(AsyncMock):
+    """An `_execute` that checks the command line before answering.
+
+    The mock stands in for the spawn, not for the command line: the
+    arguments still go through `_build_argv`, and what comes out is
+    checked against the grammar of the app itself. Both halves matter.
+    A mock answers a misspelt parameter as readily as a real one, and so
+    does the CLI — it ignores what it does not recognise. And where an
+    argument sits in the line decides what it means, which is a thing
+    only the built line can be asked.
+
+    Checking here rather than through `side_effect` keeps the check
+    whatever a test does with the answer: `side_effect` is how a test
+    raises from the CLI or answers a series of commands, and it would
+    otherwise take the check away with it.
+
+    Attributes:
+        cli: The client whose command lines these are.
+    """
+
+    def __call__(self, /, *args, **kwargs):
+        argv = self.cli._build_argv(
+            *args, **{name: v for name, v in kwargs.items() if name != "timeout"}
+        )
+        GRAMMAR.check_argv(argv[1:])
+        return super().__call__(*args, **kwargs)
+
+
 @pytest.fixture()
 def cli():
+    """An `ObsidianCLI` that answers instead of spawning anything.
+
+    `_execute` is replaced, so a test says what the CLI printed and
+    reads back what the command was asked. Every test that calls a
+    resource method is therefore also a test that the command line it
+    produces is one Obsidian accepts — see `CheckedExecute`.
+    """
     instance = ObsidianCLI("TestVault", binary="/usr/local/bin/obsidian")
-    instance._execute = AsyncMock()
+    instance._execute = CheckedExecute()
+    instance._execute.cli = instance
     return instance

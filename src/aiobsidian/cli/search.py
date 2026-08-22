@@ -40,6 +40,9 @@ class CLISearchResource(BaseCLIResource):
         Returns:
             Paths of the matching files. Use `context()` to see where in
             each file the query matched.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
         """
         params: dict[str, str] = {"query": query}
         if path is not None:
@@ -50,8 +53,7 @@ class CLISearchResource(BaseCLIResource):
         output = await self._cli._execute(
             "search", params=params, flags=flags, output_format="json"
         )
-        result: list[str] = self._parse_json("search", output)
-        return result
+        return self._parse_json_strings("search", output)
 
     async def context(
         self,

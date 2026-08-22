@@ -552,8 +552,8 @@ class TestRun:
 
         mock_exec.assert_awaited_once_with(
             "/usr/bin/obsidian",
-            "tags",
             "vault=TestVault",
+            "tags",
             "format=json",
             "path=note.md",
             "counts",
@@ -618,11 +618,28 @@ class TestExecute:
         assert result == "output"
         mock_exec.assert_awaited_once_with(
             "/usr/bin/obsidian",
-            "read",
             "vault=TestVault",
+            "read",
             "path=note.md",
             **SPAWN_KWARGS,
         )
+
+    async def test_the_vault_comes_before_the_command(self):
+        # Obsidian reads vault= off the front of the arguments and
+        # nowhere else. Behind the command it stays where it is, reaches
+        # the command as a parameter it has no use for, and the vault
+        # becomes whichever one holds the working directory — or, that
+        # failing, whichever window was last in front.
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+
+        argv = cli._build_argv("read", params={"path": "note.md"})
+
+        assert argv == [
+            "/usr/bin/obsidian",
+            "vault=TestVault",
+            "read",
+            "path=note.md",
+        ]
 
     async def test_output_format(self):
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
@@ -633,11 +650,70 @@ class TestExecute:
 
         mock_exec.assert_awaited_once_with(
             "/usr/bin/obsidian",
-            "tags",
             "vault=TestVault",
+            "tags",
             "format=json",
             **SPAWN_KWARGS,
         )
+
+    async def test_an_unknown_vault_raises(self):
+        # Obsidian decides this before the command reaches a vault, in
+        # the process that owns them, so it answers with the sentence and
+        # not with the `Error: ` every other failure carries. Returned it
+        # would have been the note's content.
+        cli = ObsidianCLI("Wrok", binary="/usr/bin/obsidian")
+        process = _mock_process(b"Vault not found.\n")
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CommandError) as exc_info:
+                await cli._execute("read", params={"path": "note.md"})
+
+        assert exc_info.value.command == "read"
+        assert exc_info.value.stdout == "Vault not found.\n"
+        # Not a missing resource: `except NotFoundError` is what a caller
+        # writes around one note, and a vault it cannot reach would
+        # answer that for every note in it.
+        assert not isinstance(exc_info.value, CLINotFoundError)
+
+    async def test_a_disabled_cli_raises(self):
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(
+            b"Command line interface is not enabled. "
+            b"Please turn it on in Settings > General > Advanced.\n"
+        )
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CommandError) as exc_info:
+                await cli._execute("version")
+
+        assert exc_info.value.command == "version"
+        assert not isinstance(exc_info.value, CLINotFoundError)
+
+    async def test_a_returned_usage_message_raises(self):
+        # `command`, `history:restore` and `workspace:save` report a
+        # parameter they cannot do without by returning the usage rather
+        # than raising it, so it arrives with no `Error: ` on it.
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(
+            b"Missing required parameter: id\nUsage: command id=<command-id>\n"
+        )
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with pytest.raises(CommandError) as exc_info:
+                await cli._execute("command", params={"id": ""})
+
+        assert exc_info.value.command == "command"
+
+    async def test_a_note_that_merely_mentions_a_missing_vault_is_content(self):
+        # The sentence is the whole of the output when it is a failure,
+        # so a note that has more to say than that is a note.
+        cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
+        process = _mock_process(b"Vault not found.\n\nIt was here yesterday.\n")
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            output = await cli._execute("read", params={"path": "note.md"})
+
+        assert output == "Vault not found.\n\nIt was here yesterday.\n"
 
     async def test_command_error(self):
         cli = ObsidianCLI("TestVault", binary="/usr/bin/obsidian")
@@ -705,8 +781,8 @@ class TestExecute:
 
         mock_exec.assert_awaited_once_with(
             "/usr/bin/obsidian",
-            "create",
             "vault=TestVault",
+            "create",
             "path=note.md",
             "overwrite",
             **SPAWN_KWARGS,

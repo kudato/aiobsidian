@@ -20,6 +20,18 @@ async def test_list(cli):
     cli._execute.assert_awaited_once_with("bases")
 
 
+async def test_list_without_any(cli):
+    # The one empty-result line the CLI prints without the full stop the
+    # rest of them end in. Read as a listing it was a path.
+    cli._execute.return_value = "No base files found in vault\n"
+    assert await cli.bases.list() == []
+
+
+async def test_query_of_a_base_with_no_views(cli):
+    cli._execute.return_value = "No views defined in base file\n"
+    assert await cli.bases.query("databases/tasks.base") == []
+
+
 async def test_views(cli):
     cli._execute.return_value = "All\ttable\nActive\tcards\n"
     result = await cli.bases.views()
@@ -75,6 +87,15 @@ async def test_query(cli):
     cli._execute.assert_awaited_once_with(
         "base:query", params={"path": "databases/tasks.base"}, output_format="json"
     )
+
+
+async def test_query_of_something_that_is_not_a_list_of_records(cli):
+    # Valid JSON of the wrong shape used to come back as it arrived,
+    # typed as the records it is not.
+    cli._execute.return_value = json.dumps(["Task 1", "Task 2"])
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.bases.query("databases/tasks.base")
+    assert exc_info.value.command == "base:query"
 
 
 async def test_query_empty_view(cli):

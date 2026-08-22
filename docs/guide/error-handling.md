@@ -69,8 +69,8 @@ except CLITimeoutError as e:
 
 ### How CLI failures are detected
 
-The Obsidian CLI exits with status `0` even when a command fails, and prints the
-failure as `Error: ...` on standard output. aiobsidian therefore treats output
+The Obsidian CLI exits with status `0` even when a command fails, and prints most
+failures as `Error: ...` on standard output. aiobsidian therefore treats output
 starting with that prefix as a failure:
 
 - `Error: File "note.md" not found.`, `Error: Folder "archive" not found.` and other
@@ -83,6 +83,21 @@ Because the detection is based on the message prefix, reading a note whose conte
 starts with `Error: ` raises instead of returning the text. The prefix only matters at
 the very beginning of the output, so `Error: ` further down a note is returned as
 normal content.
+
+Three failures arrive without that prefix, and are recognised anyway:
+
+- `command`, `history:restore` and `workspace:save` report a parameter they cannot do
+  without by returning their usage instead of raising it. That starts with
+  `Missing required parameter: `, and is read the same way, by the prefix
+- `Vault not found.` — the `vault=` name reached no vault Obsidian knows. It is decided
+  before the command reaches a vault, so it carries no prefix, and raises `CommandError`
+  rather than `CLINotFoundError`: a vault you cannot reach would otherwise answer
+  "the note does not exist" for every note in it
+- `Command line interface is not enabled. Please turn it on in Settings > General >
+  Advanced.` — likewise `CommandError`
+
+These two sentences are matched as the whole of the output rather than as a prefix, so
+only a note whose entire content is one of them is mistaken for the failure it spells.
 
 A command may also succeed and still print something the library cannot interpret. In
 that case parsing raises `CLIParseError`, which carries the raw `output`, instead of

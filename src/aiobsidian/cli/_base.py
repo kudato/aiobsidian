@@ -11,7 +11,14 @@ from .._exceptions import CLIParseError
 if TYPE_CHECKING:
     from .._cli import ObsidianCLI
 
-_EMPTY_RESULT_PATTERN = re.compile(r"^No [^\n]+\.$")
+_EMPTY_RESULT_PATTERN = re.compile(
+    r"^No [^\n]+\.$|^No base files found in vault$|^No views defined in base file$"
+)
+"""The one line the CLI prints instead of an empty listing. Nearly all of
+them are a sentence and end like one, and matching the full stop is what
+keeps a note called `No idea.md` from reading as one. Two do not have it,
+so they are named rather than matched: leaving them out had
+`bases.list()` hand the sentence back as the path of a base."""
 _ESCAPE_BOUNDARY_PATTERN = re.compile(r"(?<=\\)(?=[nt])")
 
 
@@ -101,6 +108,70 @@ class BaseCLIResource:
             return json.loads(stripped)
         except json.JSONDecodeError as exc:
             raise CLIParseError(command, output) from exc
+
+    @classmethod
+    def _parse_json_object(cls, command: str, output: str) -> dict[str, Any]:
+        """Parse JSON output that describes one thing rather than a table.
+
+        Args:
+            command: CLI command name, used for error reporting.
+            output: Raw output of the command.
+
+        Returns:
+            The object printed, or an empty one for an empty result.
+
+        Raises:
+            CLIParseError: If the output is not valid JSON, or is valid
+                JSON of some other shape.
+        """
+        value = cls._parse_json(command, output, empty={})
+        if not isinstance(value, dict):
+            raise CLIParseError(command, output)
+        return value
+
+    @classmethod
+    def _parse_json_objects(cls, command: str, output: str) -> list[dict[str, Any]]:
+        """Parse JSON output that lists objects nothing here models.
+
+        Args:
+            command: CLI command name, used for error reporting.
+            output: Raw output of the command.
+
+        Returns:
+            The objects printed, in order, or an empty list for an empty
+            result.
+
+        Raises:
+            CLIParseError: If the output is not valid JSON, or is valid
+                JSON of some other shape.
+        """
+        rows = cls._parse_json(command, output)
+        if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
+            raise CLIParseError(command, output)
+        return rows
+
+    @classmethod
+    def _parse_json_strings(cls, command: str, output: str) -> list[str]:
+        """Parse JSON output that lists plain strings.
+
+        Args:
+            command: CLI command name, used for error reporting.
+            output: Raw output of the command.
+
+        Returns:
+            The strings printed, in order, or an empty list for an empty
+            result.
+
+        Raises:
+            CLIParseError: If the output is not valid JSON, or is valid
+                JSON of some other shape.
+        """
+        values = cls._parse_json(command, output)
+        if not isinstance(values, list) or not all(
+            isinstance(value, str) for value in values
+        ):
+            raise CLIParseError(command, output)
+        return values
 
     @classmethod
     def _parse_json_column(cls, command: str, output: str, *, key: str) -> list[str]:

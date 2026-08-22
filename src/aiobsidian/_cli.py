@@ -57,6 +57,25 @@ _ERROR_PREFIX = "Error: "
 _NOT_FOUND_PATTERN = re.compile(r"\bnot found\b", re.IGNORECASE)
 _UNKNOWN_COMMAND_PATTERN = re.compile(r'^Error: Command "[^"]*" not found')
 
+_MISSING_PARAMETER_PREFIX = "Missing required parameter: "
+"""How a handler reports a parameter it cannot do without. Most raise it,
+and a raised failure is printed with the `Error: ` above; `command`,
+`history:restore` and `workspace:save` return it instead, so it arrives
+as ordinary output and is read here by its prefix."""
+
+_UNPREFIXED_FAILURES = frozenset(
+    {
+        "Vault not found.",
+        "Command line interface is not enabled. "
+        "Please turn it on in Settings > General > Advanced.",
+    }
+)
+"""What Obsidian answers a `vault=` naming no vault it knows, and what it
+answers with the CLI switched off in its settings. Both are decided
+before the command reaches a vault, in the process that owns the vaults
+rather than in the one that would answer, so both arrive as the whole of
+the output with no prefix to know them by."""
+
 
 class ObsidianCLI:
     """Async wrapper for the Obsidian CLI.
@@ -190,10 +209,20 @@ class ObsidianCLI:
         """Execute an Obsidian CLI command.
 
         The Obsidian CLI exits with status `0` even when a command fails and
-        prints the failure as `Error: ...` on standard output. Output starting
-        with that prefix is therefore treated as a failure and raised. As a
-        consequence, reading a note whose first line starts with `Error: ` also
-        raises instead of returning the text.
+        prints most failures as `Error: ...` on standard output. Output
+        starting with that prefix is therefore treated as a failure and
+        raised. As a consequence, reading a note whose first line starts with
+        `Error: ` also raises instead of returning the text.
+
+        Not every failure carries it. A handler that reports a parameter it
+        cannot do without by returning its usage rather than raising prints
+        `Missing required parameter: ...`, which is read the same way, by
+        the prefix. And two failures are decided before the command reaches
+        a vault at all, in the process that owns the vaults: a `vault=`
+        naming none it knows, and a CLI switched off in the settings. Each
+        of those answers with one sentence and nothing else, so each is
+        recognised as the whole of the output — a note whose entire content
+        is one of those two sentences is read as the failure it spells.
 
         Cancelling a running command kills it and everything it started
         before the cancellation propagates, so no orphan keeps writing to the
@@ -234,13 +263,9 @@ class ObsidianCLI:
 
         effective_timeout = timeout if timeout is not None else self._timeout
 
-        args: list[str] = [self._binary, command, f"vault={self._vault}"]
-        if output_format is not None:
-            args.append(f"format={output_format}")
-        if params:
-            args.extend(f"{k}={v}" for k, v in params.items())
-        if flags:
-            args.extend(flags)
+        args = self._build_argv(
+            command, params=params, flags=flags, output_format=output_format
+        )
 
         # Counted from here, before the spawn can be awaited, so that a
         # concurrent aclose() knows a command exists that is not in
@@ -329,10 +354,50 @@ class ObsidianCLI:
         if stderr:
             logger.warning("CLI stderr for %r: %s", command, stderr)
 
-        if stdout.startswith(_ERROR_PREFIX):
+        if stdout.startswith((_ERROR_PREFIX, _MISSING_PARAMETER_PREFIX)):
             raise self._build_error(command, 0, stdout, stderr)
 
+        if stdout.strip() in _UNPREFIXED_FAILURES:
+            raise CommandError(command, 0, stderr, stdout)
+
         return stdout
+
+    def _build_argv(
+        self,
+        command: str,
+        *,
+        params: dict[str, str] | None = None,
+        flags: list[str] | None = None,
+        output_format: str | None = None,
+    ) -> list[str]:
+        """Build the command line for one command.
+
+        `vault=` goes first, ahead of the command name. Obsidian reads
+        the vault off the front of the arguments and takes it off before
+        anything else sees them, and it looks nowhere else: given after
+        the command it is left in place and reaches the command as a
+        parameter, which every command ignores. The vault is then
+        whichever one holds the working directory, or failing that
+        whichever window was last in front — so the command runs, and
+        runs somewhere else.
+
+        Args:
+            command: CLI command name.
+            params: Key-value parameters passed as `key=value` arguments.
+            flags: Extra CLI flags.
+            output_format: Value for the `format=` parameter.
+
+        Returns:
+            The arguments to spawn, binary first.
+        """
+        argv = [self._binary, f"vault={self._vault}", command]
+        if output_format is not None:
+            argv.append(f"format={output_format}")
+        if params:
+            argv.extend(f"{key}={value}" for key, value in params.items())
+        if flags:
+            argv.extend(flags)
+        return argv
 
     @staticmethod
     def _signal(process: asyncio.subprocess.Process) -> None:

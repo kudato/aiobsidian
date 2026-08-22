@@ -61,10 +61,15 @@ return.
 - **Breaking**: leaving an `ObsidianCLI` context manager now closes the client. It was a no-op before, so one instance could serve several `async with` blocks; entering a closed one now raises `RuntimeError`
 - **Breaking**: a request the HTTP layer refuses to send — an unparseable `host`, a `scheme` that is not HTTP, a `port` out of range, an illegal header — raises `ValueError` instead of surfacing as a transport failure or an `ExceptionGroup`
 - **Breaking**: patching against Local REST API 5.x sends the 1.x patch protocol, and `DocumentMap` reports targets in the spelling `patch()` accepts
+- **Breaking**: `tags.list(sort=)` takes `"count"` or nothing. The command compares against that one word and sorts by name for everything else, so any other value asked for an order it did not get and was told nothing
 - `SearchResult.result` accepts the strings, numbers and booleans a query returns, not only objects and arrays
 - Closing an `ObsidianCLI` kills every command still running, and the command's own children with it
 
 ### Fixed
+- The vault a client was built for was never the one commands ran against. `vault=` was sent behind the command name, and Obsidian reads it off the front of the arguments and nowhere else, so it reached the command as a parameter no command has a use for. What ran instead was whichever vault holds the working directory or, that failing, whichever window was last in front
+- Three failures the CLI reports without the `Error: ` prefix were returned as content. A `vault=` naming no vault and a CLI switched off in the settings each answer with one sentence, decided before the command reaches a vault; and `command`, `history:restore` and `workspace:save` report a parameter they cannot do without by returning `Missing required parameter: ...` rather than raising it. All three raise `CommandError` now — a vault that cannot be reached is not a missing note, so it is not a `CLINotFoundError`
+- `bases.list()` handed back `No base files found in vault` as though it were the path of a base, and `bases.query()` refused `No views defined in base file` as unparseable. Obsidian ends nearly every empty-result line with a full stop and these two with nothing, so the library read them as content
+- `properties.list()`, `search.query()` and `bases.query()` annotated what they hand back and never looked at it, so a command answering with valid JSON of another shape returned a list where the signature says mapping, and a mapping where it says list of paths. They raise `CLIParseError` now
 - The CLI exits `0` on failure and prints `Error: ...`, which the library returned as content. Failures now raise
 - Cancelling or timing out a command left the processes it had started behind, holding the vault and the caller's pipe. Commands run in their own process group
 - `httpx` exceptions escaped the REST client, so catching "Obsidian is not running" meant importing an optional dependency

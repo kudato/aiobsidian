@@ -111,6 +111,15 @@ async def test_context(cli):
     )
 
 
+async def test_query_of_something_that_is_not_a_list_of_paths(cli):
+    # Valid JSON of the wrong shape used to come back as it arrived,
+    # typed as the list of paths it is not.
+    cli._execute.return_value = json.dumps({"welcome.md": 1})
+    with pytest.raises(CLIParseError) as exc_info:
+        await cli.search.query("welcome")
+    assert exc_info.value.command == "search"
+
+
 async def test_context_reports_the_line_as_a_number(cli):
     cli._execute.return_value = json.dumps(CONTEXT_RESULTS)
     result = await cli.search.context("welcome")

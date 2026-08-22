@@ -75,6 +75,9 @@ class CLIBasesResource(BaseCLIResource):
 
         Returns:
             List of record objects.
+
+        Raises:
+            CLIParseError: If the output has an unexpected shape.
         """
         params: dict[str, str] = {"path": path}
         if view is not None:
@@ -82,8 +85,7 @@ class CLIBasesResource(BaseCLIResource):
         output = await self._cli._execute(
             "base:query", params=params, output_format="json"
         )
-        result: list[dict[str, Any]] = self._parse_json("base:query", output)
-        return result
+        return self._parse_json_objects("base:query", output)
 
     async def list(self) -> list[str]:
         """List all base files in the vault.
