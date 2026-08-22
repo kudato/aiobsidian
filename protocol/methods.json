@@ -1142,7 +1142,8 @@
       "mutates": false,
       "gated": true,
       "gates": [
-        "commands"
+        "commands",
+        "unstable"
       ],
       "unstable": true,
       "params": {},
@@ -1158,7 +1159,8 @@
       "mutates": true,
       "gated": true,
       "gates": [
-        "commands"
+        "commands",
+        "unstable"
       ],
       "unstable": true,
       "params": {
@@ -2018,6 +2020,12 @@
       "subscription": {
         "type": "string",
         "doc": "Names this subscription on this connection."
+      }
+    },
+    "Event": {
+      "name": {
+        "type": "string",
+        "doc": "Which event this is: one of the names in the events table. The rest of the object is that event's own fields, flattened in beside this one, which is why no event may declare a field called name."
       }
     }
   }

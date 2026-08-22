@@ -175,6 +175,13 @@ thread, competing with the editor the user is typing in, so an unbounded peer is
 editor. On Windows each pipe instance also reserves 64 KiB in and 64 KiB out of *nonpaged
 pool*, which makes it a kernel-memory question rather than a plugin-memory one.
 
+**What is written is bounded too, and by the same reasoning.** A peer that asks and then
+stops reading is spending the vault's memory, not its own: what does not flush is held
+in the renderer. So the vault **stops reading from a connection whose writes are backing
+up, and closes one whose unflushed queue passes twice the frame cap**. Enforcement by
+the reader is not optional here either — this is reachable before the handshake, because
+a refusal is itself something to write.
+
 ---
 
 ## 5. Cancellation, and one mutation per method
@@ -222,6 +229,18 @@ to prevent.
 An **unknown event name is `invalidParams`**, so a typo fails at once instead of silently
 delivering nothing.
 
+```
+vault → {"jsonrpc":"2.0","method":"events.event",
+         "params":{"subscription":"s1","seq":7,
+                   "event":{"name":"file.renamed","path":"b.md","old_path":"a.md",
+                            "kind":"file"}}}
+```
+
+The envelope carries `name` and nothing else of its own; the rest of the object is the
+event's own fields, flattened in beside it, exactly as the table in `methods.json`
+declares them. That is why **no event may have a field called `name`**. A client
+dispatches on `name` and reads the rest as that event's shape.
+
 **Backpressure.** A consumer that stops reading must not grow Obsidian's memory. Each
 subscription has a bounded queue; on overflow the oldest events are dropped and a `gap`
 event says how many were missed. **The gap is delivered in the stream, in order**, so the
@@ -267,7 +286,9 @@ does.
 ## 8. Versioning
 
 The protocol version is `MAJOR.MINOR`, **independent of the plugin's version and the
-library's**. It lives in `methods.json` and CI asserts that both sides agree.
+library's**. It lives in `methods.json`, and every implementation is tested against that
+file rather than against another implementation — two sides agreeing with each other and
+not with the contract is the failure this arrangement exists to prevent.
 
 A **minor** may add methods, optional parameters, result fields, event types and error
 codes. It may not remove, rename or retype anything, and it may not promote an optional
@@ -323,9 +344,9 @@ silent no-op.
 
 ## 10. Capabilities
 
-Two groups of methods are switched off until the user switches them on. `app.info`
-reports which, so a caller can learn what is gated without provoking a refusal; a call
-into a gated group answers `forbidden`.
+Two capabilities, both off until the user switches them on. `app.info` reports which,
+so a caller can learn what is gated without provoking a refusal; a call the switch
+forbids answers `forbidden`.
 
 **`commands`** — running an arbitrary Obsidian command is code execution by proxy. It
 reaches every enabled plugin, including ones that talk to the network.
@@ -335,6 +356,27 @@ public `App` class exposes `keymap`, `scope`, `workspace`, `vault`, `metadataCac
 `fileManager`, `lastEvent`, `renderContext` and `secretStorage` — no `commands`, no
 `plugins`, no `setting`. Anything reaching past that list may break in any Obsidian
 release.
+
+### `gated` and `gates` are different questions
+
+`methods.json` answers both, and conflating them is how a gate ends up decorative.
+
+**`gates`** is the list of capabilities a method may refuse on — the whole answer to
+"can this method ever return `forbidden`". A method with a non-empty `gates` declares
+`forbidden` among its errors, and one with an empty `gates` does not; nothing else may
+raise it.
+
+**`gated`** says the method is off in its entirety while any of those capabilities is
+off. `commands.execute` is gated: without `commands` and `unstable` there is nothing it
+will do. `events.subscribe` is **not** gated but still gates on `unstable` — it works
+whether or not that capability is on, and refuses only the argument that needs it. So a
+gated method must name what gates it, but naming a gate does not make a method gated.
+
+**`unstable` the flag and `unstable` the gate travel together.** The flag is the
+warning, the gate is the switch, and either without the other is a trap: a warning
+nobody has to accept, or an acceptance nobody was warned about. `commands.*` carry both
+capabilities for that reason — listing commands reads `app.commands`, which is not on
+the public list above.
 
 ---
 

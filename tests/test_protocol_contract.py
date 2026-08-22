@@ -26,6 +26,25 @@ _PRIMITIVES = frozenset(
     {"string", "integer", "number", "boolean", "object", "null", "any"}
 )
 
+#: Every class an error code may map to. Two are the standard library's, because
+#: `invalidParams` is a caller's mistake and `cancelled` is what withdrawal already
+#: means in asyncio; inventing a name for either would only make callers learn it. The
+#: rest are the library's own, and the transport is tested against these same names.
+_EXCEPTIONS = frozenset(
+    {
+        "AlreadyExistsError",
+        "CancelledError",
+        "ConflictError",
+        "NotFoundError",
+        "OperationError",
+        "ProtocolError",
+        "UnavailableError",
+        "UnsupportedProtocolError",
+        "UntrustedPeerError",
+        "ValueError",
+    }
+)
+
 
 @pytest.fixture(scope="module")
 def contract() -> dict[str, Any]:
@@ -72,8 +91,21 @@ def test_our_error_codes_stay_out_of_the_reserved_range(
 
 
 def test_every_error_maps_to_one_exception(contract: dict[str, Any]) -> None:
+    """A name a caller can catch, not merely a non-empty string.
+
+    Several codes may share a class — `ProtocolError` covers four — but a code with a
+    class of its own invention is a class no caller imports.
+    """
     for name, error in contract["errors"].items():
-        assert error["exception"], f"{name} maps to nothing a caller can catch"
+        assert error["exception"] in _EXCEPTIONS, (
+            f"{name} maps to {error['exception']}, which is not one a caller can catch"
+        )
+
+
+def test_no_exception_is_promised_and_unused(contract: dict[str, Any]) -> None:
+    """The other direction: a roster entry nothing raises is a class nobody needs."""
+    raised = {error["exception"] for error in contract["errors"].values()}
+    assert raised == _EXCEPTIONS
 
 
 def test_universal_errors_are_real_errors(contract: dict[str, Any]) -> None:
@@ -109,12 +141,14 @@ def test_every_result_shape_exists(contract: dict[str, Any]) -> None:
 
 
 def test_every_parameter_type_resolves(contract: dict[str, Any]) -> None:
-    for name, method in contract["methods"].items():
-        for parameter, spec in method["params"].items():
-            for shape in _named_shapes(spec["type"]):
-                assert shape in contract["shapes"], (
-                    f"{name}.{parameter} is typed as the unknown {shape}"
-                )
+    """Notifications are checked too, or the one carrying every event goes unchecked."""
+    for section in ("methods", "notifications"):
+        for name, entry in contract[section].items():
+            for parameter, spec in entry["params"].items():
+                for shape in _named_shapes(spec["type"]):
+                    assert shape in contract["shapes"], (
+                        f"{name}.{parameter} is typed as the unknown {shape}"
+                    )
 
 
 def test_every_shape_field_type_resolves(contract: dict[str, Any]) -> None:
@@ -236,6 +270,21 @@ def test_anything_gated_on_unstable_says_it_is_unstable(
             assert event["unstable"] is True, name
 
 
+def test_anything_unstable_gates_on_unstable(contract: dict[str, Any]) -> None:
+    """And the other way round, which is the half that keeps a warning honest.
+
+    A method that reaches past Obsidian's public API and does not gate on
+    ``unstable`` is reachable by a user who never agreed to undocumented internals.
+    ``commands.execute`` gates on ``commands`` as well, and needs both.
+    """
+    for name, method in contract["methods"].items():
+        if method["unstable"]:
+            assert "unstable" in method["gates"], f"{name} warns and does not gate"
+    for name, event in contract["events"].items():
+        if event["unstable"]:
+            assert "unstable" in event["gates"], f"{name} warns and does not gate"
+
+
 def test_every_event_field_type_resolves(contract: dict[str, Any]) -> None:
     for name, event in contract["events"].items():
         for field, declared in event["fields"].items():
@@ -266,6 +315,27 @@ def test_a_method_can_refuse_every_gate_its_arguments_carry(
 def test_notifications_declare_a_direction(contract: dict[str, Any]) -> None:
     for name, notification in contract["notifications"].items():
         assert notification["direction"] in {"vault to client", "client to vault"}, name
+
+
+def test_an_event_is_its_name_and_its_own_fields(contract: dict[str, Any]) -> None:
+    """The envelope carries the discriminator; the table carries the rest.
+
+    ``Event`` cannot list the fields, because they differ per event — so it declares
+    the one field every event has, and the events table declares the others. That only
+    works while no event wants a field of its own called ``name``.
+    """
+    assert set(contract["shapes"]["Event"]) == {"name"}
+    for name, event in contract["events"].items():
+        assert "name" not in event["fields"], (
+            f"{name} declares a field the envelope already uses"
+        )
+
+
+def test_the_event_notification_carries_the_envelope(contract: dict[str, Any]) -> None:
+    """A subscription id and a sequence number are of no use without the event."""
+    params = contract["notifications"]["events.event"]["params"]
+    assert set(params) == {"subscription", "seq", "event"}
+    assert params["event"]["type"] == "Event"
 
 
 def test_a_gap_is_an_event(contract: dict[str, Any]) -> None:

@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { apiVersion, FileSystemAdapter, Notice, Plugin } from "obsidian";
 
+import { buildRegistry } from "./api/index.ts";
 import { ServeError } from "./lib/errors.ts";
 import {
   currentEnvironment,
@@ -14,7 +15,6 @@ import {
 } from "./lib/paths.ts";
 import { loadOrCreateToken } from "./server/auth.ts";
 import { ensureRuntimeDirectory } from "./server/directory.ts";
-import { MethodRegistry } from "./server/registry.ts";
 import { Sessions } from "./server/sessions.ts";
 import { SocketServer } from "./server/socket.ts";
 import { DEFAULT_SETTINGS, parseSettings, type Settings } from "./settings.ts";
@@ -149,7 +149,7 @@ export default class AioPlugin extends Plugin {
 
     const sessions = new Sessions({
       token,
-      registry: new MethodRegistry(),
+      registry: buildRegistry(),
       describe: () => ({
         plugin_version: this.manifest.version,
         obsidian_version: apiVersion,

@@ -13,11 +13,11 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { buildRegistry } from "../src/api/index.ts";
 import { CODES } from "../src/protocol/codes.ts";
 import { MAX_MESSAGE_BYTES } from "../src/protocol/framing.ts";
 import { PROTOCOL_MAJOR, PROTOCOL_MINOR, SUPPORTED_MAJORS } from "../src/protocol/version.ts";
 import { DEFAULT_LIMITS } from "../src/server/connection.ts";
-import { MethodRegistry } from "../src/server/registry.ts";
 import { MAX_CONNECTIONS } from "../src/server/socket.ts";
 
 interface Contract {
@@ -28,9 +28,15 @@ interface Contract {
 }
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const root = path.join(here, "..", "..");
 const contract = JSON.parse(
-  await fs.readFile(path.join(here, "..", "..", "protocol", "methods.json"), "utf8"),
+  await fs.readFile(path.join(root, "protocol", "methods.json"), "utf8"),
 ) as Contract;
+const mainSource = await fs.readFile(path.join(root, "plugin", "src", "main.ts"), "utf8");
+const connectionSource = await fs.readFile(
+  path.join(root, "plugin", "src", "server", "connection.ts"),
+  "utf8",
+);
 
 /**
  * Everything the plugin should have in its registry.
@@ -44,14 +50,6 @@ function expectedMethods(): string[] {
     .filter(([, method]) => method.status === "live" && method.domain !== "session")
     .map(([name]) => name)
     .sort();
-}
-
-/** The registry the plugin builds, with every domain registered into it. */
-function registry(): MethodRegistry {
-  const methods = new MethodRegistry();
-  // Domains register here as they land. Until then the list is empty, and the test
-  // below is what says so out loud rather than letting it pass unnoticed.
-  return methods;
 }
 
 describe("the plugin against protocol/methods.json", () => {
@@ -72,17 +70,33 @@ describe("the plugin against protocol/methods.json", () => {
   });
 
   it("registers exactly the methods the contract calls live", () => {
-    assert.deepEqual(registry().names(), expectedMethods());
+    // The registry the server is actually given, not one assembled here to match: a
+    // method registered and undocumented has to fail, and it cannot if the test builds
+    // its own.
+    assert.deepEqual(buildRegistry().names(), expectedMethods());
   });
 
-  it("answers every notification the contract calls live", () => {
-    // Nothing dispatches these through the registry, so the check is that the contract
-    // and the connection agree on the names — a rename on one side has to fail here.
+  it("serves the registry it is tested on", () => {
+    // The check above is worth only as much as this one: `main.ts` reaching for
+    // `new MethodRegistry()` again would leave the test comparing something nothing
+    // serves.
+    const source = mainSource;
+    assert.match(source, /buildRegistry\(\)/);
+    assert.doesNotMatch(source, /new MethodRegistry\(/);
+  });
+
+  it("names every notification the contract calls live", () => {
+    // Nothing dispatches these through a registry, so the names live in the connection
+    // as string literals. Reading them out of its source is what makes a rename on
+    // either side fail here rather than at a client.
     const live = Object.entries(contract.notifications)
       .filter(([, notification]) => notification.status === "live")
       .map(([name]) => name)
       .sort();
-    assert.deepEqual(live, ["rpc.cancel", "session.challenge", "session.goodbye"]);
+    const spoken = [...connectionSource.matchAll(/"((?:session|rpc)\.[a-z_]+)"/g)]
+      .map((match) => match[1] as string)
+      .filter((name) => name !== "session.hello");
+    assert.deepEqual([...new Set(spoken)].sort(), live);
   });
 
   it("caps a frame at the 16 MiB the specification names", () => {
