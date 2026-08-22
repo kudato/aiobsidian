@@ -1,0 +1,2024 @@
+{
+  "note": "The wire contract. Both sides are tested against this file: the plugin asserts that it registered exactly the methods marked live, and the Python tests assert that they call exactly those. Prose lives in spec.md; this file is what the tests read.",
+  "protocol": {
+    "major": 1,
+    "minor": 0
+  },
+  "errors": {
+    "parseError": {
+      "code": -32700,
+      "exception": "ProtocolError",
+      "doc": "The line was not JSON. The connection survives; the line does not."
+    },
+    "invalidRequest": {
+      "code": -32600,
+      "exception": "ProtocolError",
+      "doc": "It was JSON, but not a request: a batch, a missing jsonrpc, an id that is neither a number nor a string, a second session.hello."
+    },
+    "methodNotFound": {
+      "code": -32601,
+      "exception": "ProtocolError",
+      "doc": "No method by that name. Nearly always a library newer than the plugin."
+    },
+    "invalidParams": {
+      "code": -32602,
+      "exception": "ValueError",
+      "doc": "The method exists; these arguments do not fit it. The library raises before the wire wherever it can, so this one arriving is a bug on one side or the other."
+    },
+    "internalError": {
+      "code": -32603,
+      "exception": "OperationError",
+      "doc": "A bug in the plugin. The message never carries what was thrown; the vault's console does."
+    },
+    "notFound": {
+      "code": 1001,
+      "exception": "NotFoundError",
+      "doc": "A file, folder, command, leaf, handle or subscription that is not there."
+    },
+    "alreadyExists": {
+      "code": 1002,
+      "exception": "AlreadyExistsError",
+      "doc": "Creating something that is already there."
+    },
+    "conflict": {
+      "code": 1003,
+      "exception": "ConflictError",
+      "doc": "A compare-and-set lost its race: the file changed between the read and the commit."
+    },
+    "unavailable": {
+      "code": 1004,
+      "exception": "UnavailableError",
+      "doc": "The right request in the wrong application state: no active editor, a deferred leaf that will not load."
+    },
+    "unauthenticated": {
+      "code": 1005,
+      "exception": "UntrustedPeerError",
+      "doc": "A method arrived before a valid handshake, or the proof did not match."
+    },
+    "unsupportedProtocol": {
+      "code": 1006,
+      "exception": "UnsupportedProtocolError",
+      "doc": "No protocol major in common. The message names which side to update."
+    },
+    "forbidden": {
+      "code": 1007,
+      "exception": "OperationError",
+      "doc": "The capability this method needs is switched off in the plugin's settings."
+    },
+    "messageTooLarge": {
+      "code": 1008,
+      "exception": "ProtocolError",
+      "doc": "A line longer than the frame cap, in either direction. A result over the cap names the paged alternative."
+    },
+    "tooManyRequests": {
+      "code": 1009,
+      "exception": "OperationError",
+      "doc": "Too many requests in flight on this connection."
+    },
+    "cancelled": {
+      "code": 1010,
+      "exception": "CancelledError",
+      "doc": "The client withdrew the request. Delivered so a caller waiting on an id is never left waiting."
+    }
+  },
+  "universal_errors": [
+    "parseError",
+    "invalidRequest",
+    "methodNotFound",
+    "invalidParams",
+    "internalError",
+    "unauthenticated",
+    "messageTooLarge",
+    "tooManyRequests",
+    "cancelled"
+  ],
+  "capabilities": {
+    "commands": {
+      "default": false,
+      "doc": "Running an arbitrary Obsidian command is code execution by proxy: it reaches every enabled plugin, including ones that talk to the network. Off unless the user turns it on."
+    },
+    "unstable": {
+      "default": false,
+      "doc": "Methods and events that rest on undocumented Obsidian internals. They may break in any Obsidian release."
+    }
+  },
+  "methods": {
+    "session.hello": {
+      "status": "live",
+      "domain": "session",
+      "summary": "Prove the client may talk to this vault, and settle which protocol both speak.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "frozen": true,
+      "params": {
+        "protocol": {
+          "type": "integer[]",
+          "required": true,
+          "doc": "Every protocol major the client implements. The vault answers with the highest it shares."
+        },
+        "proof": {
+          "type": "string",
+          "required": true,
+          "doc": "HMAC-SHA256(token, nonce) as lowercase hex, over the nonce from session.challenge."
+        }
+      },
+      "result": "SessionInfo",
+      "errors": [
+        "unsupportedProtocol"
+      ]
+    },
+    "files.read": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "Read a note as text, with the hash that makes a later write a compare-and-set.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path to a file."
+        }
+      },
+      "result": "FileContent",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "files.create": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "Create a note that is not there yet.",
+      "mutates": true,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path to create."
+        },
+        "content": {
+          "type": "string",
+          "required": true,
+          "doc": "The whole file."
+        }
+      },
+      "result": "WriteResult",
+      "errors": [
+        "alreadyExists",
+        "notFound"
+      ]
+    },
+    "files.write": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "Write a note, creating it or replacing it whole.",
+      "mutates": true,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path."
+        },
+        "content": {
+          "type": "string",
+          "required": true,
+          "doc": "The whole file."
+        }
+      },
+      "result": "WriteResult",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "files.append": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "Add to the end of a note without reading it first.",
+      "mutates": true,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path to an existing file."
+        },
+        "content": {
+          "type": "string",
+          "required": true,
+          "doc": "What to add, verbatim; no separator is inserted."
+        }
+      },
+      "result": "WriteResult",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "files.process": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "Replace a note only if it still holds what was read: the commit half of read-modify-write.",
+      "mutates": true,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path to an existing file."
+        },
+        "content": {
+          "type": "string",
+          "required": true,
+          "doc": "The whole new file."
+        },
+        "expect_hash": {
+          "type": "string",
+          "required": true,
+          "doc": "The hash the read returned. Compared under the per-path lock; a mismatch is conflict and nothing is written."
+        }
+      },
+      "result": "WriteResult",
+      "errors": [
+        "notFound",
+        "conflict"
+      ]
+    },
+    "files.delete": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "Delete a file or folder, to the trash by default.",
+      "mutates": true,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path to a file or folder."
+        },
+        "trash": {
+          "type": "\"system\" | \"vault\" | null",
+          "required": false,
+          "default": "system",
+          "doc": "Where it goes: the operating system's trash, the vault's .trash folder, or nowhere at all."
+        }
+      },
+      "result": "null",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "files.move": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "Move or rename a file or folder, rewriting the links that pointed at it.",
+      "mutates": true,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path to a file or folder."
+        },
+        "to": {
+          "type": "string",
+          "required": true,
+          "doc": "The new vault-relative path, including the name."
+        }
+      },
+      "result": "FileEntry",
+      "errors": [
+        "notFound",
+        "alreadyExists"
+      ]
+    },
+    "files.copy": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "Copy a file or folder.",
+      "mutates": true,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path to a file or folder."
+        },
+        "to": {
+          "type": "string",
+          "required": true,
+          "doc": "The new vault-relative path, including the name."
+        }
+      },
+      "result": "FileEntry",
+      "errors": [
+        "notFound",
+        "alreadyExists"
+      ]
+    },
+    "files.create_folder": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "Create a folder, and every folder above it that is missing.",
+      "mutates": true,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path to create."
+        }
+      },
+      "result": "FileEntry",
+      "errors": [
+        "alreadyExists"
+      ]
+    },
+    "files.exists": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "Ask whether a path is there, and what it is.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path."
+        }
+      },
+      "result": "Existence",
+      "errors": []
+    },
+    "files.stat": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "Size and timestamps for one file or folder.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path."
+        }
+      },
+      "result": "FileStat",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "files.list": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "List what is in a folder.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": false,
+          "default": "",
+          "doc": "Vault-relative folder path. Empty means the vault root."
+        },
+        "recursive": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "doc": "Descend into subfolders."
+        },
+        "kind": {
+          "type": "\"file\" | \"folder\" | null",
+          "required": false,
+          "default": null,
+          "doc": "Keep only files, only folders, or both."
+        },
+        "extension": {
+          "type": "string | null",
+          "required": false,
+          "default": null,
+          "doc": "Keep only files with this extension, without the dot."
+        }
+      },
+      "result": "FileEntry[]",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "files.read_binary": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "Read one range of a file's bytes, so an attachment never travels as one frame.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path to a file."
+        },
+        "offset": {
+          "type": "integer",
+          "required": false,
+          "default": 0,
+          "doc": "Where to start, in bytes."
+        },
+        "length": {
+          "type": "integer",
+          "required": false,
+          "default": 4194304,
+          "doc": "How many bytes to read. The vault reads a range, so it holds one chunk and not the file."
+        }
+      },
+      "result": "BinaryChunk",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "files.upload_begin": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "Open a transactional binary write. Nothing appears at the path until it commits.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Where the file will appear on commit."
+        },
+        "overwrite": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "doc": "Whether committing may replace a file that is already there."
+        }
+      },
+      "result": "UploadHandle",
+      "errors": [
+        "alreadyExists",
+        "notFound"
+      ]
+    },
+    "files.upload_chunk": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "Add bytes to an open upload.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "handle": {
+          "type": "string",
+          "required": true,
+          "doc": "From files.upload_begin."
+        },
+        "data": {
+          "type": "string",
+          "required": true,
+          "doc": "The chunk, base64."
+        }
+      },
+      "result": "UploadProgress",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "files.upload_commit": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "Put the uploaded file at its path, in one rename.",
+      "mutates": true,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "handle": {
+          "type": "string",
+          "required": true,
+          "doc": "From files.upload_begin."
+        }
+      },
+      "result": "FileStat",
+      "errors": [
+        "notFound",
+        "alreadyExists"
+      ]
+    },
+    "files.upload_abort": {
+      "status": "planned",
+      "domain": "files",
+      "summary": "Throw an upload away. The vault never saw it.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "handle": {
+          "type": "string",
+          "required": true,
+          "doc": "From files.upload_begin."
+        }
+      },
+      "result": "null",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "frontmatter.get": {
+      "status": "planned",
+      "domain": "frontmatter",
+      "summary": "Read a note's properties.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path to a file."
+        }
+      },
+      "result": "Frontmatter",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "frontmatter.set": {
+      "status": "planned",
+      "domain": "frontmatter",
+      "summary": "Add, change and remove properties in one atomic write.",
+      "mutates": true,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path to a file."
+        },
+        "values": {
+          "type": "object",
+          "required": false,
+          "default": {},
+          "doc": "Keys to write. A key already there is replaced; the rest of the block is left alone."
+        },
+        "remove": {
+          "type": "string[]",
+          "required": false,
+          "default": [],
+          "doc": "Keys to delete. A key that is not there is not an error."
+        }
+      },
+      "result": "Frontmatter",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "frontmatter.replace": {
+      "status": "planned",
+      "domain": "frontmatter",
+      "summary": "Replace the whole property block.",
+      "mutates": true,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path to a file."
+        },
+        "values": {
+          "type": "object",
+          "required": true,
+          "doc": "The properties the note will have. An empty object removes the block."
+        }
+      },
+      "result": "Frontmatter",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "metadata.get": {
+      "status": "planned",
+      "domain": "metadata",
+      "summary": "Everything Obsidian's cache knows about one note: headings, tags, links, sections, list items, properties.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path to a file."
+        }
+      },
+      "result": "Metadata",
+      "errors": [
+        "notFound",
+        "unavailable"
+      ]
+    },
+    "metadata.tags": {
+      "status": "planned",
+      "domain": "metadata",
+      "summary": "Every tag in the vault and how often it is used.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {},
+      "result": "TagCount[]",
+      "errors": []
+    },
+    "metadata.tagged": {
+      "status": "planned",
+      "domain": "metadata",
+      "summary": "The notes carrying a tag, read from the cache rather than by opening files.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "tag": {
+          "type": "string",
+          "required": true,
+          "doc": "The tag, with or without its leading #."
+        },
+        "include_nested": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "doc": "Whether #project also matches #project/aio."
+        }
+      },
+      "result": "string[]",
+      "errors": []
+    },
+    "links.resolve": {
+      "status": "planned",
+      "domain": "links",
+      "summary": "Turn a link's text into a path, the way Obsidian would when following it.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "doc": "What is written inside the brackets."
+        },
+        "from_path": {
+          "type": "string",
+          "required": false,
+          "default": "",
+          "doc": "The note the link is written in, which decides what a relative name means."
+        }
+      },
+      "result": "string | null",
+      "errors": []
+    },
+    "links.outgoing": {
+      "status": "planned",
+      "domain": "links",
+      "summary": "The links leaving a note, resolved and unresolved alike.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path to a file."
+        }
+      },
+      "result": "OutgoingLinks",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "links.backlinks": {
+      "status": "planned",
+      "domain": "links",
+      "summary": "The notes linking to this one.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path to a file."
+        }
+      },
+      "result": "Backlink[]",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "links.unresolved": {
+      "status": "planned",
+      "domain": "links",
+      "summary": "Links that point at notes which do not exist.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string | null",
+          "required": false,
+          "default": null,
+          "doc": "One note, or the whole vault when null."
+        }
+      },
+      "result": "UnresolvedLink[]",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "links.format": {
+      "status": "planned",
+      "domain": "links",
+      "summary": "Write a link to a note the way this vault's settings say links are written.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "The note being linked to."
+        },
+        "from_path": {
+          "type": "string",
+          "required": false,
+          "default": "",
+          "doc": "The note the link will be written in."
+        },
+        "subpath": {
+          "type": "string | null",
+          "required": false,
+          "default": null,
+          "doc": "A heading or block within the target, without the leading # or ^."
+        },
+        "alias": {
+          "type": "string | null",
+          "required": false,
+          "default": null,
+          "doc": "The text to display instead of the name."
+        }
+      },
+      "result": "string",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "workspace.open": {
+      "status": "planned",
+      "domain": "workspace",
+      "summary": "Open a note on screen.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "doc": "Vault-relative path to a file."
+        },
+        "pane": {
+          "type": "\"active\" | \"tab\" | \"split\" | \"window\"",
+          "required": false,
+          "default": "tab",
+          "doc": "Where it opens: over the current pane, in a new tab, beside it, or in its own window."
+        },
+        "focus": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "doc": "Whether the opened pane becomes the active one."
+        }
+      },
+      "result": "Leaf",
+      "errors": [
+        "notFound",
+        "unavailable"
+      ]
+    },
+    "workspace.leaves": {
+      "status": "planned",
+      "domain": "workspace",
+      "summary": "Every open pane, with the id the editor methods take.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {},
+      "result": "Leaf[]",
+      "errors": []
+    },
+    "workspace.active_leaf": {
+      "status": "planned",
+      "domain": "workspace",
+      "summary": "The pane the user is in, or null when none is.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {},
+      "result": "Leaf | null",
+      "errors": []
+    },
+    "workspace.active_file": {
+      "status": "planned",
+      "domain": "workspace",
+      "summary": "The note the user is looking at, or null.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {},
+      "result": "string | null",
+      "errors": []
+    },
+    "workspace.focus": {
+      "status": "planned",
+      "domain": "workspace",
+      "summary": "Bring a pane to the front and make it active.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "leaf": {
+          "type": "string",
+          "required": true,
+          "doc": "A leaf id from workspace.leaves."
+        }
+      },
+      "result": "Leaf",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "workspace.close": {
+      "status": "planned",
+      "domain": "workspace",
+      "summary": "Close a pane.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "leaf": {
+          "type": "string",
+          "required": true,
+          "doc": "A leaf id from workspace.leaves."
+        }
+      },
+      "result": "null",
+      "errors": [
+        "notFound"
+      ]
+    },
+    "workspace.recent_files": {
+      "status": "planned",
+      "domain": "workspace",
+      "summary": "The notes opened most recently, newest first.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {},
+      "result": "string[]",
+      "errors": []
+    },
+    "editor.get": {
+      "status": "planned",
+      "domain": "editor",
+      "summary": "What one editor holds right now: its text, its cursor and its selections.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "leaf": {
+          "type": "string | null",
+          "required": false,
+          "default": null,
+          "doc": "A leaf id, or null for the active markdown editor."
+        }
+      },
+      "result": "EditorState",
+      "errors": [
+        "notFound",
+        "unavailable"
+      ]
+    },
+    "editor.set": {
+      "status": "planned",
+      "domain": "editor",
+      "summary": "Replace everything in an editor, as one undoable edit.",
+      "mutates": true,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "content": {
+          "type": "string",
+          "required": true,
+          "doc": "The whole document."
+        },
+        "leaf": {
+          "type": "string | null",
+          "required": false,
+          "default": null,
+          "doc": "A leaf id, or null for the active markdown editor."
+        }
+      },
+      "result": "null",
+      "errors": [
+        "notFound",
+        "unavailable"
+      ]
+    },
+    "editor.replace": {
+      "status": "planned",
+      "domain": "editor",
+      "summary": "Replace a range, or insert at a point when the range is empty.",
+      "mutates": true,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "text": {
+          "type": "string",
+          "required": true,
+          "doc": "What goes in."
+        },
+        "from": {
+          "type": "EditorPosition | null",
+          "required": false,
+          "default": null,
+          "doc": "Where the replaced range starts. Null means the cursor."
+        },
+        "to": {
+          "type": "EditorPosition | null",
+          "required": false,
+          "default": null,
+          "doc": "Where it ends. Null means the same place as from, which makes this an insert."
+        },
+        "leaf": {
+          "type": "string | null",
+          "required": false,
+          "default": null,
+          "doc": "A leaf id, or null for the active markdown editor."
+        }
+      },
+      "result": "EditorPosition",
+      "errors": [
+        "notFound",
+        "unavailable"
+      ]
+    },
+    "editor.replace_selection": {
+      "status": "planned",
+      "domain": "editor",
+      "summary": "Replace what is selected, or insert at the cursor when nothing is.",
+      "mutates": true,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "text": {
+          "type": "string",
+          "required": true,
+          "doc": "What goes in."
+        },
+        "leaf": {
+          "type": "string | null",
+          "required": false,
+          "default": null,
+          "doc": "A leaf id, or null for the active markdown editor."
+        }
+      },
+      "result": "EditorPosition",
+      "errors": [
+        "notFound",
+        "unavailable"
+      ]
+    },
+    "editor.set_cursor": {
+      "status": "planned",
+      "domain": "editor",
+      "summary": "Put the cursor somewhere.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "position": {
+          "type": "EditorPosition",
+          "required": true,
+          "doc": "Zero-based line and character."
+        },
+        "leaf": {
+          "type": "string | null",
+          "required": false,
+          "default": null,
+          "doc": "A leaf id, or null for the active markdown editor."
+        }
+      },
+      "result": "null",
+      "errors": [
+        "notFound",
+        "unavailable"
+      ]
+    },
+    "editor.set_selection": {
+      "status": "planned",
+      "domain": "editor",
+      "summary": "Select a range.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "anchor": {
+          "type": "EditorPosition",
+          "required": true,
+          "doc": "Where the selection is held."
+        },
+        "head": {
+          "type": "EditorPosition",
+          "required": true,
+          "doc": "Where it is dragged to; this is where the cursor ends up."
+        },
+        "leaf": {
+          "type": "string | null",
+          "required": false,
+          "default": null,
+          "doc": "A leaf id, or null for the active markdown editor."
+        }
+      },
+      "result": "null",
+      "errors": [
+        "notFound",
+        "unavailable"
+      ]
+    },
+    "editor.exec": {
+      "status": "planned",
+      "domain": "editor",
+      "summary": "Run one of the editor's own movement and folding commands.",
+      "mutates": true,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "command": {
+          "type": "string",
+          "required": true,
+          "doc": "One of goUp, goDown, goLeft, goRight, goStart, goEnd, goWordLeft, goWordRight, indentMore, indentLess, newlineAndIndent, swapLineUp, swapLineDown, deleteLine, toggleFold, foldAll, unfoldAll."
+        },
+        "leaf": {
+          "type": "string | null",
+          "required": false,
+          "default": null,
+          "doc": "A leaf id, or null for the active markdown editor."
+        }
+      },
+      "result": "null",
+      "errors": [
+        "notFound",
+        "unavailable"
+      ]
+    },
+    "commands.list": {
+      "status": "planned",
+      "domain": "commands",
+      "summary": "Every command Obsidian and its plugins have registered.",
+      "mutates": false,
+      "gated": true,
+      "gates": [
+        "commands"
+      ],
+      "unstable": true,
+      "params": {},
+      "result": "Command[]",
+      "errors": [
+        "forbidden"
+      ]
+    },
+    "commands.execute": {
+      "status": "planned",
+      "domain": "commands",
+      "summary": "Run a command by id.",
+      "mutates": true,
+      "gated": true,
+      "gates": [
+        "commands"
+      ],
+      "unstable": true,
+      "params": {
+        "id": {
+          "type": "string",
+          "required": true,
+          "doc": "A command id from commands.list."
+        }
+      },
+      "result": "null",
+      "errors": [
+        "forbidden",
+        "notFound",
+        "unavailable"
+      ]
+    },
+    "app.info": {
+      "status": "planned",
+      "domain": "app",
+      "summary": "What this vault is and what this plugin will do: versions, paths, and which capabilities are switched on.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {},
+      "result": "AppInfo",
+      "errors": []
+    },
+    "app.plugins": {
+      "status": "planned",
+      "domain": "app",
+      "summary": "The community plugins installed here, and whether each is enabled.",
+      "mutates": false,
+      "gated": true,
+      "gates": [
+        "unstable"
+      ],
+      "unstable": true,
+      "params": {},
+      "result": "PluginInfo[]",
+      "errors": [
+        "forbidden",
+        "unavailable"
+      ]
+    },
+    "app.config": {
+      "status": "planned",
+      "domain": "app",
+      "summary": "Read one of Obsidian's own settings.",
+      "mutates": false,
+      "gated": true,
+      "gates": [
+        "unstable"
+      ],
+      "unstable": true,
+      "params": {
+        "key": {
+          "type": "string | null",
+          "required": false,
+          "default": null,
+          "doc": "One setting, or every setting when null."
+        }
+      },
+      "result": "object",
+      "errors": [
+        "forbidden",
+        "notFound",
+        "unavailable"
+      ]
+    },
+    "events.subscribe": {
+      "status": "planned",
+      "domain": "events",
+      "summary": "Start receiving events on this connection.",
+      "mutates": false,
+      "gated": false,
+      "gates": [
+        "unstable"
+      ],
+      "unstable": false,
+      "params": {
+        "events": {
+          "type": "string[]",
+          "required": true,
+          "doc": "The event names to receive. An unknown name is invalidParams, so a typo fails at once rather than silently delivering nothing."
+        },
+        "queue": {
+          "type": "integer",
+          "required": false,
+          "default": 1024,
+          "doc": "How many events may wait for a consumer that has stopped reading. Past it the oldest are dropped and a gap event says how many."
+        }
+      },
+      "result": "Subscription",
+      "errors": [
+        "forbidden"
+      ]
+    },
+    "events.unsubscribe": {
+      "status": "planned",
+      "domain": "events",
+      "summary": "Stop receiving events. Closing the connection does this for every subscription on it.",
+      "mutates": false,
+      "gated": false,
+      "gates": [],
+      "unstable": false,
+      "params": {
+        "subscription": {
+          "type": "string",
+          "required": true,
+          "doc": "From events.subscribe."
+        }
+      },
+      "result": "null",
+      "errors": [
+        "notFound"
+      ]
+    }
+  },
+  "notifications": {
+    "session.challenge": {
+      "status": "live",
+      "direction": "vault to client",
+      "summary": "The first and only thing an unproven peer is told. Sent once, on accept.",
+      "params": {
+        "nonce": {
+          "type": "string",
+          "required": true,
+          "doc": "Thirty-two random bytes as lowercase hex."
+        }
+      }
+    },
+    "session.goodbye": {
+      "status": "live",
+      "direction": "vault to client",
+      "summary": "Why the vault is hanging up, sent before it does.",
+      "params": {
+        "reason": {
+          "type": "\"stopped\" | \"unloading\"",
+          "required": true,
+          "doc": "Serving was switched off, or the plugin is being unloaded — which is Obsidian quitting, the vault closing and the plugin being disabled alike, because a plugin cannot tell those apart."
+        }
+      }
+    },
+    "rpc.cancel": {
+      "status": "live",
+      "direction": "client to vault",
+      "summary": "Withdraw a request. The answer still arrives, as a cancelled error, so nothing waits forever.",
+      "params": {
+        "id": {
+          "type": "integer | string",
+          "required": true,
+          "doc": "The id of the request being withdrawn."
+        }
+      }
+    },
+    "events.event": {
+      "status": "planned",
+      "direction": "vault to client",
+      "summary": "One event on one subscription. Events are ordered among themselves; responses may overtake them.",
+      "params": {
+        "subscription": {
+          "type": "string",
+          "required": true,
+          "doc": "From events.subscribe."
+        },
+        "seq": {
+          "type": "integer",
+          "required": true,
+          "doc": "Counts from 1 within the subscription, gaps included."
+        },
+        "event": {
+          "type": "Event",
+          "required": true,
+          "doc": "The event itself, discriminated by its type field."
+        }
+      }
+    }
+  },
+  "events": {
+    "file.created": {
+      "status": "planned",
+      "summary": "A file or folder appeared. Fires for every existing file when the vault is first indexed.",
+      "gates": [],
+      "unstable": false,
+      "fields": {
+        "path": "string",
+        "kind": "\"file\" | \"folder\""
+      }
+    },
+    "file.modified": {
+      "status": "planned",
+      "summary": "A file's contents changed on disk.",
+      "gates": [],
+      "unstable": false,
+      "fields": {
+        "path": "string"
+      }
+    },
+    "file.deleted": {
+      "status": "planned",
+      "summary": "A file or folder went away.",
+      "gates": [],
+      "unstable": false,
+      "fields": {
+        "path": "string",
+        "kind": "\"file\" | \"folder\""
+      }
+    },
+    "file.renamed": {
+      "status": "planned",
+      "summary": "A file or folder moved or was renamed.",
+      "gates": [],
+      "unstable": false,
+      "fields": {
+        "path": "string",
+        "old_path": "string",
+        "kind": "\"file\" | \"folder\""
+      }
+    },
+    "metadata.changed": {
+      "status": "planned",
+      "summary": "Obsidian re-read a note and its cache entry changed.",
+      "gates": [],
+      "unstable": false,
+      "fields": {
+        "path": "string"
+      }
+    },
+    "metadata.deleted": {
+      "status": "planned",
+      "summary": "A note left the cache.",
+      "gates": [],
+      "unstable": false,
+      "fields": {
+        "path": "string"
+      }
+    },
+    "metadata.resolved": {
+      "status": "planned",
+      "summary": "Every link in the vault has been resolved; the link graph is settled.",
+      "gates": [],
+      "unstable": false,
+      "fields": {}
+    },
+    "workspace.file_opened": {
+      "status": "planned",
+      "summary": "The note on screen changed.",
+      "gates": [],
+      "unstable": false,
+      "fields": {
+        "path": "string | null"
+      }
+    },
+    "workspace.layout_changed": {
+      "status": "planned",
+      "summary": "Panes were opened, closed or rearranged.",
+      "gates": [],
+      "unstable": false,
+      "fields": {}
+    },
+    "workspace.leaf_changed": {
+      "status": "planned",
+      "summary": "The active pane changed.",
+      "gates": [],
+      "unstable": false,
+      "fields": {
+        "leaf": "string | null",
+        "path": "string | null"
+      }
+    },
+    "unstable.raw": {
+      "status": "planned",
+      "summary": "A path under the vault's config directory changed: settings, themes, plugin state. This rests on an Obsidian event that is not in its public API and may vanish in any release.",
+      "gates": [
+        "unstable"
+      ],
+      "unstable": true,
+      "fields": {
+        "path": "string"
+      }
+    },
+    "gap": {
+      "status": "planned",
+      "summary": "Events were dropped because the consumer stopped reading. Delivered in order, in the stream, so the decision to re-read state is made where the events are read.",
+      "gates": [],
+      "unstable": false,
+      "fields": {
+        "missed": "integer"
+      }
+    }
+  },
+  "shapes": {
+    "SessionInfo": {
+      "protocol": {
+        "type": "Protocol",
+        "doc": "The major both sides settled on, and the vault's exact minor."
+      },
+      "server_proof": {
+        "type": "string",
+        "doc": "HMAC-SHA256(token, nonce ‖ \"s\") as lowercase hex. The client verifies it before sending any note content."
+      },
+      "plugin_version": {
+        "type": "string",
+        "doc": "The plugin's own version, from its manifest."
+      },
+      "obsidian_version": {
+        "type": "string",
+        "doc": "The Obsidian API version the plugin is running against."
+      },
+      "vault": {
+        "type": "VaultInfo",
+        "doc": "Which vault answered. Untrusted: every field is whatever the peer said."
+      }
+    },
+    "Protocol": {
+      "major": {
+        "type": "integer",
+        "doc": "A break. A client that does not implement it is refused."
+      },
+      "minor": {
+        "type": "integer",
+        "doc": "Additive only, and never negotiated."
+      }
+    },
+    "VaultInfo": {
+      "id": {
+        "type": "string",
+        "doc": "Sixteen hex characters derived from the vault's real path. A name, not a secret."
+      },
+      "name": {
+        "type": "string",
+        "doc": "What the user calls it."
+      },
+      "path": {
+        "type": "string",
+        "doc": "Where it sits, resolved through realpath. Never fed back into local filesystem work."
+      }
+    },
+    "FileContent": {
+      "content": {
+        "type": "string",
+        "doc": "The file, as text."
+      },
+      "hash": {
+        "type": "string",
+        "doc": "SHA-256 over the exact bytes, lowercase hex. Hand it to files.process to write only if nothing changed."
+      }
+    },
+    "WriteResult": {
+      "path": {
+        "type": "string",
+        "doc": "Where it was written."
+      },
+      "hash": {
+        "type": "string",
+        "doc": "SHA-256 of what is now on disk, so a caller can chain writes without re-reading."
+      }
+    },
+    "FileEntry": {
+      "path": {
+        "type": "string",
+        "doc": "Vault-relative path."
+      },
+      "name": {
+        "type": "string",
+        "doc": "The last component."
+      },
+      "kind": {
+        "type": "\"file\" | \"folder\"",
+        "doc": "What it is."
+      },
+      "extension": {
+        "type": "string | null",
+        "doc": "Without the dot; null for folders and for files that have none."
+      }
+    },
+    "FileStat": {
+      "path": {
+        "type": "string",
+        "doc": "Vault-relative path."
+      },
+      "name": {
+        "type": "string",
+        "doc": "The last component."
+      },
+      "kind": {
+        "type": "\"file\" | \"folder\"",
+        "doc": "What it is."
+      },
+      "extension": {
+        "type": "string | null",
+        "doc": "Without the dot; null for folders and for files that have none."
+      },
+      "size": {
+        "type": "integer",
+        "doc": "Bytes. Zero for a folder."
+      },
+      "created": {
+        "type": "integer",
+        "doc": "Milliseconds since the epoch, as the operating system reports it."
+      },
+      "modified": {
+        "type": "integer",
+        "doc": "Milliseconds since the epoch."
+      }
+    },
+    "Existence": {
+      "exists": {
+        "type": "boolean",
+        "doc": "Whether anything is at that path."
+      },
+      "kind": {
+        "type": "\"file\" | \"folder\" | null",
+        "doc": "What it is, or null when nothing is there."
+      }
+    },
+    "BinaryChunk": {
+      "data": {
+        "type": "string",
+        "doc": "The bytes read, base64."
+      },
+      "offset": {
+        "type": "integer",
+        "doc": "Where this chunk starts."
+      },
+      "length": {
+        "type": "integer",
+        "doc": "How many bytes it holds, which may be fewer than asked for."
+      },
+      "size": {
+        "type": "integer",
+        "doc": "The whole file's size, so a caller knows how far it has to go."
+      },
+      "eof": {
+        "type": "boolean",
+        "doc": "Whether this chunk reaches the end."
+      }
+    },
+    "UploadHandle": {
+      "handle": {
+        "type": "string",
+        "doc": "Names this upload until it commits or is thrown away."
+      },
+      "path": {
+        "type": "string",
+        "doc": "Where the file will appear."
+      }
+    },
+    "UploadProgress": {
+      "written": {
+        "type": "integer",
+        "doc": "Bytes written to the temporary file so far."
+      }
+    },
+    "Frontmatter": {
+      "path": {
+        "type": "string",
+        "doc": "Vault-relative path."
+      },
+      "properties": {
+        "type": "object",
+        "doc": "The property block as YAML would parse it. Empty when the note has none."
+      }
+    },
+    "Metadata": {
+      "path": {
+        "type": "string",
+        "doc": "Vault-relative path."
+      },
+      "frontmatter": {
+        "type": "object | null",
+        "doc": "The property block, or null when the note has none."
+      },
+      "frontmatter_position": {
+        "type": "Pos | null",
+        "doc": "Where the block sits in the file."
+      },
+      "frontmatter_links": {
+        "type": "FrontmatterLink[]",
+        "doc": "Links written inside properties."
+      },
+      "headings": {
+        "type": "Heading[]",
+        "doc": "Every heading, in document order."
+      },
+      "tags": {
+        "type": "Tag[]",
+        "doc": "Every tag in the body."
+      },
+      "links": {
+        "type": "Link[]",
+        "doc": "Every link in the body."
+      },
+      "embeds": {
+        "type": "Link[]",
+        "doc": "Every embed in the body."
+      },
+      "sections": {
+        "type": "Section[]",
+        "doc": "Root-level blocks, which is how the document divides up."
+      },
+      "list_items": {
+        "type": "ListItem[]",
+        "doc": "Every list item, with its nesting and its task state."
+      },
+      "blocks": {
+        "type": "object",
+        "doc": "Block ids to their positions."
+      },
+      "footnotes": {
+        "type": "Footnote[]",
+        "doc": "Footnote definitions. Obsidian has reported these since 1.6.6."
+      },
+      "footnote_refs": {
+        "type": "Footnote[]",
+        "doc": "Footnote references. Obsidian has reported these since 1.8.7."
+      },
+      "reference_links": {
+        "type": "ReferenceLink[]",
+        "doc": "Markdown reference-style link definitions. Since 1.8.7."
+      }
+    },
+    "Loc": {
+      "line": {
+        "type": "integer",
+        "doc": "Zero-based, as Obsidian counts. Not translated: these feed straight back into editor calls."
+      },
+      "col": {
+        "type": "integer",
+        "doc": "Zero-based column."
+      },
+      "offset": {
+        "type": "integer",
+        "doc": "Characters from the start of the file."
+      }
+    },
+    "Pos": {
+      "start": {
+        "type": "Loc",
+        "doc": "Where it begins."
+      },
+      "end": {
+        "type": "Loc",
+        "doc": "Where it ends."
+      }
+    },
+    "Heading": {
+      "heading": {
+        "type": "string",
+        "doc": "The text, without the hashes."
+      },
+      "level": {
+        "type": "integer",
+        "doc": "One through six."
+      },
+      "position": {
+        "type": "Pos",
+        "doc": "Where it sits."
+      }
+    },
+    "Tag": {
+      "tag": {
+        "type": "string",
+        "doc": "With its leading #, as written."
+      },
+      "position": {
+        "type": "Pos",
+        "doc": "Where it sits."
+      }
+    },
+    "Link": {
+      "link": {
+        "type": "string",
+        "doc": "What is written inside the brackets, before any alias."
+      },
+      "original": {
+        "type": "string",
+        "doc": "The whole link, exactly as it appears in the file."
+      },
+      "display_text": {
+        "type": "string | null",
+        "doc": "The alias, when there is one."
+      },
+      "position": {
+        "type": "Pos",
+        "doc": "Where it sits."
+      }
+    },
+    "FrontmatterLink": {
+      "key": {
+        "type": "string",
+        "doc": "The property the link is written in."
+      },
+      "link": {
+        "type": "string",
+        "doc": "What is written inside the brackets."
+      },
+      "original": {
+        "type": "string",
+        "doc": "The whole link, as it appears."
+      },
+      "display_text": {
+        "type": "string | null",
+        "doc": "The alias, when there is one."
+      }
+    },
+    "Section": {
+      "type": {
+        "type": "string",
+        "doc": "blockquote, callout, code, heading, list, paragraph, table, yaml and the rest; Obsidian may add more."
+      },
+      "id": {
+        "type": "string | null",
+        "doc": "The block id, when the section carries one."
+      },
+      "position": {
+        "type": "Pos",
+        "doc": "Where it sits."
+      }
+    },
+    "ListItem": {
+      "parent": {
+        "type": "integer",
+        "doc": "The line of the item this one sits under; negative at the top level."
+      },
+      "task": {
+        "type": "string | null",
+        "doc": "What is between the brackets of a checkbox — a space when unchecked, x when checked — or null when the item is not a task."
+      },
+      "id": {
+        "type": "string | null",
+        "doc": "The block id, when the item carries one."
+      },
+      "position": {
+        "type": "Pos",
+        "doc": "Where it sits."
+      }
+    },
+    "Footnote": {
+      "id": {
+        "type": "string",
+        "doc": "The name between the brackets."
+      },
+      "position": {
+        "type": "Pos",
+        "doc": "Where it sits."
+      }
+    },
+    "ReferenceLink": {
+      "id": {
+        "type": "string",
+        "doc": "The label the definition binds."
+      },
+      "link": {
+        "type": "string",
+        "doc": "What it binds to."
+      },
+      "position": {
+        "type": "Pos",
+        "doc": "Where it sits."
+      }
+    },
+    "TagCount": {
+      "tag": {
+        "type": "string",
+        "doc": "With its leading #."
+      },
+      "count": {
+        "type": "integer",
+        "doc": "How many times it is used across the vault."
+      }
+    },
+    "OutgoingLinks": {
+      "resolved": {
+        "type": "ResolvedLink[]",
+        "doc": "Links that point at a note which exists."
+      },
+      "unresolved": {
+        "type": "UnresolvedLink[]",
+        "doc": "Links that do not."
+      }
+    },
+    "ResolvedLink": {
+      "path": {
+        "type": "string",
+        "doc": "The note being linked to."
+      },
+      "count": {
+        "type": "integer",
+        "doc": "How many links point there from the source."
+      }
+    },
+    "UnresolvedLink": {
+      "from_path": {
+        "type": "string",
+        "doc": "The note the link is written in."
+      },
+      "link": {
+        "type": "string",
+        "doc": "The name that resolves to nothing."
+      },
+      "count": {
+        "type": "integer",
+        "doc": "How many times it appears there."
+      }
+    },
+    "Backlink": {
+      "path": {
+        "type": "string",
+        "doc": "The note that links here."
+      },
+      "count": {
+        "type": "integer",
+        "doc": "How many of its links point here."
+      }
+    },
+    "Leaf": {
+      "id": {
+        "type": "string",
+        "doc": "Obsidian's own id for the pane. Stable while the pane is open, and nothing more."
+      },
+      "view_type": {
+        "type": "string",
+        "doc": "markdown, graph, canvas, and whatever plugins register."
+      },
+      "path": {
+        "type": "string | null",
+        "doc": "The file it shows, when it shows one."
+      },
+      "active": {
+        "type": "boolean",
+        "doc": "Whether this is the pane the user is in."
+      },
+      "pinned": {
+        "type": "boolean",
+        "doc": "Whether it is pinned."
+      },
+      "group": {
+        "type": "string | null",
+        "doc": "The link group it belongs to, when it belongs to one."
+      },
+      "window": {
+        "type": "\"main\" | \"popout\"",
+        "doc": "Which window it lives in."
+      }
+    },
+    "EditorPosition": {
+      "line": {
+        "type": "integer",
+        "doc": "Zero-based."
+      },
+      "ch": {
+        "type": "integer",
+        "doc": "Zero-based character within the line."
+      }
+    },
+    "EditorSelection": {
+      "anchor": {
+        "type": "EditorPosition",
+        "doc": "Where the selection is held."
+      },
+      "head": {
+        "type": "EditorPosition",
+        "doc": "Where it is dragged to; this is where the cursor is."
+      }
+    },
+    "EditorState": {
+      "leaf": {
+        "type": "string",
+        "doc": "The pane this editor belongs to."
+      },
+      "path": {
+        "type": "string | null",
+        "doc": "The file it is editing."
+      },
+      "content": {
+        "type": "string",
+        "doc": "The whole document, which is what is on screen and may differ from what is on disk."
+      },
+      "cursor": {
+        "type": "EditorPosition",
+        "doc": "Where the cursor is."
+      },
+      "selections": {
+        "type": "EditorSelection[]",
+        "doc": "Every selection, because Obsidian allows more than one."
+      },
+      "line_count": {
+        "type": "integer",
+        "doc": "How many lines the document has."
+      }
+    },
+    "Command": {
+      "id": {
+        "type": "string",
+        "doc": "What commands.execute takes."
+      },
+      "name": {
+        "type": "string",
+        "doc": "What the command palette shows."
+      },
+      "icon": {
+        "type": "string | null",
+        "doc": "The icon name, when the command has one."
+      }
+    },
+    "PluginInfo": {
+      "id": {
+        "type": "string",
+        "doc": "The plugin's own id."
+      },
+      "name": {
+        "type": "string",
+        "doc": "Its display name."
+      },
+      "version": {
+        "type": "string",
+        "doc": "The installed version."
+      },
+      "enabled": {
+        "type": "boolean",
+        "doc": "Whether it is switched on."
+      }
+    },
+    "AppInfo": {
+      "plugin_version": {
+        "type": "string",
+        "doc": "This plugin's version."
+      },
+      "obsidian_version": {
+        "type": "string",
+        "doc": "The Obsidian API version."
+      },
+      "protocol": {
+        "type": "Protocol",
+        "doc": "What this plugin speaks."
+      },
+      "platform": {
+        "type": "string",
+        "doc": "darwin, linux or win32."
+      },
+      "vault": {
+        "type": "VaultInfo",
+        "doc": "Which vault this is."
+      },
+      "config_dir": {
+        "type": "string",
+        "doc": "The vault-relative configuration directory, usually .obsidian."
+      },
+      "capabilities": {
+        "type": "object",
+        "doc": "Each capability name to whether it is switched on, so a caller learns what is gated without provoking a refusal."
+      }
+    },
+    "Subscription": {
+      "subscription": {
+        "type": "string",
+        "doc": "Names this subscription on this connection."
+      }
+    }
+  }
+}
