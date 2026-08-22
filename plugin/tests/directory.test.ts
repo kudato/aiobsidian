@@ -22,9 +22,9 @@ function fresh(): string {
 }
 
 /** Run the check and hand back the refusal, or `null` when it accepted. */
-async function refusal(directory: string): Promise<ServeError | null> {
+async function refusal(directory: string, verifyOwnership = true): Promise<ServeError | null> {
   try {
-    await ensureRuntimeDirectory(directory);
+    await ensureRuntimeDirectory(directory, verifyOwnership);
     return null;
   } catch (error) {
     assert.ok(error instanceof ServeError);
@@ -74,5 +74,18 @@ describe("ensureRuntimeDirectory", { skip: process.platform === "win32" }, () =>
     const file = fresh();
     await fs.writeFile(file, "");
     assert.equal((await refusal(file))?.code, "unsafe-directory");
+  });
+
+  it("still refuses a file where ownership means nothing, as on Windows", async () => {
+    const file = fresh();
+    await fs.writeFile(file, "");
+    assert.equal((await refusal(file, false))?.code, "unsafe-directory");
+  });
+
+  it("accepts an open directory where ownership means nothing", async () => {
+    const directory = fresh();
+    await fs.mkdir(directory);
+    await fs.chmod(directory, 0o755);
+    assert.equal(await refusal(directory, false), null);
   });
 });

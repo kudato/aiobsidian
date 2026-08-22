@@ -27,7 +27,19 @@ export interface SocketServerOptions {
   readonly onConnectionsChanged?: (count: number) => void;
   /** Called for errors the server reports after it started listening. */
   readonly onRuntimeError?: (error: Error) => void;
+  /**
+   * How many clients may be attached at once.
+   *
+   * Enforced by libuv, so the refusal costs nothing and writes nothing. Every request
+   * runs on the renderer's single JS thread, competing with the editor the user is
+   * typing in, and on Windows each pipe instance reserves 64 KiB in and 64 KiB out of
+   * nonpaged pool.
+   */
+  readonly maxConnections?: number;
 }
+
+/** The default cap on attached clients. */
+export const MAX_CONNECTIONS = 16;
 
 /**
  * The listening half of the plugin: a socket, the connections on it, and the rules
@@ -69,11 +81,12 @@ export class SocketServer {
 
     const { directory, socketPath } = this.#options;
     if (directory !== null) {
-      await ensureRuntimeDirectory(directory);
+      await ensureRuntimeDirectory(directory, true);
       await clearDeadSocket(socketPath);
     }
 
     const server = net.createServer((socket) => this.#accept(socket));
+    server.maxConnections = this.#options.maxConnections ?? MAX_CONNECTIONS;
     await listen(server, socketPath);
     this.#server = server;
 

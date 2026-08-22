@@ -1,18 +1,35 @@
 import fs from "node:fs";
+import path from "node:path";
 
-import { FileSystemAdapter, Notice, Plugin } from "obsidian";
+import { apiVersion, FileSystemAdapter, Notice, Plugin } from "obsidian";
 
 import { ServeError } from "./lib/errors.ts";
 import {
   currentEnvironment,
+  type Environment,
   runtimeDirectory,
   socketPath as deriveSocketPath,
+  tokenPath,
   vaultId,
 } from "./lib/paths.ts";
+import { loadOrCreateToken } from "./server/auth.ts";
+import { ensureRuntimeDirectory } from "./server/directory.ts";
+import { MethodRegistry } from "./server/registry.ts";
+import { Sessions } from "./server/sessions.ts";
 import { SocketServer } from "./server/socket.ts";
 import { DEFAULT_SETTINGS, parseSettings, type Settings } from "./settings.ts";
 import { AioSettingTab } from "./ui/settings-tab.ts";
 import { StatusItem } from "./ui/status.ts";
+
+/** Everything derived from where the vault sits on disk. */
+interface Location {
+  readonly environment: Environment;
+  readonly id: string;
+  readonly name: string;
+  readonly base: string;
+  readonly socketPath: string;
+  readonly tokenPath: string;
+}
 
 export default class AioPlugin extends Plugin {
   override settings: Settings = { ...DEFAULT_SETTINGS };
@@ -24,6 +41,7 @@ export default class AioPlugin extends Plugin {
   failure: ServeError | null = null;
 
   #server: SocketServer | null = null;
+  #sessions: Sessions | null = null;
   #status: StatusItem | null = null;
 
   get serving(): boolean {
@@ -65,6 +83,8 @@ export default class AioPlugin extends Plugin {
   }
 
   override onunload(): void {
+    this.#sessions?.closeAll("unloading");
+    this.#sessions = null;
     void this.#server?.stop();
     this.#server = null;
     this.socketPath = null;
@@ -78,12 +98,13 @@ export default class AioPlugin extends Plugin {
   async startServing(): Promise<void> {
     this.failure = null;
     try {
-      const server = this.#server ?? this.#buildServer();
+      const server = this.#server ?? (await this.#buildServer());
       this.#server = server;
       await server.start();
       this.#status?.serving(server.connectionCount);
     } catch (error) {
       this.#server = null;
+      this.#sessions = null;
       this.socketPath = null;
       const failure =
         error instanceof ServeError
@@ -98,6 +119,10 @@ export default class AioPlugin extends Plugin {
   /** Stop listening. The socket goes away with it, and so does every connection. */
   async stopServing(): Promise<void> {
     const server = this.#server;
+    // Say goodbye before the socket goes, so a client learns why rather than finding
+    // out from a dead connection.
+    this.#sessions?.closeAll("stopped");
+    this.#sessions = null;
     this.#server = null;
     this.socketPath = null;
     this.failure = null;
@@ -111,7 +136,47 @@ export default class AioPlugin extends Plugin {
     await (this.settings.serve ? this.startServing() : this.stopServing());
   }
 
-  #buildServer(): SocketServer {
+  async #buildServer(): Promise<SocketServer> {
+    const location = this.#locate();
+    this.socketPath = location.socketPath;
+
+    const onWindows = location.environment.platform === "win32";
+    // The token has to exist before a single client is accepted, and on Windows its
+    // directory is not the socket's, so it is created and checked here rather than
+    // inside the server.
+    await ensureRuntimeDirectory(path.dirname(location.tokenPath), !onWindows);
+    const token = await loadOrCreateToken(location.tokenPath, !onWindows);
+
+    const sessions = new Sessions({
+      token,
+      registry: new MethodRegistry(),
+      describe: () => ({
+        plugin_version: this.manifest.version,
+        obsidian_version: apiVersion,
+        vault: { id: location.id, name: location.name, path: location.base },
+      }),
+    });
+    this.#sessions = sessions;
+
+    return new SocketServer({
+      socketPath: location.socketPath,
+      directory: runtimeDirectory(location.environment),
+      onConnection: (socket) => {
+        sessions.accept(socket);
+      },
+      onConnectionsChanged: (count) => {
+        if (this.serving) {
+          this.#status?.serving(count);
+        }
+      },
+      onRuntimeError: (error) => {
+        this.failure = new ServeError("listen-failed", error.message, { cause: error });
+        this.#status?.failed(error.message);
+      },
+    });
+  }
+
+  #locate(): Location {
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof FileSystemAdapter)) {
       throw new ServeError(
@@ -124,26 +189,14 @@ export default class AioPlugin extends Plugin {
     // same way, and a symlinked vault must not answer to two different names.
     const base = fs.realpathSync(adapter.getBasePath());
     const environment = currentEnvironment();
-    const socketPath = deriveSocketPath(environment, vaultId(base, environment.platform));
-    this.socketPath = socketPath;
-
-    return new SocketServer({
-      socketPath,
-      directory: runtimeDirectory(environment),
-      onConnection: (socket) => {
-        // Nothing speaks the protocol yet, and a server that stays silent on an open
-        // socket is indistinguishable from one that has hung. Closing says so.
-        socket.destroy();
-      },
-      onConnectionsChanged: (count) => {
-        if (this.serving) {
-          this.#status?.serving(count);
-        }
-      },
-      onRuntimeError: (error) => {
-        this.failure = new ServeError("listen-failed", error.message, { cause: error });
-        this.#status?.failed(error.message);
-      },
-    });
+    const id = vaultId(base, environment.platform);
+    return {
+      environment,
+      id,
+      name: this.app.vault.getName(),
+      base,
+      socketPath: deriveSocketPath(environment, id),
+      tokenPath: tokenPath(environment, id),
+    };
   }
 }

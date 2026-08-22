@@ -7,6 +7,7 @@ import {
   type Environment,
   runtimeDirectory,
   socketPath,
+  tokenPath,
   vaultId,
 } from "../src/lib/paths.ts";
 
@@ -134,5 +135,40 @@ describe("socketPath", () => {
     const home = `/home/${"a".repeat(64)}`;
     assert.doesNotThrow(() => socketPath(environment({ platform: "linux", home }), id));
     assert.throws(() => socketPath(environment({ platform: "darwin", home }), id), ServeError);
+  });
+});
+
+describe("tokenPath", () => {
+  const id = "0123456789abcdef";
+
+  it("keeps the token beside the socket", () => {
+    assert.equal(tokenPath(environment(), id), `/Users/ada/.aiobsidian/${id}.token`);
+  });
+
+  it("follows the socket into the XDG runtime directory", () => {
+    const where = environment({ platform: "linux", variables: { XDG_RUNTIME_DIR: "/run/user/501" } });
+    assert.equal(tokenPath(where, id), `/run/user/501/aiobsidian/${id}.token`);
+  });
+
+  it("keeps it under the profile on Windows, where the pipe has no directory", () => {
+    const where = environment({
+      platform: "win32",
+      home: "C:\\Users\\ada",
+      variables: { LOCALAPPDATA: "C:\\Users\\ada\\AppData\\Local" },
+    });
+    assert.equal(tokenPath(where, id), `C:\\Users\\ada\\AppData\\Local\\aiobsidian\\${id}.token`);
+  });
+
+  it("finds the profile on Windows without the variable", () => {
+    const where = environment({ platform: "win32", home: "C:\\Users\\ada" });
+    assert.equal(tokenPath(where, id), `C:\\Users\\ada\\AppData\\Local\\aiobsidian\\${id}.token`);
+  });
+
+  it("refuses an id that is not one, so nothing writes outside the directory", () => {
+    assert.throws(() => tokenPath(environment(), "../../../tmp/x"), ServeError);
+  });
+
+  it("is not the socket, so neither can be mistaken for the other", () => {
+    assert.notEqual(tokenPath(environment(), id), socketPath(environment(), id));
   });
 });

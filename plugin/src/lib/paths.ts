@@ -94,9 +94,9 @@ export function runtimeDirectory(environment: Environment): string | null {
   }
   const xdg = environment.variables["XDG_RUNTIME_DIR"];
   if (environment.platform === "linux" && xdg !== undefined && xdg !== "") {
-    return path.join(xdg, "aiobsidian");
+    return path.posix.join(xdg, "aiobsidian");
   }
-  return path.join(environment.home, ".aiobsidian");
+  return path.posix.join(environment.home, ".aiobsidian");
 }
 
 /**
@@ -122,7 +122,7 @@ export function socketPath(environment: Environment, id: string): string {
   if (directory === null) {
     throw new ServeError("unsupported-platform", `no socket directory for ${environment.platform}`);
   }
-  const socket = path.join(directory, `${id}.sock`);
+  const socket = path.posix.join(directory, `${id}.sock`);
   const limit = SUN_PATH_LIMIT[environment.platform] ?? 103;
   const length = Buffer.byteLength(socket, "utf8");
   if (length > limit) {
@@ -132,6 +132,37 @@ export function socketPath(environment: Environment, id: string): string {
     );
   }
   return socket;
+}
+
+/**
+ * Where this vault's shared secret is kept.
+ *
+ * Beside the socket on POSIX, in the verified `0700` directory. On Windows the pipe
+ * has no containing directory, so the token goes under the user profile, whose ACL is
+ * the control there. Never inside the vault: `.obsidian/` is inside Sync, iCloud,
+ * Dropbox and git.
+ *
+ * Args:
+ *     environment: The machine the path is derived for.
+ *     id: The vault id, as returned by `vaultId`.
+ *
+ * Raises:
+ *     ServeError: The id is malformed.
+ */
+export function tokenPath(environment: Environment, id: string): string {
+  assertVaultId(id);
+  if (environment.platform === "win32") {
+    // The separators follow the platform the path is *for*, not the one this process
+    // runs on, so the same environment always derives the same path.
+    const local =
+      environment.variables["LOCALAPPDATA"] ?? path.win32.join(environment.home, "AppData", "Local");
+    return path.win32.join(local, "aiobsidian", `${id}.token`);
+  }
+  const directory = runtimeDirectory(environment);
+  if (directory === null) {
+    throw new ServeError("unsupported-platform", `no token directory for ${environment.platform}`);
+  }
+  return path.posix.join(directory, `${id}.token`);
 }
 
 /** Drop trailing separators, except the one that makes a path a root. */
