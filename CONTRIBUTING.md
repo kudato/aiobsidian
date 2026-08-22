@@ -101,7 +101,7 @@ uv run mkdocs serve
 - **Type hints**: use `X | Y` union syntax, `TYPE_CHECKING` guard for circular imports
 - **Docstrings**: Google-style with `Args:`, `Returns:`, `Raises:` sections
 - **Naming**: Python `snake_case` everywhere; API `camelCase` mapped via Pydantic `Field(alias=...)`
-- **Linting**: ruff with rules `E`, `F`, `I`, `UP`; line length 88; target Python 3.13
+- **Linting**: ruff with rules `E`, `F`, `I`, `UP`; line length 88; target Python 3.12, the lowest supported version
 
 ## Project structure
 

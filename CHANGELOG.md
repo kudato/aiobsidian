@@ -66,6 +66,7 @@ return.
 - **Breaking**: `tags.list(sort=)` takes `"count"` or nothing. The command compares against that one word and sorts by name for everything else, so any other value asked for an order it did not get and was told nothing
 - `SearchResult.result` accepts the strings, numbers and booleans a query returns, not only objects and arrays
 - Closing an `ObsidianCLI` kills every command still running, and the command's own children with it
+- The library runs on Python 3.12: `requires-python` drops from 3.13, which nothing in the code ever needed, and CI runs the suite on every version the metadata claims — 3.12, 3.13 and 3.14 — rather than on 3.13 alone
 
 ### Fixed
 - The vault a client was built for was never the one commands ran against. `vault=` was sent behind the command name, and Obsidian reads it off the front of the arguments and nowhere else, so it reached the command as a parameter no command has a use for. What ran instead was whichever vault holds the working directory or, that failing, whichever window was last in front
