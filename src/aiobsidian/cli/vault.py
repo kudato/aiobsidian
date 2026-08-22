@@ -72,6 +72,9 @@ class CLIVaultResource(BaseCLIResource):
                 as it is and write beside it instead, under the next
                 free name. The CLI has no refusal to give.
             open: If ``True``, show the file in Obsidian afterwards.
+                The CLI writes first and opens after, so a failure to
+                open leaves the file created and reads as a plain
+                `CommandError` that names no path.
             new_tab: Where to show it, for when ``open`` is asked for.
                 On its own it does nothing, since the CLI reads it only
                 once it has been told to open something.
@@ -166,6 +169,9 @@ class CLIVaultResource(BaseCLIResource):
             content: Note content. Written instead of the plugin's
                 template, which fills only a note left empty.
             open: If ``True``, show the note in Obsidian afterwards.
+                The CLI creates first and opens after, so a failure to
+                open leaves the note created and reads as a plain
+                `CommandError` that names no path.
             pane: Where to show it, for when ``open`` is asked for. On
                 its own it does nothing, since the CLI reads it only
                 once it has been told to open something.

@@ -114,7 +114,12 @@ between those commands leaves the file holding what already landed, and arrives 
 for `create_unique()` that is the path the exception would otherwise have cost the
 caller — and `written` of `total` says how much of the content is in place. The
 periodic-note commands find their own file, so their `path` is `None`. A failure of
-the first command raises itself instead, since nothing has landed yet.
+the first command raises itself instead, since nothing has landed yet — save when
+that command was also told to `open` what it wrote, which it does after the
+writing, so a failure to open leaves the file created behind a plain
+`CommandError` that names no path. And only a command failing is a write failing:
+cancellation, and a client closed while the write ran, propagate as
+`CancelledError` and `RuntimeError`, as everywhere else in the library.
 
 ### CLIError attributes
 

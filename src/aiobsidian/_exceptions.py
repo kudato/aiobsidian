@@ -224,7 +224,12 @@ class PartialWriteError(CLIError):
     itself is the `__cause__`; this names the file, so a caller knows
     what to look at, and counts the parts, so it knows how much of the
     content is there. A failure of the first command raises itself
-    instead, since nothing has landed yet.
+    instead, since nothing has landed yet — save when that command was
+    also told to `open` what it wrote, which it does after the writing,
+    so a failure to open leaves the file created behind a plain
+    `CommandError` that names no path. And only a command failing is a
+    write failing: cancellation, and the client being closed while the
+    write ran, propagate as themselves, as everywhere else.
 
     Attributes:
         command: The CLI command the failed part was sent with.
@@ -247,9 +252,10 @@ class PartialWriteError(CLIError):
         self.path = path
         self.written = written
         self.total = total
-        placed = "" if path is None else f" at {path!r}"
+        placed = "" if path is None else f" to {path!r}"
         super().__init__(
-            f"Command {command!r} left {written} of {total} content parts{placed}"
+            f"Command {command!r} wrote {written} of {total} content parts"
+            f"{placed} before failing"
         )
 
     def __reduce__(self) -> tuple[partial[PartialWriteError], tuple[()]]:
