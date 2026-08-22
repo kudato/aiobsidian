@@ -1,0 +1,10 @@
+{
+  "id": "aio",
+  "name": "AIO",
+  "version": "0.1.0",
+  "minAppVersion": "1.7.2",
+  "description": "Serves this vault on a local socket so scripts on this machine can read and edit it.",
+  "author": "Aleksander Shevchenko",
+  "authorUrl": "https://github.com/kudato/aiobsidian",
+  "isDesktopOnly": true
+}
