@@ -71,11 +71,12 @@ class BaseResource:
             The decoded JSON value.
 
         Raises:
-            APIParseError: If the body is not valid JSON.
+            APIParseError: If the body is not valid JSON — a body nested
+                too deep for the decoder to recurse through included.
         """
         try:
             return response.json()
-        except ValueError as exc:
+        except (ValueError, RecursionError) as exc:
             raise cls._parse_error(response) from exc
 
     @classmethod

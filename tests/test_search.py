@@ -124,6 +124,15 @@ async def test_jsonlogic_search_answering_no_list(mock_api, client):
         await client.search.jsonlogic({"glob": ["*.md"]})
 
 
+async def test_simple_search_with_a_row_that_is_no_result(mock_api, client):
+    # A list, but of the wrong thing: the row refusal is its own branch,
+    # apart from the body-is-no-list one the tests above take.
+    mock_api.post("/search/simple/").respond(200, json=[{"score": 0.9}])
+
+    with pytest.raises(APIParseError):
+        await client.search.simple("hello")
+
+
 async def test_simple_search_server_error(mock_api, client):
     mock_api.post("/search/simple/").respond(
         500, json={"message": "Internal server error"}

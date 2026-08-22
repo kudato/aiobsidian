@@ -43,6 +43,21 @@ async def test_list_commands_that_are_not_json(mock_api, client):
         await client.commands.list()
 
 
+async def test_list_commands_nested_beyond_reading(mock_api, client):
+    # A body the decoder cannot even recurse through fails as
+    # RecursionError rather than ValueError, and stays inside the
+    # hierarchy all the same.
+    depth = 200_000
+    mock_api.get("/commands/").respond(
+        200,
+        content=b"[" * depth + b"]" * depth,
+        headers={"Content-Type": "application/json"},
+    )
+
+    with pytest.raises(APIParseError):
+        await client.commands.list()
+
+
 async def test_execute_command(mock_api, client):
     route = mock_api.post("/commands/graph:open/").respond(204)
 

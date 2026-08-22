@@ -175,6 +175,10 @@ A request that could not be sent at all never gets that far: an unparseable
 the HTTP layer refuses raises `ValueError`, because the argument is what needs
 fixing.
 
+The underlying `httpx` exception is available as `__cause__` and never escapes
+on its own — `httpx` is an optional dependency, so catching it would mean
+importing a package the caller may not have installed.
+
 ### When a success answer cannot be read
 
 A response can arrive whole, with a success status, and still not be what the
@@ -182,11 +186,9 @@ endpoint documents: not JSON, JSON of another shape, or a `200 OK` whose body
 is an error object. Reading it raises `APIParseError`, which carries the raw
 `body` — the REST counterpart of `CLIParseError` — instead of letting a
 `KeyError` or a pydantic `ValidationError` escape the `ObsidianError`
-hierarchy.
-
-The underlying `httpx` exception is available as `__cause__` and never escapes
-on its own — `httpx` is an optional dependency, so catching it would mean
-importing a package the caller may not have installed.
+hierarchy. Its `__cause__` is what said the shape was wrong: the JSON decode
+error, or the pydantic `ValidationError` — no `httpx` exception is involved,
+since the exchange itself held.
 
 ### Attributes
 

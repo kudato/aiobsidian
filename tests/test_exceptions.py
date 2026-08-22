@@ -101,6 +101,15 @@ class TestHierarchy:
         assert not isinstance(error, APIStatusError)
         assert not hasattr(error, "status_code")
 
+    def test_an_unreadable_answer_sits_on_neither_branch(self):
+        # The server answered success and the exchange held, so it is
+        # neither a refusal nor a failed request — what the class
+        # docstring claims, pinned here so a re-parenting is noticed.
+        error = APIParseError("GET", "https://127.0.0.1:27124/commands/", "{}")
+        assert not isinstance(error, APIStatusError)
+        assert not isinstance(error, APIRequestError)
+        assert not hasattr(error, "status_code")
+
     @pytest.mark.parametrize(
         "error_class", [APIConnectionError, APITimeoutError, APIProtocolError]
     )
