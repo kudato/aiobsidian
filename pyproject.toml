@@ -70,3 +70,9 @@ plugins = ["pydantic.mypy"]
 [[tool.mypy.overrides]]
 module = ["respx", "respx.*"]
 ignore_missing_imports = true
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+fail_under = 99
