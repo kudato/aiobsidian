@@ -2,10 +2,9 @@
 
 ## Obsidian API
 
-- The plugin and the library use only Obsidian's **documented public plugin API** — what the [TypeScript API reference](https://docs.obsidian.md/Reference/TypeScript+API/) declares. Nothing else: no `app.commands`, no `app.plugins`, no `Vault.getConfig()`, no undocumented event name, no member reached through a cast
-- A documented method whose accepted arguments are undocumented is undocumented too
-- A feature that needs an undocumented member is rebuilt on documented ones, or it is removed from the contract — never shipped behind a flag. A warning is not consent, and a switch does not make an internal stable
-- Prefer the Vault API over the Adapter API, and the Adapter API over Node `fs`; Node is for the socket and the token and nothing else
+- The plugin and the library use only Obsidian's **documented public plugin API** — what the [TypeScript API reference](https://docs.obsidian.md/Reference/TypeScript+API/) declares, not what the shipped typings happen to expose
+- Call a documented method only with documented arguments
+- Build against Obsidian's own developer documentation: the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines), the [developer policies](https://docs.obsidian.md/community-directory/developer-policies) and the [submission requirements](https://docs.obsidian.md/community-directory/submission-requirements-for-plugins). Where it recommends one API over another, take the recommendation — prefer the Vault API over the Adapter API
 
 ## Git
 
