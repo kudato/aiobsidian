@@ -1,5 +1,11 @@
 # CLAUDE.md
 
+## Obsidian API
+
+- The plugin and the library use only Obsidian's **documented public plugin API** — what the [TypeScript API reference](https://docs.obsidian.md/Reference/TypeScript+API/) declares, not what the shipped typings happen to expose
+- Call a documented method only with documented arguments
+- Build against Obsidian's own developer documentation: the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines), the [developer policies](https://docs.obsidian.md/community-directory/developer-policies) and the [submission requirements](https://docs.obsidian.md/community-directory/submission-requirements-for-plugins). Where it recommends one API over another, take the recommendation — prefer the Vault API over the Adapter API
+
 ## Git
 
 - Open every pull request against `main`, never against another branch; keep dependent work local until what it needs is merged
