@@ -19,6 +19,7 @@ from ._exceptions import (
     CommandError,
     NotFoundError,
     ObsidianError,
+    PartialWriteError,
 )
 from ._types import (
     ContentType,
@@ -95,6 +96,7 @@ __all__ = [
     "ObsidianCLI",
     "ObsidianClient",
     "ObsidianError",
+    "PartialWriteError",
     "PatchOperation",
     "Plugin",
     "PluginInfo",

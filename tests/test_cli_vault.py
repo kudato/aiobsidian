@@ -8,7 +8,7 @@ from unittest.mock import call
 import pytest
 from pydantic import ValidationError
 
-from aiobsidian._exceptions import CLIParseError
+from aiobsidian._exceptions import CLIParseError, CommandError, PartialWriteError
 from aiobsidian.models.vault import FileInfo, FolderInfo, VaultInfo, WordCount
 
 from .helpers import drop_field
@@ -150,6 +150,29 @@ async def test_write_all_params(cli):
     )
 
 
+async def test_write_returns_the_path_create_answers(cli):
+    # Without `overwrite` the CLI leaves an existing file alone and
+    # creates the next free name beside it, and its answer is the only
+    # thing that says which file that was.
+    cli._execute.return_value = "Created: note 1.md\n"
+    result = await cli.vault.write("note.md", "content", overwrite=False)
+    assert result == "note 1.md"
+
+
+async def test_write_reads_an_overwrite_answer(cli):
+    cli._execute.return_value = "Overwrote: note.md\n"
+    result = await cli.vault.write("note.md", "content")
+    assert result == "note.md"
+
+
+async def test_write_with_an_answer_naming_no_file(cli):
+    cli._execute.return_value = "Something else entirely\n"
+    with pytest.raises(CLIParseError):
+        await cli.vault.write("note.md", r"a\tb")
+    # The rest of the content has nowhere to go, so nothing more is sent.
+    assert cli._execute.await_count == 1
+
+
 # `unique` prints the path it settled on and nothing else. The name is
 # the plugin's timestamp format, in its default `YYYYMMDDHHmm`, and a
 # name given to the command follows it after a space.
@@ -288,6 +311,84 @@ async def test_prepend_with_backslash_escapes(cli):
             flags=["inline"],
         ),
     ]
+
+
+async def test_write_follows_the_answer_not_the_argument(cli):
+    # The rest of a split write goes to the file `create` says it made,
+    # which without `overwrite` is not the file the caller named.
+    cli._execute.side_effect = ["Created: note 1.md\n", "Appended to: note 1.md\n"]
+    result = await cli.vault.write("note.md", r"a\tb", overwrite=False)
+    assert result == "note 1.md"
+    assert cli._execute.await_args_list == [
+        call("create", params={"path": "note.md", "content": "a\\"}, flags=None),
+        call(
+            "append",
+            params={"path": "note 1.md", "content": "tb"},
+            flags=["inline"],
+        ),
+    ]
+
+
+async def test_write_that_fails_part_way_names_what_landed(cli):
+    failure = CommandError("append", 0, "", "Error: Obsidian quit.")
+    cli._execute.side_effect = [
+        "Created: note.md\n",
+        "Appended to: note.md\n",
+        failure,
+    ]
+    with pytest.raises(PartialWriteError) as raised:
+        await cli.vault.write("note.md", r"C:\notes\temp")
+    assert raised.value.path == "note.md"
+    assert raised.value.written == 2
+    assert raised.value.total == 3
+    assert raised.value.__cause__ is failure
+
+
+async def test_append_that_fails_part_way_names_what_landed(cli):
+    failure = CommandError("append", 0, "", "Error: Obsidian quit.")
+    cli._execute.side_effect = ["Appended to: note.md\n", failure]
+    with pytest.raises(PartialWriteError) as raised:
+        await cli.vault.append("note.md", r"a\tb")
+    assert raised.value.path == "note.md"
+    assert raised.value.written == 1
+    assert raised.value.total == 2
+
+
+async def test_append_that_fails_on_its_first_call_is_no_partial_write(cli):
+    # Nothing has landed yet, so the failure is its own answer.
+    failure = CommandError("append", 0, "", "Error: Obsidian quit.")
+    cli._execute.side_effect = failure
+    with pytest.raises(CommandError) as raised:
+        await cli.vault.append("note.md", r"a\tb")
+    assert raised.value is failure
+
+
+async def test_prepend_that_fails_part_way_names_what_landed(cli):
+    # Parts go in back to front, so two of three landed means the tail
+    # of the content sits at the head of the file.
+    failure = CommandError("prepend", 0, "", "Error: Obsidian quit.")
+    cli._execute.side_effect = [
+        "Prepended to: note.md\n",
+        "Prepended to: note.md\n",
+        failure,
+    ]
+    with pytest.raises(PartialWriteError) as raised:
+        await cli.vault.prepend("note.md", r"C:\notes\temp")
+    assert raised.value.path == "note.md"
+    assert raised.value.written == 2
+    assert raised.value.total == 3
+
+
+async def test_create_unique_that_fails_part_way_carries_the_path(cli):
+    # The exception takes the return value's place, so the path of the
+    # note rides on it instead.
+    failure = CommandError("append", 0, "", "Error: Obsidian quit.")
+    cli._execute.side_effect = [UNIQUE_PATH, failure]
+    with pytest.raises(PartialWriteError) as raised:
+        await cli.vault.create_unique(content=r"a\tb")
+    assert raised.value.path == "202608180312.md"
+    assert raised.value.written == 1
+    assert raised.value.total == 2
 
 
 async def test_move(cli):

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import partial
+
 
 class ObsidianError(Exception):
     """Base exception for all aiobsidian errors."""
@@ -210,3 +212,52 @@ class CLITimeoutError(CLIError):
 
     def __reduce__(self) -> tuple[type[CLITimeoutError], tuple[str, float]]:
         return type(self), (self.command, self.timeout)
+
+
+class PartialWriteError(CLIError):
+    """A write that takes several commands failed with some already run.
+
+    The CLI reads `\\n` and `\\t` inside a content value as escapes and
+    gives a backslash no way to hide from it, so content spelling them
+    literally is written one part per command. A failure between those
+    commands leaves the file holding what already landed. The failure
+    itself is the `__cause__`; this names the file, so a caller knows
+    what to look at, and counts the parts, so it knows how much of the
+    content is there. A failure of the first command raises itself
+    instead, since nothing has landed yet.
+
+    Attributes:
+        command: The CLI command the failed part was sent with.
+        path: Path of the file left holding part of the content,
+            relative to the vault root, or `None` when the command
+            finds its own file, as the periodic-note commands do.
+        written: How many parts landed, the opening write included.
+        total: How many parts the content was split into.
+    """
+
+    def __init__(
+        self,
+        command: str,
+        *,
+        path: str | None,
+        written: int,
+        total: int,
+    ) -> None:
+        self.command = command
+        self.path = path
+        self.written = written
+        self.total = total
+        placed = "" if path is None else f" at {path!r}"
+        super().__init__(
+            f"Command {command!r} left {written} of {total} content parts{placed}"
+        )
+
+    def __reduce__(self) -> tuple[partial[PartialWriteError], tuple[()]]:
+        rebuild = partial(
+            type(self),
+            self.command,
+            path=self.path,
+            written=self.written,
+            total=self.total,
+        )
+        return rebuild, ()

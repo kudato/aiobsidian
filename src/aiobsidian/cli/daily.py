@@ -50,6 +50,12 @@ class CLIDailyResource(BaseCLIResource):
 
         Args:
             content: Content to append.
+
+        Raises:
+            PartialWriteError: If a later call of a several-call append
+                fails. The note keeps the parts that landed, and the
+                error counts them; its `path` is `None`, since the
+                command finds the note itself.
         """
         parts = self._split_content(content)
         await self._cli._execute("daily:append", params={"content": parts[0]})
@@ -63,6 +69,13 @@ class CLIDailyResource(BaseCLIResource):
 
         Args:
             content: Content to prepend.
+
+        Raises:
+            PartialWriteError: If a later call of a several-call
+                prepend fails. Parts go in back to front, so what the
+                note keeps at its head is the tail of the content; its
+                `path` is `None`, since the command finds the note
+                itself.
         """
         parts = self._split_content(content)
         await self._cli._execute("daily:prepend", params={"content": parts[-1]})

@@ -20,6 +20,8 @@
 
 ::: aiobsidian.CLITimeoutError
 
+::: aiobsidian.PartialWriteError
+
 ## REST API exceptions
 
 ::: aiobsidian.APIError

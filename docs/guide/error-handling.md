@@ -12,7 +12,8 @@ ObsidianError                   # Base exception for all aiobsidian errors
 │   ├── CommandError            # Command failed
 │   │   └── CLINotFoundError    # ... because the resource does not exist
 │   ├── CLIParseError           # Command output could not be parsed
-│   └── CLITimeoutError         # Command exceeded timeout
+│   ├── CLITimeoutError         # Command exceeded timeout
+│   └── PartialWriteError       # A several-command write failed part-way
 └── APIError                    # Base exception for REST errors
     ├── APIStatusError          # The server answered with status >= 400
     │   ├── AuthenticationError # 401 Unauthorized
@@ -103,6 +104,18 @@ A command may also succeed and still print something the library cannot interpre
 that case parsing raises `CLIParseError`, which carries the raw `output`, instead of
 letting a `json.JSONDecodeError` escape the `ObsidianError` hierarchy.
 
+### When a write fails part-way
+
+The CLI reads `\n` and `\t` inside a content value as escapes and gives a backslash no
+way to hide from it, so content spelling them literally is written as several commands
+(the docstrings of `vault.write()` and the other writing methods say so). A failure
+between those commands leaves the file holding what already landed, and arrives as
+`PartialWriteError`: the underlying failure is its `__cause__`, `path` names the file —
+for `create_unique()` that is the path the exception would otherwise have cost the
+caller — and `written` of `total` says how much of the content is in place. The
+periodic-note commands find their own file, so their `path` is `None`. A failure of
+the first command raises itself instead, since nothing has landed yet.
+
 ### CLIError attributes
 
 | Exception | Attributes |
@@ -112,6 +125,7 @@ letting a `json.JSONDecodeError` escape the `ObsidianError` hierarchy.
 | `CLINotFoundError` | `command`, `exit_code`, `stderr`, `stdout` |
 | `CLIParseError` | `command`, `output` |
 | `CLITimeoutError` | `command`, `timeout` |
+| `PartialWriteError` | `command`, `path`, `written`, `total` |
 
 ## REST API errors
 

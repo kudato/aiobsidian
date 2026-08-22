@@ -21,6 +21,7 @@ from aiobsidian._exceptions import (
     CommandError,
     NotFoundError,
     ObsidianError,
+    PartialWriteError,
 )
 
 CASES = [
@@ -37,6 +38,8 @@ CASES = [
     CLINotFoundError("read", 0, "", 'Error: File "a.md" not found.'),
     CLIParseError("tags", "plain text"),
     CLITimeoutError("read", 30.0),
+    PartialWriteError("append", path="notes/a.md", written=2, total=3),
+    PartialWriteError("daily:append", path=None, written=1, total=2),
 ]
 
 
@@ -76,7 +79,7 @@ class TestHierarchy:
     def test_the_two_groups_cover_every_case(self):
         assert len(REST_CASES) + len(CLI_CASES) == len(CASES)
         assert len(REST_CASES) == 8
-        assert len(CLI_CASES) == 5
+        assert len(CLI_CASES) == 7
 
     @pytest.mark.parametrize("error", REST_CASES, ids=lambda e: type(e).__name__)
     def test_api_error_is_the_rest_transport_root(self, error):
@@ -144,3 +147,15 @@ class TestMessages:
         assert str(error) == (
             "PUT https://127.0.0.1:27124/vault/a.md timed out: timed out"
         )
+
+    def test_a_partial_write_says_where_the_parts_are(self):
+        error = PartialWriteError("append", path="notes/a.md", written=2, total=3)
+        assert str(error) == (
+            "Command 'append' left 2 of 3 content parts at 'notes/a.md'"
+        )
+
+    def test_a_partial_write_without_a_path_only_counts(self):
+        # The periodic-note commands find their own file, so there is no
+        # path to name.
+        error = PartialWriteError("daily:append", path=None, written=1, total=2)
+        assert str(error) == "Command 'daily:append' left 1 of 2 content parts"
