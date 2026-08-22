@@ -20,7 +20,7 @@ return.
 - `APIStatusError`, `APIRequestError`, `APIConnectionError`, `APITimeoutError` and `APIProtocolError`
 - `APINotFoundError`, `CLINotFoundError` and `CLIParseError`, so a missing note and unparseable output can be told apart from any other failure of that transport
 - `APIParseError`, the REST counterpart of `CLIParseError`: a success answer whose body is not what the endpoint documents, with the raw body on it
-- `PartialWriteError`, for a write the CLI forces into several commands failing part-way: it names the file the earlier parts landed in — for `vault.create_unique()` the note whose path the exception would otherwise have cost the caller — counts them, and carries the failure as its cause. A first command failing raises itself, as before, since nothing has landed yet
+- `PartialWriteError`, for a write the CLI forces into several commands failing part-way: it names the file the earlier parts landed in — for `vault.create_unique()` the note whose path the exception would otherwise have cost the caller — counts them, and carries the failure as its cause. A first command failing raises itself, as before — the docstring carries the one `open=` caveat
 - `tasks.reopen()` to undo `tasks.complete()`, `tasks.list(todo=)`, `daily.open()`, `publish.add(changed=)` and `CommandError.stdout`
 - `vault.create_unique()`, the Unique note creator's command: it names a note after the moment it was created, puts it where that plugin says, and reports the path it landed on
 - `vault.resolve()`, which looks a note up by name the way a wikilink does and hands back its record, so a name can be turned into the path every other method takes
