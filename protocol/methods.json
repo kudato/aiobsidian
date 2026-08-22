@@ -1,5 +1,5 @@
 {
-  "note": "The wire contract. Both sides are tested against this file: the plugin asserts that it registered exactly the methods marked live, and the Python tests assert that they call exactly those. Prose lives in spec.md; this file is what the tests read.",
+  "note": "The wire contract. The plugin is tested against this file: it asserts that it registered exactly the methods marked live, and that its codes and bounds are these. The Python tests check this file's own consistency, and will check the client against it when the socket transport lands. Prose lives in spec.md; this file is what the tests read.",
   "protocol": {
     "major": 1,
     "minor": 0
@@ -28,7 +28,7 @@
     "internalError": {
       "code": -32603,
       "exception": "OperationError",
-      "doc": "A bug in the plugin. The message never carries what was thrown; the vault's console does."
+      "doc": "A bug in the plugin. The message never carries what was thrown; the vault's console does. Nothing a caller can do about it, which is what OperationError means."
     },
     "notFound": {
       "code": 1001,
@@ -62,8 +62,8 @@
     },
     "forbidden": {
       "code": 1007,
-      "exception": "OperationError",
-      "doc": "The capability this method needs is switched off in the plugin's settings."
+      "exception": "ForbiddenError",
+      "doc": "The capability this method needs is switched off in the plugin's settings. Its own class, because the answer is for a person to turn a switch on and no amount of retrying substitutes."
     },
     "messageTooLarge": {
       "code": 1008,
@@ -72,13 +72,13 @@
     },
     "tooManyRequests": {
       "code": 1009,
-      "exception": "OperationError",
-      "doc": "Too many requests in flight on this connection."
+      "exception": "TooManyRequestsError",
+      "doc": "Too many requests in flight on this connection. Its own class, because the answer is to wait for the answers already asked for."
     },
     "cancelled": {
       "code": 1010,
       "exception": "CancelledError",
-      "doc": "The client withdrew the request. Delivered so a caller waiting on an id is never left waiting."
+      "doc": "The client withdrew the request. Delivered so a caller waiting on an id is never left waiting. It answers an rpc.cancel the caller sent and nothing else: the vault never withdraws a request on its own, so this code always arrives inside the call that asked for it, which is what makes asyncio.CancelledError the right class."
     }
   },
   "universal_errors": [
@@ -152,7 +152,7 @@
     "files.create": {
       "status": "planned",
       "domain": "files",
-      "summary": "Create a note that is not there yet.",
+      "summary": "Create a note that is not there yet. The folder above it must already exist, and notFound is what says it does not.",
       "mutates": true,
       "gated": false,
       "gates": [],
@@ -178,7 +178,7 @@
     "files.write": {
       "status": "planned",
       "domain": "files",
-      "summary": "Write a note, creating it or replacing it whole.",
+      "summary": "Write a note, creating it or replacing it whole. The folder above it must already exist, and notFound is what says it does not.",
       "mutates": true,
       "gated": false,
       "gates": [],
@@ -285,7 +285,7 @@
     "files.move": {
       "status": "planned",
       "domain": "files",
-      "summary": "Move or rename a file or folder, rewriting the links that pointed at it.",
+      "summary": "Move or rename a file or folder. Obsidian rewrites the links that pointed at it, note by note, after the move itself has landed; only the move is the atomic part.",
       "mutates": true,
       "gated": false,
       "gates": [],
@@ -466,7 +466,7 @@
     "files.upload_begin": {
       "status": "planned",
       "domain": "files",
-      "summary": "Open a transactional binary write. Nothing appears at the path until it commits.",
+      "summary": "Open a transactional binary write. Nothing appears at the path until it commits, so alreadyExists here is an early courtesy and not a promise: the path is checked again under the lock at commit, where the answer counts.",
       "mutates": false,
       "gated": false,
       "gates": [],
@@ -817,7 +817,7 @@
       "status": "planned",
       "domain": "workspace",
       "summary": "Open a note on screen.",
-      "mutates": false,
+      "mutates": true,
       "gated": false,
       "gates": [],
       "unstable": false,
@@ -886,7 +886,7 @@
       "status": "planned",
       "domain": "workspace",
       "summary": "Bring a pane to the front and make it active.",
-      "mutates": false,
+      "mutates": true,
       "gated": false,
       "gates": [],
       "unstable": false,
@@ -906,7 +906,7 @@
       "status": "planned",
       "domain": "workspace",
       "summary": "Close a pane.",
-      "mutates": false,
+      "mutates": true,
       "gated": false,
       "gates": [],
       "unstable": false,
@@ -1053,7 +1053,7 @@
       "status": "planned",
       "domain": "editor",
       "summary": "Put the cursor somewhere.",
-      "mutates": false,
+      "mutates": true,
       "gated": false,
       "gates": [],
       "unstable": false,
@@ -1080,7 +1080,7 @@
       "status": "planned",
       "domain": "editor",
       "summary": "Select a range.",
-      "mutates": false,
+      "mutates": true,
       "gated": false,
       "gates": [],
       "unstable": false,
@@ -1209,7 +1209,7 @@
     "app.config": {
       "status": "planned",
       "domain": "app",
-      "summary": "Read one of Obsidian's own settings.",
+      "summary": "Read Obsidian's own settings. The result is an object keyed by setting name: one entry when key is given, every setting when it is not. A setting whose value is a bare number or boolean therefore still arrives inside an object.",
       "mutates": false,
       "gated": true,
       "gates": [
@@ -1245,13 +1245,15 @@
         "events": {
           "type": "string[]",
           "required": true,
-          "doc": "The event names to receive. An unknown name is invalidParams, so a typo fails at once rather than silently delivering nothing."
+          "doc": "The event names to receive. An unknown name is invalidParams, so a typo fails at once rather than silently delivering nothing, and so is gap, which is not subscribable: it arrives on every subscription whether asked for or not."
         },
         "queue": {
           "type": "integer",
           "required": false,
           "default": 1024,
-          "doc": "How many events may wait for a consumer that has stopped reading. Past it the oldest are dropped and a gap event says how many."
+          "doc": "How many events may wait for a consumer that has stopped reading. Past it the oldest are dropped and a gap event says how many. Between 1 and 65536; anything else is invalidParams, because an unbounded queue is the renderer's memory spent by a peer that has stopped reading.",
+          "maximum": 65536,
+          "minimum": 1
         }
       },
       "result": "Subscription",
@@ -1335,7 +1337,7 @@
         "event": {
           "type": "Event",
           "required": true,
-          "doc": "The event itself, discriminated by its type field."
+          "doc": "The event itself, discriminated by its name field."
         }
       }
     }
@@ -1347,9 +1349,16 @@
       "gates": [],
       "unstable": false,
       "fields": {
-        "path": "string",
-        "kind": "\"file\" | \"folder\""
-      }
+        "path": {
+          "type": "string",
+          "doc": "Vault-relative path of what appeared."
+        },
+        "kind": {
+          "type": "\"file\" | \"folder\"",
+          "doc": "Whether it is a file or a folder."
+        }
+      },
+      "subscribable": true
     },
     "file.modified": {
       "status": "planned",
@@ -1357,8 +1366,12 @@
       "gates": [],
       "unstable": false,
       "fields": {
-        "path": "string"
-      }
+        "path": {
+          "type": "string",
+          "doc": "Vault-relative path of the file that changed."
+        }
+      },
+      "subscribable": true
     },
     "file.deleted": {
       "status": "planned",
@@ -1366,9 +1379,16 @@
       "gates": [],
       "unstable": false,
       "fields": {
-        "path": "string",
-        "kind": "\"file\" | \"folder\""
-      }
+        "path": {
+          "type": "string",
+          "doc": "Vault-relative path of what went away."
+        },
+        "kind": {
+          "type": "\"file\" | \"folder\"",
+          "doc": "Whether it was a file or a folder."
+        }
+      },
+      "subscribable": true
     },
     "file.renamed": {
       "status": "planned",
@@ -1376,10 +1396,20 @@
       "gates": [],
       "unstable": false,
       "fields": {
-        "path": "string",
-        "old_path": "string",
-        "kind": "\"file\" | \"folder\""
-      }
+        "path": {
+          "type": "string",
+          "doc": "Where it is now."
+        },
+        "old_path": {
+          "type": "string",
+          "doc": "Where it was."
+        },
+        "kind": {
+          "type": "\"file\" | \"folder\"",
+          "doc": "Whether it is a file or a folder."
+        }
+      },
+      "subscribable": true
     },
     "metadata.changed": {
       "status": "planned",
@@ -1387,8 +1417,12 @@
       "gates": [],
       "unstable": false,
       "fields": {
-        "path": "string"
-      }
+        "path": {
+          "type": "string",
+          "doc": "The note whose cache entry changed."
+        }
+      },
+      "subscribable": true
     },
     "metadata.deleted": {
       "status": "planned",
@@ -1396,15 +1430,20 @@
       "gates": [],
       "unstable": false,
       "fields": {
-        "path": "string"
-      }
+        "path": {
+          "type": "string",
+          "doc": "The note that left the cache."
+        }
+      },
+      "subscribable": true
     },
     "metadata.resolved": {
       "status": "planned",
       "summary": "Every link in the vault has been resolved; the link graph is settled.",
       "gates": [],
       "unstable": false,
-      "fields": {}
+      "fields": {},
+      "subscribable": true
     },
     "workspace.file_opened": {
       "status": "planned",
@@ -1412,15 +1451,20 @@
       "gates": [],
       "unstable": false,
       "fields": {
-        "path": "string | null"
-      }
+        "path": {
+          "type": "string | null",
+          "doc": "The note now on screen, or null when the pane holds no note."
+        }
+      },
+      "subscribable": true
     },
     "workspace.layout_changed": {
       "status": "planned",
       "summary": "Panes were opened, closed or rearranged.",
       "gates": [],
       "unstable": false,
-      "fields": {}
+      "fields": {},
+      "subscribable": true
     },
     "workspace.leaf_changed": {
       "status": "planned",
@@ -1428,9 +1472,16 @@
       "gates": [],
       "unstable": false,
       "fields": {
-        "leaf": "string | null",
-        "path": "string | null"
-      }
+        "leaf": {
+          "type": "string | null",
+          "doc": "The id of the pane now active, or null when none is."
+        },
+        "path": {
+          "type": "string | null",
+          "doc": "The note that pane holds, or null when it holds none."
+        }
+      },
+      "subscribable": true
     },
     "unstable.raw": {
       "status": "planned",
@@ -1440,8 +1491,12 @@
       ],
       "unstable": true,
       "fields": {
-        "path": "string"
-      }
+        "path": {
+          "type": "string",
+          "doc": "The path under the config directory that changed."
+        }
+      },
+      "subscribable": true
     },
     "gap": {
       "status": "planned",
@@ -1449,8 +1504,12 @@
       "gates": [],
       "unstable": false,
       "fields": {
-        "missed": "integer"
-      }
+        "missed": {
+          "type": "integer",
+          "doc": "How many events were dropped, counted in this subscription's own sequence numbers."
+        }
+      },
+      "subscribable": false
     }
   },
   "shapes": {

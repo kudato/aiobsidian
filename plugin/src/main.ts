@@ -149,7 +149,7 @@ export default class AioPlugin extends Plugin {
 
     const sessions = new Sessions({
       token,
-      registry: buildRegistry(),
+      registry: buildRegistry({ app: this.app, settings: () => this.settings }),
       describe: () => ({
         plugin_version: this.manifest.version,
         obsidian_version: apiVersion,

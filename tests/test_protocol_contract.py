@@ -1,11 +1,14 @@
 """The wire contract has to hold together before either side is written against it.
 
-``protocol/methods.json`` is what the plugin and this library are both tested against,
-so a contradiction inside it is a contradiction neither side can catch. These tests
-read it as data and check the things a reviewer would otherwise have to check by eye:
-that every method's errors exist, that every result names a shape that exists, that no
-shape refers to a shape that does not, and that the file says the same thing twice
-nowhere.
+``protocol/methods.json`` is what the plugin is tested against, and what this library
+will be tested against once the socket transport lands, so a contradiction inside it is
+a contradiction neither side can catch. These tests read it as data and check the things
+a reviewer would otherwise have to check by eye: that every method's errors exist, that
+every result names a shape that exists, that no shape refers to a shape that does not,
+and that the file says the same thing twice nowhere.
+
+What they cannot check is whether the file describes the plugin truthfully. That is the
+plugin's own contract test, and it is why the claims in here are about this file only.
 """
 
 from __future__ import annotations
@@ -28,16 +31,21 @@ _PRIMITIVES = frozenset(
 
 #: Every class an error code may map to. Two are the standard library's, because
 #: `invalidParams` is a caller's mistake and `cancelled` is what withdrawal already
-#: means in asyncio; inventing a name for either would only make callers learn it. The
-#: rest are the library's own, and the transport is tested against these same names.
+#: means in asyncio; inventing a name for either would only make callers learn it.
+#:
+#: The rest are the library's own and most of them are not written yet — this roster is
+#: the list the transport will be held to when it lands, not a claim that it already is.
+#: The day it does, this becomes an import and stops being a list of strings.
 _EXCEPTIONS = frozenset(
     {
         "AlreadyExistsError",
         "CancelledError",
         "ConflictError",
+        "ForbiddenError",
         "NotFoundError",
         "OperationError",
         "ProtocolError",
+        "TooManyRequestsError",
         "UnavailableError",
         "UnsupportedProtocolError",
         "UntrustedPeerError",
@@ -161,7 +169,11 @@ def test_every_shape_field_type_resolves(contract: dict[str, Any]) -> None:
 
 
 def test_every_shape_is_reachable(contract: dict[str, Any]) -> None:
-    """A shape nothing refers to is a shape nobody will implement."""
+    """A shape nothing refers to is a shape nobody will implement.
+
+    Events are walked too: a shape only an event field names is referred to, and
+    calling it an orphan would be a failure with the wrong message on it.
+    """
     referenced: set[str] = set()
     for method in contract["methods"].values():
         referenced.update(_named_shapes(method["result"]))
@@ -169,6 +181,9 @@ def test_every_shape_is_reachable(contract: dict[str, Any]) -> None:
             referenced.update(_named_shapes(spec["type"]))
     for notification in contract["notifications"].values():
         for spec in notification["params"].values():
+            referenced.update(_named_shapes(spec["type"]))
+    for event in contract["events"].values():
+        for spec in event["fields"].values():
             referenced.update(_named_shapes(spec["type"]))
     for fields in contract["shapes"].values():
         for spec in fields.values():
@@ -179,11 +194,22 @@ def test_every_shape_is_reachable(contract: dict[str, Any]) -> None:
 
 
 def test_everything_documented(contract: dict[str, Any]) -> None:
-    """A contract with an undocumented field is a contract read from source anyway."""
-    for name, method in contract["methods"].items():
-        assert method["summary"], f"{name} says nothing about itself"
-        for parameter, spec in method["params"].items():
-            assert spec["doc"], f"{name}.{parameter} says nothing about itself"
+    """A contract with an undocumented field is a contract read from source anyway.
+
+    Every section, because the one left out is the one that goes undocumented: a
+    notification is as much of the wire as a method, and an event field is the only
+    thing a client reads off an event.
+    """
+    for section in ("methods", "notifications", "events"):
+        for name, entry in contract[section].items():
+            assert entry["summary"], f"{name} says nothing about itself"
+    for section in ("methods", "notifications"):
+        for name, entry in contract[section].items():
+            for parameter, spec in entry["params"].items():
+                assert spec["doc"], f"{name}.{parameter} says nothing about itself"
+    for name, event in contract["events"].items():
+        for field, spec in event["fields"].items():
+            assert spec["doc"], f"{name}.{field} says nothing about itself"
     for shape_name, fields in contract["shapes"].items():
         for field, spec in fields.items():
             assert spec["doc"], f"{shape_name}.{field} says nothing about itself"
@@ -287,8 +313,8 @@ def test_anything_unstable_gates_on_unstable(contract: dict[str, Any]) -> None:
 
 def test_every_event_field_type_resolves(contract: dict[str, Any]) -> None:
     for name, event in contract["events"].items():
-        for field, declared in event["fields"].items():
-            for shape in _named_shapes(declared):
+        for field, spec in event["fields"].items():
+            for shape in _named_shapes(spec["type"]):
                 assert shape in contract["shapes"], (
                     f"{name}.{field} is typed as the unknown {shape}"
                 )
@@ -341,7 +367,39 @@ def test_the_event_notification_carries_the_envelope(contract: dict[str, Any]) -
 def test_a_gap_is_an_event(contract: dict[str, Any]) -> None:
     """The consumer's decision point has to be inside its own loop, not beside it."""
     assert "gap" in contract["events"]
-    assert contract["events"]["gap"]["fields"]["missed"] == "integer"
+    assert contract["events"]["gap"]["fields"]["missed"]["type"] == "integer"
+
+
+def test_a_gap_is_the_one_event_nobody_asks_for(contract: dict[str, Any]) -> None:
+    """A client that had to subscribe to `gap` could silently miss losing events.
+
+    So every event says whether `events.subscribe` takes its name, and `gap` is the
+    one that says no: it arrives on a subscription because that subscription
+    overflowed, not because anyone asked.
+    """
+    for name, event in contract["events"].items():
+        assert isinstance(event["subscribable"], bool), name
+    unasked = {
+        name for name, event in contract["events"].items() if not event["subscribable"]
+    }
+    assert unasked == {"gap"}
+
+
+def test_a_bounded_number_says_both_of_its_bounds(contract: dict[str, Any]) -> None:
+    """Half a range is a number a client still cannot check before it sends it."""
+    for name, method in contract["methods"].items():
+        for parameter, spec in method["params"].items():
+            declared = {"minimum", "maximum"}.intersection(spec)
+            assert declared in (set(), {"minimum", "maximum"}), (
+                f"{name}.{parameter} declares {sorted(declared)} and not the other"
+            )
+
+
+def test_the_event_queue_is_bounded(contract: dict[str, Any]) -> None:
+    """It is the one size a peer chooses, and it is spent in Obsidian's renderer."""
+    queue = contract["methods"]["events.subscribe"]["params"]["queue"]
+    assert queue["minimum"] >= 1
+    assert queue["maximum"] >= queue["default"] >= queue["minimum"]
 
 
 def test_mutating_methods_are_marked(contract: dict[str, Any]) -> None:

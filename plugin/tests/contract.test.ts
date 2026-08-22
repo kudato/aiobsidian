@@ -13,12 +13,15 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import type { App } from "obsidian";
+
 import { buildRegistry } from "../src/api/index.ts";
 import { CODES } from "../src/protocol/codes.ts";
 import { MAX_MESSAGE_BYTES } from "../src/protocol/framing.ts";
 import { PROTOCOL_MAJOR, PROTOCOL_MINOR, SUPPORTED_MAJORS } from "../src/protocol/version.ts";
 import { DEFAULT_LIMITS } from "../src/server/connection.ts";
 import { MAX_CONNECTIONS } from "../src/server/socket.ts";
+import { DEFAULT_SETTINGS } from "../src/settings.ts";
 
 interface Contract {
   readonly protocol: { readonly major: number; readonly minor: number };
@@ -27,23 +30,102 @@ interface Contract {
   readonly notifications: Record<string, { readonly status: string }>;
 }
 
+/** A source file split into the part that runs and the strings it holds. */
+interface Source {
+  readonly file: string;
+  /** The file with every comment blanked out, so a grep cannot match one. */
+  readonly code: string;
+  /** The contents of every string and template literal in it. */
+  readonly literals: readonly string[];
+}
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, "..", "..");
 const contract = JSON.parse(
   await fs.readFile(path.join(root, "protocol", "methods.json"), "utf8"),
 ) as Contract;
-const mainSource = await fs.readFile(path.join(root, "plugin", "src", "main.ts"), "utf8");
-const connectionSource = await fs.readFile(
-  path.join(root, "plugin", "src", "server", "connection.ts"),
-  "utf8",
-);
+const sources = await readSources(path.join(root, "plugin", "src"));
+
+/**
+ * Read one TypeScript file the way a grep over it ought to see it.
+ *
+ * A test that greps raw source is a test a comment can satisfy — and one a comment can
+ * also break, by mentioning a name the code never sends. So the file is walked once,
+ * comments are replaced by spaces (offsets stay put, and nothing accidentally joins),
+ * and every string literal is collected separately.
+ */
+function scan(text: string): { code: string; literals: string[] } {
+  const code: string[] = [];
+  const literals: string[] = [];
+  let index = 0;
+  while (index < text.length) {
+    const two = text.slice(index, index + 2);
+    if (two === "//") {
+      const end = text.indexOf("\n", index);
+      const stop = end === -1 ? text.length : end;
+      code.push(" ".repeat(stop - index));
+      index = stop;
+      continue;
+    }
+    if (two === "/*") {
+      const end = text.indexOf("*/", index + 2);
+      const stop = end === -1 ? text.length : end + 2;
+      code.push(text.slice(index, stop).replace(/[^\n]/g, " "));
+      index = stop;
+      continue;
+    }
+    const quote = text[index];
+    if (quote === '"' || quote === "'" || quote === "`") {
+      const start = index;
+      let literal = "";
+      index += 1;
+      while (index < text.length && text[index] !== quote) {
+        if (text[index] === "\\") {
+          literal += text[index + 1] ?? "";
+          index += 2;
+          continue;
+        }
+        literal += text[index];
+        index += 1;
+      }
+      index += 1;
+      literals.push(literal);
+      code.push(text.slice(start, index));
+      continue;
+    }
+    code.push(text[index] as string);
+    index += 1;
+  }
+  return { code: code.join(""), literals };
+}
+
+/** Every `.ts` file under a directory, scanned. */
+async function readSources(directory: string): Promise<Source[]> {
+  const entries = await fs.readdir(directory, { withFileTypes: true });
+  const found: Source[] = [];
+  for (const entry of entries) {
+    const full = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      found.push(...(await readSources(full)));
+    } else if (entry.name.endsWith(".ts")) {
+      const { code, literals } = scan(await fs.readFile(full, "utf8"));
+      found.push({ file: path.relative(root, full), code, literals });
+    }
+  }
+  return found;
+}
+
+function source(relative: string): Source {
+  const found = sources.find((candidate) => candidate.file === relative);
+  assert.ok(found, `${relative} is not there any more; this test is about it`);
+  return found;
+}
 
 /**
  * Everything the plugin should have in its registry.
  *
- * `session.*` and `rpc.*` are answered by the connection itself, before there is an
- * authenticated session to dispatch on, so they are in the contract but never in the
- * registry.
+ * The `session` domain is not in it: the connection answers `session.hello` itself,
+ * before there is an authenticated session to dispatch on.
  */
 function expectedMethods(): string[] {
   return Object.entries(contract.methods)
@@ -73,30 +155,48 @@ describe("the plugin against protocol/methods.json", () => {
     // The registry the server is actually given, not one assembled here to match: a
     // method registered and undocumented has to fail, and it cannot if the test builds
     // its own.
-    assert.deepEqual(buildRegistry().names(), expectedMethods());
+    const registry = buildRegistry({ app: {} as App, settings: () => DEFAULT_SETTINGS });
+    assert.deepEqual(registry.names(), expectedMethods());
   });
 
-  it("serves the registry it is tested on", () => {
-    // The check above is worth only as much as this one: `main.ts` reaching for
-    // `new MethodRegistry()` again would leave the test comparing something nothing
-    // serves.
-    const source = mainSource;
-    assert.match(source, /buildRegistry\(\)/);
-    assert.doesNotMatch(source, /new MethodRegistry\(/);
+  it("hands out a registry nothing can add to afterwards", () => {
+    // The check above compares a registry built here against the contract, and the one
+    // the plugin serves is built the same way — which makes the two the same set only
+    // while neither can be added to after it is built.
+    const registry = buildRegistry({ app: {} as App, settings: () => DEFAULT_SETTINGS });
+    assert.throws(
+      () => {
+        registry.add("files.sneaky", () => null);
+      },
+      /sealed/,
+      "a method could be served without the contract ever hearing of it",
+    );
+  });
+
+  it("builds its registry in exactly one place", () => {
+    // And that place is the one the test above calls. Anywhere else and the comparison
+    // is against a registry nothing serves.
+    const builders = sources
+      .filter((candidate) => candidate.code.includes("new MethodRegistry("))
+      .map((candidate) => candidate.file);
+    assert.deepEqual(builders, [path.join("plugin", "src", "api", "index.ts")]);
+    assert.match(source(path.join("plugin", "src", "main.ts")).code, /buildRegistry\(/);
   });
 
   it("names every notification the contract calls live", () => {
-    // Nothing dispatches these through a registry, so the names live in the connection
-    // as string literals. Reading them out of its source is what makes a rename on
-    // either side fail here rather than at a client.
+    // Nothing dispatches these through a registry, so the names live in the source as
+    // string literals. Reading them out of it is what makes a rename on one side fail
+    // here rather than at a client. Only literals count: a comment naming one proves
+    // nothing, and blanking comments out is what keeps it from proving anything.
     const live = Object.entries(contract.notifications)
       .filter(([, notification]) => notification.status === "live")
       .map(([name]) => name)
       .sort();
-    const spoken = [...connectionSource.matchAll(/"((?:session|rpc)\.[a-z_]+)"/g)]
-      .map((match) => match[1] as string)
-      .filter((name) => name !== "session.hello");
-    assert.deepEqual([...new Set(spoken)].sort(), live);
+    const known = new Set(Object.keys(contract.notifications));
+    const spoken = new Set(
+      sources.flatMap((candidate) => candidate.literals).filter((text) => known.has(text)),
+    );
+    assert.deepEqual([...spoken].sort(), live);
   });
 
   it("caps a frame at the 16 MiB the specification names", () => {
@@ -109,5 +209,6 @@ describe("the plugin against protocol/methods.json", () => {
     assert.equal(DEFAULT_LIMITS.maxInFlight, 32);
     assert.equal(DEFAULT_LIMITS.handshakeTimeoutMs, 5_000);
     assert.equal(DEFAULT_LIMITS.idleTimeoutMs, 30 * 60_000);
+    assert.equal(DEFAULT_LIMITS.maxQueuedBytes, 2 * MAX_MESSAGE_BYTES);
   });
 });

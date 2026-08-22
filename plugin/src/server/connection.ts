@@ -328,7 +328,7 @@ export class Connection {
         if (controller.signal.aborted) {
           this.#sendError(id, CODES.cancelled, "the request was withdrawn");
         } else {
-          this.#sendResult(id, result);
+          this.#sendResult(id, method, result);
         }
       } catch (error) {
         // A method that answers an abort by raising is answering the withdrawal, not
@@ -397,7 +397,7 @@ export class Connection {
     }
 
     const description = this.#describe();
-    this.#sendResult(id, {
+    this.#sendResult(id, "session.hello", {
       protocol: { major, minor: PROTOCOL_MINOR },
       server_proof: serverProof(this.#token, this.#nonce).toString("hex"),
       ...description,
@@ -415,7 +415,12 @@ export class Connection {
     this.#sendError(id, CODES.internalError, "the vault failed to answer");
   }
 
-  #sendResult(id: RequestId, result: unknown): void {
+  /**
+   * Args:
+   *     method: What was asked. Only the refusal uses it — a caller told its own answer
+   *         is too large needs to know which of the calls it has in flight that was.
+   */
+  #sendResult(id: RequestId, method: string, result: unknown): void {
     const payload = { jsonrpc: "2.0", id, result: result === undefined ? null : result };
     let encoded: string;
     try {
@@ -428,7 +433,8 @@ export class Connection {
       this.#sendError(
         id,
         CODES.messageTooLarge,
-        `the result is larger than the ${this.#limits.maxMessageBytes} byte cap; read it in pages`,
+        `the result of ${method} is larger than the ${this.#limits.maxMessageBytes} byte cap; ` +
+          "read it in pages",
       );
       return;
     }

@@ -32,13 +32,35 @@ export type Method = (
  */
 export class MethodRegistry {
   readonly #methods = new Map<string, Method>();
+  #sealed = false;
+
+  /**
+   * Refuse every later registration.
+   *
+   * What the contract test compares is a registry built by `buildRegistry()`; what the
+   * plugin serves is one built the same way. The two are the same set only while
+   * nobody adds to the registry afterwards — and a registration the test cannot see is
+   * exactly a method served and undocumented. Sealing is what turns that from a thing
+   * reviewers have to notice into a thing that throws.
+   */
+  seal(): void {
+    this.#sealed = true;
+  }
 
   /**
    * Raises:
    *     Error: The name is already taken. Two domains claiming one name is a bug that
    *         must not resolve itself by silently picking a winner.
+   *     Error: The registry is sealed. Registering outside `buildRegistry()` would put
+   *         a method on the wire that no test compares against the contract.
    */
   add(name: string, method: Method): void {
+    if (this.#sealed) {
+      throw new Error(
+        `the method ${name} is registered after the registry was sealed; ` +
+          "every method belongs in buildRegistry(), which is what the contract is tested against",
+      );
+    }
     if (this.#methods.has(name)) {
       throw new Error(`the method ${name} is registered twice`);
     }

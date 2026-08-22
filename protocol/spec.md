@@ -7,8 +7,9 @@ It is written down so that a third implementation — another language, a shell 
 different editor — can be written against it without reading either side's source.
 
 The machine-readable half is [`methods.json`](methods.json): every method, its
-parameters, its result, its errors, and the protocol version. Both sides are tested
-against that file. This document is the part that cannot be expressed as data.
+parameters, its result, its errors, and the protocol version. The plugin is tested
+against that file today; the library will be as its transport lands. This document is
+the part that cannot be expressed as data.
 
 ---
 
@@ -64,8 +65,9 @@ best debugging property this design has.
 Enforced in both directions, by both sides, for different reasons.
 
 **The sender checks first**, because only the sender can fail locally with a useful
-message — naming the method and the paged alternative. A receiver cannot refuse what it
-has not yet delimited, nor name the id of a frame it never parsed.
+message — naming the method whose answer this was, and pointing at the paged
+alternative. A receiver cannot refuse what it has not yet delimited, nor name the id of
+a frame it never parsed.
 
 **The receiver's cap is normative anyway**, because "enforced by the sender" is not a
 security property: a hostile peer is not *the sender*. A receiver **never retains more
@@ -156,8 +158,10 @@ JSON-RPC 2.0, with three deviations, all of them narrowing:
   `invalidParams`. Named parameters are what let a minor add an optional one.
 - **Batches are refused** with `invalidRequest`. They complicate cancellation for no gain
   on a local socket.
-- **Ids are numbers or strings, never null.** They are monotonic per connection and never
-  reused, which is what makes a late response safe to discard.
+- **Ids are numbers or strings, never null**, and **never reused on a connection** —
+  which is what makes a late response safe to discard. A client that numbers its
+  requests counts up; a client that names them need only not repeat itself. Nothing on
+  the vault's side orders ids, so nothing on it requires them to be orderable.
 
 **Responses arrive in completion order, never request order.** The vault dispatches each
 request as its own task, so one slow method does not hold up the ones behind it, and the
@@ -186,8 +190,29 @@ a refusal is itself something to write.
 
 ## 5. Cancellation, and one mutation per method
 
+### What `mutates` means
+
+Every method in `methods.json` carries a `mutates` flag, and it decides two things: what
+cancellation does to a running call, and what a broken connection says about one. So it
+has to mean something exact.
+
+> **`mutates` is true when the method changes something another method would report
+> differently afterwards, on any connection.**
+
+Writing a note is a mutation; so is moving the cursor, because `editor.get` answers
+differently after it. Reading anything is not. Neither is state that belongs to one
+connection and dies with it — `events.subscribe`, `session.hello` — because no method
+reports it at all. Nor is the plugin's own scratch: `files.upload_begin` and
+`files.upload_chunk` write to a temporary file under an unpredictable name outside the
+vault, which nothing can address until `files.upload_commit` renames it into place, and
+that commit is the mutation.
+
+### Cancellation
+
 A client withdraws a request by sending `rpc.cancel` with its id. The answer still
-arrives — as a `cancelled` error — so nothing waits forever.
+arrives — as a `cancelled` error — so nothing waits forever. It is the client's own
+withdrawal that produces it: **the vault never sends `cancelled` for a request nobody
+withdrew**, so the error always lands inside the call that asked for it.
 
 The vault drops the request if it is still queued. If it is already running: reads and
 queries stop at their next await point; **single mutations do not** — they run to
@@ -204,8 +229,17 @@ This is what makes "halfway through writing a file" a state the protocol cannot 
 It is enforced in review of `methods.json`, and a proposed method that would need two
 mutations is a wrong method.
 
-So: **a cancelled mutation either applied in full or did not apply at all.** Cancelled is
-not the same as "did not happen" — a caller that needs to know must re-read.
+So: **a cancelled mutation either applied in full or did not apply at all, at the path
+it was asked about.** Cancelled is not the same as "did not happen" — a caller that
+needs to know must re-read.
+
+The promise is about that path and no other, because one of these methods reaches
+further than its own arguments and cannot promise more. `files.move` renames one file
+atomically, and then Obsidian rewrites the links that pointed at it, note by note, on
+its own schedule — work that is not part of the rename, not covered by the law above,
+and not something a plugin can make atomic. The move either happened or did not; the
+link rewrite is Obsidian's, and a crash in the middle of it leaves some notes updated
+and some not.
 
 ### Compare-and-set
 
@@ -227,7 +261,14 @@ to prevent.
 `events.event` notifications carrying the subscription id and a sequence number.
 
 An **unknown event name is `invalidParams`**, so a typo fails at once instead of silently
-delivering nothing.
+delivering nothing. So is `gap`: it is the one event nobody subscribes to, and it is
+`invalidParams` rather than a harmless no-op because a client that thought it had asked
+for it would be a client quietly unable to hear about losing events. Every event in
+`methods.json` says which it is, in `subscribable`.
+
+`queue` bounds the subscription, and it is the one size a peer picks: between 1 and
+65536, defaulting to 1024, anything else `invalidParams`. The queue is spent in
+Obsidian's renderer, so it is not the peer's to make unbounded.
 
 ```
 vault → {"jsonrpc":"2.0","method":"events.event",
@@ -273,6 +314,19 @@ Every code maps to **exactly one** exception class on the client, so a caller br
 a type rather than on the wording of a message. Adding a failure means adding a row to
 the table, not a special case at a call site.
 
+Several codes may share a class, but only where the caller would do the same thing about
+them: `ProtocolError` covers four ways of not speaking this protocol, and there is one
+answer to all of them. Where the answers differ, the classes do. `forbidden` means a
+person has to turn a switch on and no amount of retrying substitutes; `tooManyRequests`
+means wait for the answers already asked for; `internalError` means file a bug. Folding
+those three together would leave the two a program most needs to tell apart catchable
+only alongside plugin bugs, so each has its own class.
+
+`cancelled` maps to `asyncio.CancelledError`, which is safe only because of the rule in
+§5: it answers a withdrawal the caller itself sent, and so is raised inside the call that
+withdrew. A vault that sent it unbidden would be throwing a `BaseException` past every
+`except Exception` a caller wrote.
+
 `methods.json` lists per method only the errors *that method* can raise. Nine are
 universal and are not repeated: `parseError`, `invalidRequest`, `methodNotFound`,
 `invalidParams`, `internalError`, `unauthenticated`, `messageTooLarge`,
@@ -286,9 +340,11 @@ does.
 ## 8. Versioning
 
 The protocol version is `MAJOR.MINOR`, **independent of the plugin's version and the
-library's**. It lives in `methods.json`, and every implementation is tested against that
-file rather than against another implementation — two sides agreeing with each other and
-not with the contract is the failure this arrangement exists to prevent.
+library's**. It lives in `methods.json`, and the rule for every implementation is that it
+is tested against that file rather than against another implementation — two sides
+agreeing with each other and not with the contract is the failure this arrangement exists
+to prevent. The plugin keeps that rule today; the library keeps it as its transport
+lands.
 
 A **minor** may add methods, optional parameters, result fields, event types and error
 codes. It may not remove, rename or retype anything, and it may not promote an optional
@@ -316,9 +372,12 @@ version.
 `domain.verb`, lowercase, dotted: `files.read`, `metadata.get`, `links.backlinks`,
 `workspace.open`.
 
-**The domains are exactly the Python resources and exactly the plugin's `api/` files** —
-one name, three places, no translation table. Method names within a domain need not match
-the Python method one for one: `files.read_binary` and the upload trio exist to serve
+**A domain is one Python resource and one file under the plugin's `api/`, bearing the
+name it has here** — one name, three places, no translation table. It is a rule for
+adding a domain, kept in review; the two sides are filled in domain by domain, so the
+three lists match only where a domain has actually landed on both. Method names within a
+domain need not match the Python method one for one: `files.read_binary` and the upload
+trio exist to serve
 `files.read_binary()` and `files.write_binary()`, whose paging is the library's business
 and not the caller's.
 
