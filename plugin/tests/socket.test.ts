@@ -165,12 +165,21 @@ describe("SocketServer", { skip: process.platform === "win32" }, () => {
     assert.equal(server.listening, true);
   });
 
-  it("refuses a path holding something that is not a socket", async () => {
+  it("refuses a path holding something that is not a socket, and leaves it there", async () => {
+    // Darwin refuses to connect to a regular file with ENOTSOCK and Linux with
+    // ECONNREFUSED, so the error code cannot be what decides whether to unlink.
     const socketPath = fresh();
-    await fs.writeFile(socketPath, "");
+    await fs.writeFile(socketPath, "not yours to delete");
     const error = await refusal(build(socketPath));
     assert.equal(error.code, "listen-failed");
     assert.match(error.message, /not a socket/);
+    assert.equal(await fs.readFile(socketPath, "utf8"), "not yours to delete");
+  });
+
+  it("refuses a directory in the socket's place", async () => {
+    const socketPath = fresh();
+    await fs.mkdir(socketPath);
+    assert.match((await refusal(build(socketPath))).message, /not a socket/);
   });
 
   it("refuses when the directory is open to other accounts", async () => {

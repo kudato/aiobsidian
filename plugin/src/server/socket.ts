@@ -11,12 +11,10 @@ const PROBE_TIMEOUT_MS = 1_000;
 type Occupant =
   /** Nothing is there. */
   | "absent"
-  /** A socket whose owner is gone. */
+  /** Something is there and it is not answering. */
   | "dead"
   /** Someone is listening. */
-  | "live"
-  /** Something that is not a socket at all. */
-  | "foreign";
+  | "live";
 
 export interface SocketServerOptions {
   /** The unix socket path, or the Windows pipe name. */
@@ -180,11 +178,16 @@ function listen(server: net.Server, socketPath: string): Promise<void> {
  * machine, behind `requestSingleInstanceLock()`. A plugin has no such lock: it loads
  * per vault, per window, per enable, so an unconditional unlink is one instance
  * deleting another's live socket — after which the first serves an inode nobody can
- * reach and reports no error at all. So the path is probed first, and only a socket
- * that refuses connections is removed.
+ * reach and reports no error at all. So two things have to be true before anything is
+ * deleted: nothing answered, and what is there is a socket. Neither is enough alone —
+ * a live socket must survive, and a file that is not a socket is not ours to remove,
+ * whatever `connect()` said about it. Platforms disagree on that last point: Darwin
+ * refuses a regular file with `ENOTSOCK` and Linux with `ECONNREFUSED`, so `lstat`
+ * decides rather than the error code.
  *
  * Raises:
- *     ServeError: Something is listening there right now.
+ *     ServeError: Something is listening there, or the path holds something that is
+ *         not a socket.
  */
 async function clearDeadSocket(socketPath: string): Promise<void> {
   const occupant = await probe(socketPath);
@@ -197,12 +200,23 @@ async function clearDeadSocket(socketPath: string): Promise<void> {
       `something is already listening on ${socketPath}; refusing to serve this vault`,
     );
   }
-  if (occupant === "foreign") {
+
+  let stats;
+  try {
+    stats = await fs.lstat(socketPath);
+  } catch (cause) {
+    if (errorCode(cause) === "ENOENT") {
+      return;
+    }
+    throw new ServeError("listen-failed", `cannot inspect ${socketPath}`, { cause });
+  }
+  if (!stats.isSocket()) {
     throw new ServeError(
       "listen-failed",
       `${socketPath} exists and is not a socket; remove it and reload the plugin`,
     );
   }
+
   try {
     await fs.unlink(socketPath);
   } catch (cause) {
@@ -232,13 +246,11 @@ function probe(socketPath: string): Promise<Occupant> {
       const code = errorCode(error);
       if (code === "ENOENT") {
         finish("absent");
-      } else if (code === "ECONNREFUSED") {
+      } else if (code === "ECONNREFUSED" || code === "ENOTSOCK") {
         finish("dead");
-      } else if (code === "ENOTSOCK") {
-        finish("foreign");
       } else {
-        // Anything unrecognised counts as occupied. Unlinking a path we failed to
-        // understand is the one outcome here with no way back.
+        // Anything unrecognised counts as occupied. Treating a path we failed to
+        // understand as free is the one outcome here with no way back.
         finish("live");
       }
     });
