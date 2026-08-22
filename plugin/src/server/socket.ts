@@ -18,7 +18,7 @@ const STOP_LINGER_MS = 1_000;
  * the next one probes, and a single look would refuse to serve a vault nothing else
  * wants. Something genuinely listening is still listening on the second look.
  */
-const PROBE_RETRY_MS = 250;
+export const PROBE_RETRY_MS = 250;
 
 /** What a connect probe found at a socket path. */
 type Occupant =
@@ -241,10 +241,9 @@ async function clearDeadSocket(socketPath: string): Promise<void> {
   if (occupant === "live") {
     // Possibly the handle from this plugin's own previous load, which `onunload` had
     // no way to await. Ask once more before refusing to serve the vault.
-    await new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, PROBE_RETRY_MS);
-      timer.unref?.();
-    });
+    // Ref'd on purpose: nothing else holds the loop open across the wait, and a start
+    // the loop drains out from under settles neither way.
+    await new Promise<void>((resolve) => setTimeout(resolve, PROBE_RETRY_MS));
     occupant = await probe(socketPath);
   }
   if (occupant === "absent") {

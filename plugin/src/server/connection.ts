@@ -459,7 +459,9 @@ export class Connection {
     if (this.#overCap(encoded)) {
       encoded = this.#frame(id, code, message);
     }
-    if (this.#overCap(encoded)) {
+    // No length of message saves a frame whose id alone is over, so do not search for
+    // one: every probe re-encodes that id, and this runs before the handshake.
+    if (this.#overCap(encoded) && !this.#overCap(this.#frame(id, code, ""))) {
       encoded = this.#frame(id, code, this.#shorten(id, code, message));
     }
     if (this.#overCap(encoded)) {
@@ -486,8 +488,9 @@ export class Connection {
    *     message: The text to shorten.
    *
    * Returns:
-   *     The longest prefix of the message that fits, with an ellipsis; the empty
-   *     string if not even that does, which is the floor the envelope itself sets.
+   *     The message itself when all of it fits; otherwise its longest prefix that
+   *     does, with an ellipsis, or the empty string if not even that does, which is
+   *     the floor the envelope itself sets.
    */
   #shorten(id: RequestId | null, code: Code, message: string): string {
     let kept = 0;
@@ -499,6 +502,10 @@ export class Connection {
       } else {
         kept = mid;
       }
+    }
+    if (kept === message.length) {
+      // Nothing was cut, so nothing may say it was: the mark is what tells the two apart.
+      return message;
     }
     return kept === 0 ? "" : `${clip(message, kept)}…`;
   }

@@ -7,7 +7,11 @@ import path from "node:path";
 import { after, afterEach, describe, it } from "node:test";
 
 import { ServeError } from "../src/lib/errors.ts";
-import { SocketServer, type SocketServerOptions } from "../src/server/socket.ts";
+import {
+  PROBE_RETRY_MS,
+  SocketServer,
+  type SocketServerOptions,
+} from "../src/server/socket.ts";
 
 const scratch = await fs.mkdtemp(path.join(os.tmpdir(), "aio-sock-"));
 await fs.chmod(scratch, 0o700);
@@ -219,7 +223,11 @@ describe("SocketServer", { skip: process.platform === "win32" }, () => {
     const stopping = server.stop();
     client.resume();
     await stopping;
-    await said;
+    // Raced against a deadline: `node --test` sets no timeout of its own, so a
+    // regression here would hang the job rather than fail it, and a hang says nothing
+    // about how many bytes went missing. Four mebibytes cross a unix socket in about
+    // four milliseconds, so this waits three orders of magnitude longer than it needs.
+    await Promise.race([said, new Promise((resolve) => setTimeout(resolve, 5_000))]);
     assert.equal(heard, size);
     client.destroy();
   });
@@ -241,11 +249,16 @@ describe("SocketServer", { skip: process.platform === "win32" }, () => {
     const gone = new Promise((resolve) => child.once("exit", resolve));
 
     const server = build(socketPath);
+    const began = performance.now();
     const starting = server.start();
     // Inside the retry window, so the first probe finds it live and the second does not.
     setTimeout(() => child.kill("SIGKILL"), 50);
     await starting;
     assert.equal(server.listening, true);
+    // Starting this slowly is only possible by way of the second look. Without it the
+    // test would still pass on a first probe that happened to find the path clear, and
+    // say nothing about the branch it is named for.
+    assert.ok(performance.now() - began >= PROBE_RETRY_MS, "the second probe never happened");
     await gone;
   });
 });

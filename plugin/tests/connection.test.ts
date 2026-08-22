@@ -586,6 +586,10 @@ describe("Connection", { skip: process.platform === "win32" }, () => {
     await target.next();
     target.send({ jsonrpc: "2.0", id: "x".repeat(cap - 50), method: "", params: {} });
     const answer = await target.next();
+    // The window between a request that still fits and a reply that no longer does is
+    // thirteen bytes wide. A request a little longer is refused as oversize instead,
+    // and that refusal carries no id either — so the code is what says which path ran.
+    assert.equal(errorOf(answer).code, CODES.invalidRequest);
     assert.equal(answer["id"], null);
     assert.ok(Buffer.byteLength(JSON.stringify(answer), "utf8") <= cap);
   });
@@ -599,11 +603,18 @@ describe("Connection", { skip: process.platform === "win32" }, () => {
     await greet(target);
     // As long a name as the inbound cap will carry, which is what makes the refusal
     // quoting it back the thing that does not fit.
-    target.send({ jsonrpc: "2.0", id: 2, method: "n".repeat(cap - 60), params: {} });
+    const name = "n".repeat(cap - 60);
+    target.send({ jsonrpc: "2.0", id: 2, method: name, params: {} });
     const answer = await target.next();
     assert.equal(answer["id"], 2);
     assert.equal(errorOf(answer).code, CODES.methodNotFound);
     assert.ok(Buffer.byteLength(JSON.stringify(answer), "utf8") <= cap);
-    assert.match(errorOf(answer).message, /…$/);
+    // A prefix of what it would have said, and shorter than it: a mark on its own would
+    // be satisfied by a message that was never cut at all.
+    const said = errorOf(answer).message;
+    const whole = `no method named ${name}`;
+    assert.ok(said.length < whole.length, "nothing was cut");
+    assert.equal(said.at(-1), "…");
+    assert.ok(whole.startsWith(said.slice(0, -1)), "what survived is not what it said");
   });
 });
