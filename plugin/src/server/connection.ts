@@ -488,8 +488,8 @@ export class Connection {
    *     message: The text to shorten.
    *
    * Returns:
-   *     The message itself when all of it fits; otherwise its longest prefix that
-   *     does, with an ellipsis, or the empty string if not even that does, which is
+   *     The message itself when all of it survives; otherwise the longest prefix that
+   *     fits, with an ellipsis, or the empty string if not even that does, which is
    *     the floor the envelope itself sets.
    */
   #shorten(id: RequestId | null, code: Code, message: string): string {
@@ -503,11 +503,15 @@ export class Connection {
         kept = mid;
       }
     }
-    if (kept === message.length) {
-      // Nothing was cut, so nothing may say it was: the mark is what tells the two apart.
+    const cut = clip(message, kept);
+    if (kept === message.length && cut === message) {
+      // Nothing was cut, so nothing may say it was: the mark is what tells the two
+      // apart. Only when `clip` kept the whole message, though — an orphaned surrogate
+      // it dropped is six bytes once escaped, against three for the mark, so the
+      // message returned unmarked would be larger than the one measured.
       return message;
     }
-    return kept === 0 ? "" : `${clip(message, kept)}…`;
+    return cut === "" ? "" : `${cut}…`;
   }
 
   #overCap(encoded: string): boolean {

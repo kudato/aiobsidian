@@ -617,4 +617,20 @@ describe("Connection", { skip: process.platform === "win32" }, () => {
     assert.equal(said.at(-1), "…");
     assert.ok(whole.startsWith(said.slice(0, -1)), "what survived is not what it said");
   });
+
+  it("stays inside the cap when the words it quotes end mid-character", async () => {
+    // A half of a surrogate pair costs three bytes as UTF-8 and six once escaped, so a
+    // message measured with the orphan dropped is not the message that goes out with it
+    // kept. The caller picks the method name, so it picks where the cut lands.
+    const cap = 400;
+    const target = await peer({ limits: { maxMessageBytes: cap } });
+    await greet(target);
+    // Wedged against the cap on purpose: the whole message fits once the orphan is
+    // dropped and does not fit once it is escaped, which is the only gap this can
+    // fall through. The request is 372 bytes, so the reader accepts it whole.
+    target.send({ jsonrpc: "2.0", id: "i", method: `${"n".repeat(316)}\ud800`, params: {} });
+    const answer = await target.next();
+    assert.equal(errorOf(answer).code, CODES.methodNotFound);
+    assert.ok(Buffer.byteLength(JSON.stringify(answer), "utf8") <= cap);
+  });
 });
