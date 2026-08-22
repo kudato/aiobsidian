@@ -67,8 +67,10 @@ await client.vault.write(
 !!! note
     `write()` creates or replaces: an existing file is overwritten without
     warning. `ObsidianCLI` spells the same operation the same way, and its
-    `write()` takes `overwrite=False` for the one thing REST cannot do —
-    refuse to touch a file that is already there.
+    `write()` takes `overwrite=False` to leave a file that is already there
+    as it is — the CLI then writes beside it under the next free name, such
+    as `new-note 1.md`, and the path `write()` returns names the file it
+    really made.
 
 ## Appending content
 

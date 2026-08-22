@@ -181,7 +181,7 @@ CALLS = (
     Call("themes", "list", empty=[]),
     Call("vault", "open", ("notes/setup.md",)),
     Call("vault", "read", ("notes/setup.md",), empty=""),
-    Call("vault", "write", ("notes/setup.md", "Body.")),
+    Call("vault", "write", ("notes/setup.md", "Body."), empty=CLIParseError),
     Call("vault", "create_unique", empty=""),
     Call("vault", "append", ("notes/setup.md", "Body.")),
     Call("vault", "prepend", ("notes/setup.md", "Body.")),

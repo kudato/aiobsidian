@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ValidationError
 
-from .._exceptions import CLIParseError
+from .._exceptions import CLIError, CLIParseError, PartialWriteError
 
 if TYPE_CHECKING:
     from .._cli import ObsidianCLI
@@ -55,6 +55,8 @@ class BaseCLIResource:
         parts: list[str],
         *,
         params: dict[str, str] | None = None,
+        path: str | None = None,
+        written: int = 1,
     ) -> None:
         """Write content parts one call each, without adding separators.
 
@@ -62,13 +64,28 @@ class BaseCLIResource:
             command: CLI command to run for every part (e.g. `"append"`).
             parts: Content parts to write, in call order.
             params: Extra parameters passed to every call.
+            path: Path the parts land at, for the error to name; `None`
+                for a command that finds its own file.
+            written: Parts already landed before these, counted into
+                the error along with the ones written here.
+
+        Raises:
+            PartialWriteError: If a call fails once earlier ones have
+                landed. It counts the parts in place and carries the
+                failure as its cause.
         """
-        for part in parts:
-            await self._cli._execute(
-                command,
-                params={**(params or {}), "content": part},
-                flags=["inline"],
-            )
+        total = written + len(parts)
+        for index, part in enumerate(parts):
+            try:
+                await self._cli._execute(
+                    command,
+                    params={**(params or {}), "content": part},
+                    flags=["inline"],
+                )
+            except CLIError as exc:
+                raise PartialWriteError(
+                    command, path=path, written=written + index, total=total
+                ) from exc
 
     @staticmethod
     def _is_empty_result(output: str) -> bool:

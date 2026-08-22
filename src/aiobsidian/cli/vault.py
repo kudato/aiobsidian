@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from .._exceptions import CLIParseError
 from ..models import FileInfo, FolderInfo, VaultInfo, WordCount
 from ._base import BaseCLIResource
 
@@ -47,8 +48,14 @@ class CLIVaultResource(BaseCLIResource):
         overwrite: bool = True,
         open: bool = False,
         new_tab: bool = False,
-    ) -> None:
+    ) -> str:
         """Create or replace a file in the vault.
+
+        The file does not always land at ``path``: the CLI adds `.md`
+        when the path carries no extension, files an empty path under
+        `Untitled`, and without ``overwrite`` leaves an existing file
+        alone and creates the next free name — `note 1.md` — beside it.
+        The path that comes back is the one it settled on.
 
         Content with literal ``\\n`` or ``\\t`` sequences is written in several
         calls, so the file is built up incrementally rather than atomically.
@@ -61,15 +68,22 @@ class CLIVaultResource(BaseCLIResource):
                 ``path``.
             template: Template to fill the new file with. The CLI reads
                 the template instead of ``content``, never both.
-            overwrite: If ``False``, refuse to touch a file that is
-                already there and let the CLI report it as a failure.
+            overwrite: If ``False``, leave a file that is already there
+                as it is and write beside it instead, under the next
+                free name. The CLI has no refusal to give.
             open: If ``True``, show the file in Obsidian afterwards.
             new_tab: Where to show it, for when ``open`` is asked for.
                 On its own it does nothing, since the CLI reads it only
                 once it has been told to open something.
 
+        Returns:
+            Path of the created file, relative to the vault root.
+
         Raises:
             ValueError: If both ``content`` and ``template`` are given.
+            CLIParseError: If the answer does not name the created file.
+            PartialWriteError: If a later call of a several-call write
+                fails. It names the file the earlier parts landed in.
         """
         if content and template is not None:
             raise ValueError(
@@ -89,28 +103,39 @@ class CLIVaultResource(BaseCLIResource):
             flags.append("open")
         if new_tab:
             flags.append("newtab")
-        await self._cli._execute("create", params=params, flags=flags or None)
+        output = await self._cli._execute("create", params=params, flags=flags or None)
+        created = self._parse_created_path(output)
         await self._write_parts(
-            "append", parts[1:], params={"path": self._created_path(path, name)}
+            "append", parts[1:], params={"path": created}, path=created
         )
+        return created
 
     @staticmethod
-    def _created_path(path: str, name: str | None) -> str:
-        """Work out where the CLI puts a file it was asked to create.
+    def _parse_created_path(output: str) -> str:
+        """Read where the file landed off the `create` command's answer.
 
-        The `create` command joins `path` and `name` when both are
-        given, and adds a `.md` extension when the result has none. The
-        rest of a content write is appended to that file, not to `path`.
+        The command answers `Created: <path>` or `Overwrote: <path>`,
+        and the path is worth reading because it is the command's to
+        decide: `.md` is added to a path without an extension, an empty
+        one is filed under `Untitled`, and a file already there without
+        `overwrite` sends the new one to the next free name. The rest
+        of a several-call write is appended to that file, so guessing
+        it from the arguments would append into the wrong one.
 
         Args:
-            path: Path passed to `write`.
-            name: File name passed to `write`, if any.
+            output: Raw output of the `create` command.
 
         Returns:
             Path of the created file, relative to the vault root.
+
+        Raises:
+            CLIParseError: If the answer is neither sentence.
         """
-        target = f"{path.rstrip('/')}/{name}" if name is not None else path
-        return target if target.rfind(".") > 0 else f"{target}.md"
+        answer = output.strip()
+        for prefix in ("Created: ", "Overwrote: "):
+            if answer.startswith(prefix):
+                return answer.removeprefix(prefix)
+        raise CLIParseError("create", output)
 
     async def create_unique(
         self,
@@ -147,6 +172,11 @@ class CLIVaultResource(BaseCLIResource):
 
         Returns:
             Path of the created note, relative to the vault root.
+
+        Raises:
+            PartialWriteError: If a later call of a several-call write
+                fails. It carries the path of the note, which the
+                exception would otherwise cost the caller.
         """
         parts = self._split_content(content)
         params: dict[str, str] = {"content": parts[0]}
@@ -157,7 +187,7 @@ class CLIVaultResource(BaseCLIResource):
         flags = ["open"] if open else None
         output = await self._cli._execute("unique", params=params, flags=flags)
         path = output.strip()
-        await self._write_parts("append", parts[1:], params={"path": path})
+        await self._write_parts("append", parts[1:], params={"path": path}, path=path)
         return path
 
     async def append(self, path: str, content: str, *, inline: bool = False) -> None:
@@ -170,13 +200,18 @@ class CLIVaultResource(BaseCLIResource):
             path: Path to the file relative to the vault root.
             content: Content to append.
             inline: If ``True``, append inline without a newline separator.
+
+        Raises:
+            PartialWriteError: If a later call of a several-call append
+                fails. The file keeps the parts that landed, and the
+                error counts them.
         """
         parts = self._split_content(content)
         flags = ["inline"] if inline else None
         await self._cli._execute(
             "append", params={"path": path, "content": parts[0]}, flags=flags
         )
-        await self._write_parts("append", parts[1:], params={"path": path})
+        await self._write_parts("append", parts[1:], params={"path": path}, path=path)
 
     async def prepend(self, path: str, content: str, *, inline: bool = False) -> None:
         """Prepend content to a vault file.
@@ -189,6 +224,12 @@ class CLIVaultResource(BaseCLIResource):
             content: Content to prepend.
             inline: If ``True``, prepend without a newline separator, so
                 the content runs straight into what was there.
+
+        Raises:
+            PartialWriteError: If a later call of a several-call
+                prepend fails. Parts go in back to front, so what the
+                file keeps at its head is the tail of the content, and
+                the error counts the parts that landed.
         """
         parts = self._split_content(content)
         flags = ["inline"] if inline else None
@@ -198,7 +239,9 @@ class CLIVaultResource(BaseCLIResource):
         await self._cli._execute(
             "prepend", params={"path": path, "content": parts[-1]}, flags=flags
         )
-        await self._write_parts("prepend", parts[-2::-1], params={"path": path})
+        await self._write_parts(
+            "prepend", parts[-2::-1], params={"path": path}, path=path
+        )
 
     async def move(self, path: str, to: str) -> None:
         """Move a vault file to a new location.
