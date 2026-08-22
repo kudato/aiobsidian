@@ -19,6 +19,7 @@ return.
 - `PropertyType` and `PropertyValue` for typed frontmatter, and `JsonValue` for what `patch()` and `properties.set()` accept
 - `APIStatusError`, `APIRequestError`, `APIConnectionError`, `APITimeoutError` and `APIProtocolError`
 - `APINotFoundError`, `CLINotFoundError` and `CLIParseError`, so a missing note and unparseable output can be told apart from any other failure of that transport
+- `APIParseError`, the REST counterpart of `CLIParseError`: a success answer whose body is not what the endpoint documents — `commands.list()` on a body without its envelope, a search on a body that is not a list, a `200 OK` carrying an error object — raises it instead of letting `KeyError` or pydantic's `ValidationError` escape the `ObsidianError` hierarchy
 - `PartialWriteError`, for a write the CLI forces into several commands failing part-way: it names the file the earlier parts landed in — for `vault.create_unique()` the note whose path the exception would otherwise have cost the caller — counts them, and carries the failure as its cause. A first command failing raises itself, as before, since nothing has landed yet
 - `tasks.reopen()` to undo `tasks.complete()`, `tasks.list(todo=)`, `daily.open()`, `publish.add(changed=)` and `CommandError.stdout`
 - `vault.create_unique()`, the Unique note creator's command: it names a note after the moment it was created, puts it where that plugin says, and reports the path it landed on

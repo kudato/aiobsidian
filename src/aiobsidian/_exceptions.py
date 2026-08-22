@@ -120,6 +120,32 @@ class APIProtocolError(APIRequestError):
     _problem = "did not complete"
 
 
+class APIParseError(APIError):
+    """The body of a REST API response could not be read as promised.
+
+    The server answered success and the exchange held, so this is
+    neither an `APIStatusError` nor an `APIRequestError`: what arrived
+    is not what the endpoint documents — not JSON, or JSON of another
+    shape. The counterpart of `CLIParseError`, and it carries the raw
+    body the same way.
+
+    Attributes:
+        method: HTTP method of the request.
+        url: URL the request was sent to.
+        body: Raw text of the response body.
+    """
+
+    def __init__(self, method: str, url: str, body: str) -> None:
+        self.method = method
+        self.url = url
+        self.body = body
+        excerpt = body.strip()[:200]
+        super().__init__(f"Could not read the answer of {method} {url}: {excerpt!r}")
+
+    def __reduce__(self) -> tuple[type[APIParseError], tuple[str, str, str]]:
+        return type(self), (self.method, self.url, self.body)
+
+
 class CLIError(ObsidianError):
     """Base exception for Obsidian CLI errors."""
 

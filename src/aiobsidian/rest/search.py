@@ -30,13 +30,16 @@ class SearchResource(BaseResource):
         Returns:
             A list of `SearchResult` objects with matching files
             and context snippets.
+
+        Raises:
+            APIParseError: If the body is not a list of results.
         """
         response = await self._client.request(
             "POST",
             f"{self._BASE_URL}/simple/",
             params={"query": query, "contextLength": context_length},
         )
-        return [SearchResult.model_validate(r) for r in response.json()]
+        return self._parse_rows_as(response, SearchResult)
 
     async def jsonlogic(self, query: dict[str, Any]) -> list[SearchResult]:
         """Search using a JsonLogic query object.
@@ -52,6 +55,9 @@ class SearchResource(BaseResource):
             A list of `SearchResult` objects. `result` holds any JSON
             type: `True` for a predicate, the value itself for a field
             lookup.
+
+        Raises:
+            APIParseError: If the body is not a list of results.
         """
         response = await self._client.request(
             "POST",
@@ -59,4 +65,4 @@ class SearchResource(BaseResource):
             json=query,
             headers={"Content-Type": ContentType.JSONLOGIC},
         )
-        return [SearchResult.model_validate(r) for r in response.json()]
+        return self._parse_rows_as(response, SearchResult)

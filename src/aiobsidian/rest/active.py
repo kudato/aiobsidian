@@ -58,6 +58,10 @@ class ActiveFileResource(ContentResource):
         Returns:
             File content as `str`, `NoteJson`, or `DocumentMap`
             depending on the requested content type.
+
+        Raises:
+            APIParseError: If a JSON content type was asked for and the
+                body does not fit it.
         """
         return await self._get_content(self._BASE_URL, content_type)
 

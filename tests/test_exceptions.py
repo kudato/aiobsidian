@@ -8,6 +8,7 @@ from aiobsidian._exceptions import (
     APIConnectionError,
     APIError,
     APINotFoundError,
+    APIParseError,
     APIProtocolError,
     APIRequestError,
     APIStatusError,
@@ -31,6 +32,7 @@ CASES = [
     APITimeoutError("GET", "https://127.0.0.1:27124/", "timed out"),
     APIProtocolError("GET", "https://127.0.0.1:27124/", "illegal status line"),
     APIRequestError("GET", "https://127.0.0.1:27124/", "something went wrong"),
+    APIParseError("GET", "https://127.0.0.1:27124/commands/", '{"items": []}'),
     AuthenticationError(401, "Unauthorized"),
     APINotFoundError(404, "Not found", 40401),
     BinaryNotFoundError("binary not found"),
@@ -78,7 +80,7 @@ class TestHierarchy:
 
     def test_the_two_groups_cover_every_case(self):
         assert len(REST_CASES) + len(CLI_CASES) == len(CASES)
-        assert len(REST_CASES) == 8
+        assert len(REST_CASES) == 9
         assert len(CLI_CASES) == 7
 
     @pytest.mark.parametrize("error", REST_CASES, ids=lambda e: type(e).__name__)

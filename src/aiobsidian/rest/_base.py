@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING, Any, Literal, overload
 from urllib.parse import quote
 
+from pydantic import BaseModel, ValidationError
+
 from .._constants import PATCH_VERSION
+from .._exceptions import APIParseError
 from .._types import ContentType, JsonValue, PatchOperation, TargetType
 from ..models.vault import DocumentMap, NoteJson
 
 if TYPE_CHECKING:
+    import httpx
+
     from .._client import ObsidianClient
 
 
@@ -36,6 +41,89 @@ class BaseResource:
             The encoded path, without leading or trailing slashes.
         """
         return quote(path.strip("/"), safe="/")
+
+    @staticmethod
+    def _parse_error(response: httpx.Response) -> APIParseError:
+        """Describe a response body that is not what it should be.
+
+        Built rather than raised, so a caller can raise it where the
+        shape went wrong and chain it from the exception that said so.
+
+        Args:
+            response: The response whose body could not be read.
+
+        Returns:
+            The error to raise, naming the request and carrying the
+            body.
+        """
+        return APIParseError(
+            response.request.method, str(response.request.url), response.text
+        )
+
+    @classmethod
+    def _parse_json(cls, response: httpx.Response) -> Any:
+        """Parse a response body that is documented to be JSON.
+
+        Args:
+            response: The response to read.
+
+        Returns:
+            The decoded JSON value.
+
+        Raises:
+            APIParseError: If the body is not valid JSON.
+        """
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise cls._parse_error(response) from exc
+
+    @classmethod
+    def _parse_as[ModelT: BaseModel](
+        cls, response: httpx.Response, model: type[ModelT]
+    ) -> ModelT:
+        """Parse a response body that describes one thing.
+
+        Args:
+            response: The response to read.
+            model: Model to validate the body against.
+
+        Returns:
+            The model built from the body.
+
+        Raises:
+            APIParseError: If the body is not valid JSON, or is valid
+                JSON that does not fit the model.
+        """
+        try:
+            return model.model_validate(cls._parse_json(response))
+        except ValidationError as exc:
+            raise cls._parse_error(response) from exc
+
+    @classmethod
+    def _parse_rows_as[ModelT: BaseModel](
+        cls, response: httpx.Response, model: type[ModelT]
+    ) -> list[ModelT]:
+        """Parse a response body that lists things.
+
+        Args:
+            response: The response to read.
+            model: Model to validate every entry against.
+
+        Returns:
+            One model per entry, in the order sent.
+
+        Raises:
+            APIParseError: If the body is not valid JSON, is not a
+                list, or an entry does not fit the model.
+        """
+        rows = cls._parse_json(response)
+        if not isinstance(rows, list):
+            raise cls._parse_error(response)
+        try:
+            return [model.model_validate(row) for row in rows]
+        except ValidationError as exc:
+            raise cls._parse_error(response) from exc
 
 
 class ContentResource(BaseResource):
@@ -80,9 +168,9 @@ class ContentResource(BaseResource):
 
         response = await self._client.request("GET", url, headers=headers)
         if content_type == ContentType.NOTE_JSON:
-            return NoteJson.model_validate(response.json())
+            return self._parse_as(response, NoteJson)
         if content_type == ContentType.DOCUMENT_MAP:
-            return DocumentMap.model_validate(response.json())
+            return self._parse_as(response, DocumentMap)
         return response.text
 
     async def _append_content(self, url: str, content: str) -> None:
