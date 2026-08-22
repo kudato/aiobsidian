@@ -47,15 +47,51 @@ jobs:
           name: coverage-${{ matrix.python }}
           path: coverage.xml
 
+  plugin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugin
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      # No lock file yet, so this resolves on every run. It is four
+      # build-time dependencies and nothing ships to a user from here,
+      # but a lock file and `npm ci` belong in this step once one can
+      # be generated.
+      - run: npm install --no-audit --no-fund
+
+      # Obsidian reads the manifest at the repository root, and the
+      # plugin is built from the one beside its source. They are the
+      # same file or the catalog ships a version nobody built.
+      - name: The two manifests agree
+        run: diff ../manifest.json manifest.json
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
   # The status check the main-protection ruleset requires is named `ci`,
   # and a matrix job reports one context per interpreter, none of them
-  # spelled that. This is the one that is: it stands for the whole
-  # matrix, so supporting another version never means editing the
+  # spelled that. This is the one that is: it stands for everything
+  # above it, so adding an interpreter or a job never means editing the
   # ruleset.
   ci:
-    needs: tests
+    needs: [tests, plugin]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Every interpreter passed
         run: test "${{ needs.tests.result }}" = "success"
+
+      - name: The plugin passed
+        run: test "${{ needs.plugin.result }}" = "success"
