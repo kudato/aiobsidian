@@ -23,7 +23,9 @@ jobs:
 
       - run: uv python install ${{ matrix.python }}
 
-      - run: uv sync --group dev
+      # --locked: a lock file that fell behind pyproject.toml fails
+      # here, rather than being quietly re-resolved on the runner.
+      - run: uv sync --locked --group dev
 
       - name: Audit dependencies
         run: uv audit --frozen --no-dev --no-group docs --preview-features audit
